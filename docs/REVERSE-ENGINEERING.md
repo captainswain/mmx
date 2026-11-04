@@ -287,11 +287,13 @@ mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
 
 * Ghidra's full auto-analysis of the 26 MB executable exceeded the 90-minute
   headless budget (118,356 functions recovered, but the reference pass did not
-  finish, so `getReferencesTo` returned nothing for the kernel strings). A
-  second pass worked around that: 158 kernel strings were located directly in
-  `.rdata`, their xref instructions were recovered with `objdump`, and the 135
-  functions containing those instructions were decompiled (1.3 MB of C, kept at
-  `docs/ghidra_decomp.txt`). There is no PDB, so the functions
+  finish, so `getReferencesTo` returned nothing for the kernel strings). That
+  was worked around by locating 158 kernel strings directly in `.rdata`,
+  recovering their xref instructions with `objdump`, and running targeted
+  headless passes on the saved project: 127 functions touching kernel strings
+  (`/data/re/meshmixer/ghidra_decomp2.txt`), 13 callers of 6 key addresses
+  (`ghidra_key_callers.txt`), and a broad caller corpus of 15,968 functions for
+  383 target addresses (`ghidra_callers.txt`). There is no PDB, so the functions
   are still named `FUN_<address>`; the source-path and log strings are what tie
   them to `libgeometry`/`libmeshtools` modules.
 * From that decompilation, these behaviours are now **[observed]** rather than
