@@ -714,7 +714,28 @@ class StudioState extends ChangeNotifier {
       notify();
       return;
     }
-    final mesh = MeshIO.readBytes(path, f.readAsBytesSync());
+    final bytes = f.readAsBytesSync();
+    if (path.toLowerCase().endsWith('.mix')) {
+      final objects = MixIO.read(bytes);
+      if (objects.isEmpty) {
+        status = 'No mesh found in $path';
+        notify();
+        return;
+      }
+      doc.snapshot('Import $path');
+      SceneObject? first;
+      for (final o in objects) {
+        final obj = doc.add(o.mesh, name: o.name);
+        first ??= obj;
+      }
+      selectedObjectId = first!.id;
+      selection = null;
+      _frameObject(first);
+      status = 'Imported ${objects.length} object(s) from ${path.split('/').last}';
+      await render();
+      return;
+    }
+    final mesh = MeshIO.readBytes(path, bytes);
     await addObject(mesh, path.split('/').last);
   }
 

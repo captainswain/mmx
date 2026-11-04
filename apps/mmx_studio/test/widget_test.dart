@@ -98,6 +98,24 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('mix scene import loads mesh objects', (tester) async {
+    final state = StudioState();
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && state.selected == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(state.selected, isNotNull);
+      await state.importPath('/data/re/meshmixer/sample.mix');
+      expect(state.status, contains('Imported'));
+      final imported = state.doc.objects
+          .where((o) => o.mesh.faceCount == 10996)
+          .toList();
+      expect(imported, isNotEmpty);
+      expect(state.selected!.mesh.vertexCount, 5550);
+    });
+    state.dispose();
+  });
+
   testWidgets('touch pinch gesture zooms the camera', (tester) async {
     final state = StudioState();
     final before = state.camera.distance;

@@ -29,6 +29,7 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
   mmx primitive <in> <out> [--kind box|cylinder|sphere]
   mmx measure <in>
   mmx clearance <a> <b>
+  mmx convert <in> <out> [.mix supported]
   mmx render <in> <out.png> [--width 960] [--height 640] [--yaw 0.6] [--pitch 0.35] [--wire]
 ''';
 
@@ -347,6 +348,8 @@ Future<void> main(List<String> args) async {
         final gap = Modify.clearance(load(positional[0]), load(positional[1]));
         stdout.writeln('clearance: ${gap.toStringAsFixed(3)}');
       }
+    case 'convert':
+      save(positional[1], load(positional[0]));
     case 'render':
       {
         final mesh = load(positional[0]);

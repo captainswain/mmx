@@ -43,6 +43,7 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
                        Taubin smoothing, bed placement, duplicate/combine,
                        pattern arrays, primitive fitting, measure, clearance
   lib/src/scene/       document, scene objects, snapshot undo with byte budget
+  lib/src/io/          OBJ/PLY/STL/OFF/3MF plus the native .mix container
   lib/src/render/      orbit camera, software z-buffer rasterizer, PNG encoder
   bin/mmx.dart         CLI for every operator
 apps/mmx_studio/                   Flutter app (Windows/macOS/Linux today)
@@ -68,6 +69,7 @@ Mapping from the recovered Meshmixer sources to this tree:
 | `MeshMirror`, `SurfaceExtruder`, `SeparateShellsTool` | `tools/edits.dart` |
 | `FlipNormalsTool`, `DuplicateTool`, `MakePatternTool`, `FitPrimitiveTool`, `MeasuringTool`, clearance tools | `tools/modify.dart` |
 | `lib3mf` (3MF import/export) | `io/threemf.dart`, `io/zip.dart` |
+| `VFMesh`/`GSurf`/`MMGS` (`.mix` binary blocks) | `io/mix.dart` |
 | `MeshSO`/`Scene`/`StoredCommands` | `scene/document.dart` |
 | `Renderer`, `mmShaderManager` | `render/rasterizer.dart` |
 
@@ -132,7 +134,7 @@ the interface takes plain arrays and a camera rather than Flutter objects.
 
 ## 5. Correctness and verification
 
-`dart test` runs 49 tests against the models that ship inside the Meshmixer
+`dart test` runs 53 tests against the models that ship inside the Meshmixer
 installer, asserting invariants rather than snapshots:
 
 * import/export round trips for STL/OBJ/PLY preserve area within 1e-4;
@@ -151,6 +153,8 @@ installer, asserting invariants rather than snapshots:
   pattern produce the expected shell counts, fitted primitives are closed, and
   measured clearance matches the analytic gap between separated spheres;
 * group-aware remeshing preserves the face-group ids and both sides of a seam;
+* `.mix` round trips preserve vertex/face counts and volume, and files written
+  by mmx_core open in Meshmixer 3.5.0 under Wine with matching counts;
 * undo/redo restores object state.
 
 ## 6. Limitations and next steps
@@ -164,8 +168,9 @@ installer, asserting invariants rather than snapshots:
    implemented (seam pinning plus group transfer), but it is constraint-based
    rather than a full variational energy solve, so the original's density
    transition fields are approximated by the isotropic target length.
-4. **`.mix` format.** Native Meshmixer scenes are still not parsed. Import and
-   export cover OBJ/PLY/STL/OFF/3MF; `.mix` and AMF remain open.
+4. **AMF and `.mix` extras.** OBJ/PLY/STL/OFF/3MF and the `.mix` mesh/scene
+   container are supported. AMF is still not parsed, and `.mix` import ignores
+   PivotSO/DecalSO records, stamps and shaders (mesh objects are imported).
 5. **Mobile UI.** Pinch zoom and two-finger orbit are implemented, and the
    panel collapses into a drawer under 900 px. Stylus pressure is not wired to
    brush strength, and Android/iOS are scaffolded but not built on this host

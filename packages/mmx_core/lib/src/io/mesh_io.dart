@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../mesh/tri_mesh.dart';
+import '../tools/modify.dart';
+import 'mix.dart';
 import 'obj.dart';
 import 'ply.dart';
 import 'stl.dart';
@@ -32,6 +34,11 @@ class MeshIO {
         return readOff(utf8.decode(bytes, allowMalformed: true));
       case '3mf':
         return ThreeMfIO.read(bytes);
+      case 'mix':
+        final objects = MixIO.read(bytes);
+        if (objects.isEmpty) return TriMesh.empty();
+        if (objects.length == 1) return objects.first.mesh;
+        return Modify.combine(objects.map((o) => o.mesh).toList());
       default:
         // Fall back on content sniffing.
         if (bytes.length > 84 && bytes[0] == 0x70 && bytes[1] == 0x6C && bytes[2] == 0x79) {
@@ -81,6 +88,9 @@ class MeshIO {
         return Uint8List.fromList(utf8.encode(ObjIO.write(mesh)));
       case '3mf':
         return ThreeMfIO.write(mesh);
+      case 'mix':
+        final name = filename.split('/').last.split('\\').last;
+        return MixIO.write(<MixObject>[MixObject(name: name, mesh: mesh)]);
       default:
         return StlIO.writeBinary(mesh);
     }

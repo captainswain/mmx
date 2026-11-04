@@ -6,7 +6,8 @@ workflow.
 
 ## What it does
 
-- import/export OBJ, PLY, STL, OFF and 3MF
+- import/export OBJ, PLY, STL, OFF and 3MF, plus native `.mix` scenes
+  (multi-object import; export writes the selected object)
 - repair (weld, hole fill, non-manifold split, inspector)
 - remesh (isotropic, optional group-boundary preservation), reduce, make solid,
   hollow, booleans, offset

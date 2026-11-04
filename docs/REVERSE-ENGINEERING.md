@@ -227,6 +227,28 @@ Scene graph objects: `MeshSO`, `PivotSO`, `DecalSO`, `Camera`, `Scene`,
 `SemanticDB`, with a command/history system (`StoredCommands`,
 `*ActivationChangedHistoryNode`, `MaxUndoMemorySize` preference).
 
+### `.mix` container (recovered from a saved scene)
+
+**[observed]** A scene saved by the running 3.5.0 build under Wine was parsed
+directly. The file is a sequence of length-prefixed records:
+
+1. `[uint32 LE length][XML]` describing `SceneObjects`, one `MeshSO9` record per
+   object (Filename, MeshBlockID, Visibility, transforms) and `SemanticDB`.
+2. `[length][block index]`: block count, block id/size pairs, semantic block id
+   and size.
+3. `[length][MMGS block]`: `u32 5` + `MMGS\0`, `u32 12` + `GSurf 01.01\0`,
+   `u32 11` + `VFMesh 1.3\0`, six u32 counts/strides (vertices, vertices,
+   faces, faces, 56, 24), then 60-byte vertex records (`u32 56`, vertex id,
+   3f position, 3f normal, u32 vertexCount, u32 0, 4f RGBA, u32 0) and
+   28-byte face records (`u32 24`, face id, three indices, u32 0, u32
+   0xFFFFFFFF), followed by a constant 194-byte `MeshPolygons 1.0` trailer.
+4. `[length][MMSDB block]`: `u32 6` + `MMSDB\0`, `u32 17` +
+   `SemanticDB 01.20\0` and a fixed 55-byte body.
+
+A `.mix` written by `mmx_core` for `bunnyr.obj` and `sphere.obj` opens in the
+unmodified Meshmixer 3.5.0 under Wine with the correct vertex and triangle
+counts, so the writer is byte-compatible with the shipped reader.
+
 ## 6. Algorithms (inferred from module names, parameter names and log strings)
 
 | Capability | Evidence | Inference |
@@ -279,4 +301,7 @@ Scene graph objects: `MeshSO`, `PivotSO`, `DecalSO`, `Camera`, `Scene`,
   **[unknown]**; `MeshBoolean::Validate` and `FindJoinLoopPairs` are real mesh
   operations over boundary loops, which suggests the pipeline is grid CSG
   followed by a mesh-level join/validate pass, but the ordering was not proven.
-* `.mix` container internals were not parsed (no public spec shipped).
+* The `.mix` container is parsed and written for triangle meshes (see section
+  5). What remains unparsed inside it: `PivotSO`, `DecalSO`, stamps, shaders,
+  and the per-face polygon-group table in the `MeshPolygons 1.0` trailer
+  (mmx writes the constant single-group trailer Meshmixer itself emits).

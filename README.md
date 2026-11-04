@@ -17,7 +17,8 @@ the reverse-engineering report itself.
 
 Geometry kernel (Dart, AOT):
 
-* import/export OBJ, PLY, STL (binary + ASCII), OFF, 3MF (OPC zip, no deps)
+* import/export OBJ, PLY, STL (binary + ASCII), OFF, 3MF (OPC zip, no deps),
+  and `.mix` (native Meshmixer scenes, binary-compatible with 3.5.0)
 * topology: CSR adjacency, edge incidence, boundary loops, components,
   manifold checks
 * repair: weld, crack closing, hole filling (flat/smooth), non-manifold
@@ -57,7 +58,7 @@ work on touch screens. Android and iOS targets are scaffolded (`android/`,
 Requires Flutter 3.47+ and Dart 3.13+.
 
 ```bash
-# kernel tests (49 tests, uses models shipped inside the Meshmixer installer)
+# kernel tests (53 tests, uses models shipped inside the Meshmixer installer)
 cd packages/mmx_core
 dart pub get
 dart test
@@ -74,6 +75,7 @@ dart run bin/mmx.dart flip model.obj flipped.obj
 dart run bin/mmx.dart smooth model.obj smoothed.obj --iters 8
 dart run bin/mmx.dart pattern model.obj array.obj --nx 3 --nz 2
 dart run bin/mmx.dart primitive model.obj box.obj --kind box
+dart run bin/mmx.dart convert model.obj scene.mix
 dart run bin/mmx.dart render model.obj view.png --width 1200 --height 800
 
 # AOT build

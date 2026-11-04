@@ -12,6 +12,7 @@ export 'src/fab/slicer.dart';
 export 'src/fab/supports.dart';
 export 'src/geom/bbox.dart';
 export 'src/io/mesh_io.dart';
+export 'src/io/mix.dart';
 export 'src/io/obj.dart';
 export 'src/io/ply.dart';
 export 'src/io/stl.dart';
