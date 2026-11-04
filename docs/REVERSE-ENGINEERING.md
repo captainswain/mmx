@@ -264,7 +264,7 @@ mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
 
 | Capability | Evidence | Inference |
 |---|---|---|
-| Voxelization | `MeshRasterizer::RasterizeVolume_RayCast`, log `find surface voxels took %f`, `MeshToSolid::GenerateVoxelSolid: m_nTargetGridResolution is %d` | Ray-cast voxelization into a signed field with target grid resolution |
+| Voxelization | `MeshRasterizer::RasterizeVolume_RayCast`, log `find surface voxels took %f`, `MeshToSolid::GenerateVoxelSolid: m_nTargetGridResolution is %d`; decompiled grid loop indexes `x + nx*(y + ny*z)` and tests sign changes against six neighbours | Ray-cast voxelization into a signed field with target grid resolution |
 | Solid conversion | `ImplicitPolygonizer.cpp`, `Make Solid` modes Blocky/Fast/Accurate, offset, min thickness, auto-repair | Implicit surface polygonization of the voxel field |
 | Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`, union/intersection/difference actions | Grid/implicit CSG on voxelized operands |
 | Remeshing | `SurfaceRemesher.cpp`, `VariationalRemesher.cpp`, `MeshRefinement.cpp`, `RefinementConstraint.cpp`, params Target Edge Length/Regularity/Adaptive Density/Transition | Isotropic + adaptive remeshing with edge split/collapse/flip and density transition |
