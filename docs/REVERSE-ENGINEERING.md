@@ -247,7 +247,10 @@ directly. The file is a sequence of length-prefixed records:
 
 A `.mix` written by `mmx_core` for `bunnyr.obj` and `sphere.obj` opens in the
 unmodified Meshmixer 3.5.0 under Wine with the correct vertex and triangle
-counts, so the writer is byte-compatible with the shipped reader.
+counts, so the writer is byte-compatible with the shipped reader. Multi-object
+scenes are written as one `MeshSO9`/`MMGS` pair per object and round-trip through
+mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
+(its Import dialog merges appended meshes into one object).
 
 ## 6. Algorithms (inferred from module names, parameter names and log strings)
 

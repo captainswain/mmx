@@ -77,5 +77,20 @@ void main() {
       expect(read.first.mesh.signedVolume(),
           closeTo(mesh.signedVolume(), mesh.signedVolume().abs() * 0.02));
     });
+
+    test('multi-object scenes round-trip with names and geometry', () {
+      final a = loadModel('sphere.obj');
+      final b = Modify.duplicate(a, offset: <double>[30, 0, 0]);
+      final bytes = MixIO.write(<MixObject>[
+        MixObject(name: 'part_a.obj', mesh: a),
+        MixObject(name: 'part_b.obj', mesh: b),
+      ]);
+      final read = MixIO.read(bytes);
+      expect(read.length, 2);
+      expect(read[0].name, 'part_a.obj');
+      expect(read[1].name, 'part_b.obj');
+      expect(read[1].mesh.bounds().minX,
+          closeTo(a.bounds().minX + 30, 1e-2));
+    });
   });
 }
