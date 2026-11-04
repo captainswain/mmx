@@ -39,7 +39,15 @@ support code, not the kernel.
   `Facade::Waypoints::toolStarted`, `toolFinished`, `documentOpened`,
   `documentSaved` **[observed]**.
 
-The geometry code is compiled into the executable. Its source tree survives in
+The geometry code is compiled into the executable. Two Ghidra headless passes
+were run: one decompiled the 127 functions that reference the recovered kernel
+strings (`ghidra_decomp2.txt`) and one exported the caller graph
+(`ghidra_callers.txt`). The kernel uses SSE intrinsics, so most arithmetic shows
+up as vector instructions rather than scalar `sqrt`/`atan2` calls; the passes
+confirm control flow and call relationships, while the module and string
+evidence supplies the algorithm names.
+
+Its source tree survives in
 `__FILE__` assert strings: 375 distinct paths under
 `E:\workspace\meshmixer-all\label\MeshmixerWin7\Src\`, with this layout
 **[observed]**:
