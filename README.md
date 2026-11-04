@@ -39,8 +39,10 @@ Geometry kernel (Dart, AOT):
   whole mesh), Taubin surface smoothing, bed placement, duplication, joining,
   grid pattern arrays, primitive fitting (box/cylinder/sphere), measurement
   (dimensions/area/volume/shells/watertightness), inter-object clearance,
-  sculpt brushes (draw/inflate/flatten/pinch/smooth/move) with dynamic
-  refinement, selection sets, face groups, soft transform
+  boundary-loop bridging/stitching, rigid ICP alignment onto a reference,
+  procedural stamps (circle/ring/star/grid/noise),
+  sculpt brushes (draw/inflate/flatten/pinch/crease/twist/smooth/move) with
+  dynamic refinement, selection sets, face groups, soft transform
 * remesh: isotropic split/collapse/flip/relax/reproject with boundary and sharp
   constraints, plus group-aware variational mode that pins internal face-group
   seams and carries groups onto the output
@@ -58,7 +60,7 @@ work on touch screens. Android and iOS targets are scaffolded (`android/`,
 Requires Flutter 3.47+ and Dart 3.13+.
 
 ```bash
-# kernel tests (53 tests, uses models shipped inside the Meshmixer installer)
+# kernel tests (61 tests, uses models shipped inside the Meshmixer installer)
 cd packages/mmx_core
 dart pub get
 dart test

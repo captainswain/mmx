@@ -10,6 +10,8 @@ enum BrushOp {
   inflate,
   flatten,
   pinch,
+  crease,
+  twist,
   smooth,
   move,
   refine,
@@ -172,6 +174,34 @@ class Sculptor {
     final dy0 = direction?[1] ?? 0.0;
     final dz0 = direction?[2] ?? 0.0;
 
+    // Twist axis: the supplied direction, else the surface normal nearest the
+    // brush centre (Meshmixer twists around the local surface normal).
+    var axX = dx0, axY = dy0, axZ = dz0;
+    if (op == BrushOp.twist) {
+      if (axX == 0 && axY == 0 && axZ == 0) {
+        var best = -1;
+        var bestD = double.infinity;
+        for (var v = 0; v < work.vertexCount; v++) {
+          final d = _dist(work, v, cx, cy, cz);
+          if (d < bestD) {
+            bestD = d;
+            best = v;
+          }
+        }
+        if (best >= 0) {
+          axX = normals[best * 3];
+          axY = normals[best * 3 + 1];
+          axZ = normals[best * 3 + 2];
+        }
+      }
+      final l = math.sqrt(axX * axX + axY * axY + axZ * axZ);
+      if (l > 1e-12) {
+        axX /= l;
+        axY /= l;
+        axZ /= l;
+      }
+    }
+
     // Flatten plane: average of selected vertices.
     var px = 0.0, py = 0.0, pz = 0.0, pn = 0.0;
     var fnx = 0.0, fny = 0.0, fnz = 0.0;
@@ -230,6 +260,29 @@ class Sculptor {
             next[v * 3] = vx + toX * w * 0.3;
             next[v * 3 + 1] = vy + toY * w * 0.3;
             next[v * 3 + 2] = vz + toZ * w * 0.3;
+          case BrushOp.crease:
+            final nx = normals[v * 3], ny = normals[v * 3 + 1],
+                nz = normals[v * 3 + 2];
+            final toX = ccx - vx, toY = ccy - vy, toZ = ccz - vz;
+            final dn = toX * nx + toY * ny + toZ * nz;
+            next[v * 3] = vx + (toX - nx * dn) * w * 0.35 + nx * w * r * 0.12;
+            next[v * 3 + 1] =
+                vy + (toY - ny * dn) * w * 0.35 + ny * w * r * 0.12;
+            next[v * 3 + 2] =
+                vz + (toZ - nz * dn) * w * 0.35 + nz * w * r * 0.12;
+          case BrushOp.twist:
+            {
+              final qx = vx - ccx, qy = vy - ccy, qz = vz - ccz;
+              final ang = w * 0.6;
+              final c = math.cos(ang), s = math.sin(ang);
+              final dot = qx * axX + qy * axY + qz * axZ;
+              final crX = axY * qz - axZ * qy;
+              final crY = axZ * qx - axX * qz;
+              final crZ = axX * qy - axY * qx;
+              next[v * 3] = ccx + qx * c + crX * s + axX * dot * (1 - c);
+              next[v * 3 + 1] = ccy + qy * c + crY * s + axY * dot * (1 - c);
+              next[v * 3 + 2] = ccz + qz * c + crZ * s + axZ * dot * (1 - c);
+            }
           case BrushOp.move:
             next[v * 3] = vx + dx0 * w;
             next[v * 3 + 1] = vy + dy0 * w;

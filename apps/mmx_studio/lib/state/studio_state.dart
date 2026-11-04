@@ -11,6 +11,7 @@ enum StudioTool {
   navigate,
   select,
   sculpt,
+  stamp,
   planeCut,
   mirror,
   extrude,
@@ -55,6 +56,9 @@ class StudioState extends ChangeNotifier {
   double brushRadius = 8;
   double brushStrength = 0.5;
   BrushOp brushOp = BrushOp.draw;
+  StampPattern stampPattern = StampPattern.circle;
+  double stampRadius = 8;
+  double stampHeight = 2;
   double remeshDensity = 0.5;
   double reducePercent = 0.5;
   double solidResolution = 128;
@@ -165,18 +169,24 @@ class StudioState extends ChangeNotifier {
     final objects = <RenderObject>[];
     for (final o in doc.objects) {
       if (!o.visible) continue;
-      final mask = (o.id == selectedObjectId && selection != null) ? selection!.faceMask : null;
+      final mask = (o.id == selectedObjectId && selection != null)
+          ? selection!.faceMask
+          : null;
       Float32List? colors;
-      if (o.id == selectedObjectId && overlay != AnalysisOverlay.none && overlayColors != null) {
+      if (o.id == selectedObjectId &&
+          overlay != AnalysisOverlay.none &&
+          overlayColors != null) {
         colors = _expandFaceColors(o.mesh, overlayColors!);
       }
-      objects.add(RenderObject(
-        o.mesh,
-        transform: o.transform,
-        color: _materialColor(o),
-        faceMask: mask,
-        faceColors: colors,
-      ));
+      objects.add(
+        RenderObject(
+          o.mesh,
+          transform: o.transform,
+          color: _materialColor(o),
+          faceMask: mask,
+          faceColors: colors,
+        ),
+      );
     }
     final opts = RenderOptions(
       width: frameWidth,
@@ -202,7 +212,13 @@ class StudioState extends ChangeNotifier {
 
   static Future<ui.Image> _decode(Uint8List rgba, int w, int h) {
     final completer = Completer<ui.Image>();
-    ui.decodeImageFromPixels(rgba, w, h, ui.PixelFormat.rgba8888, completer.complete);
+    ui.decodeImageFromPixels(
+      rgba,
+      w,
+      h,
+      ui.PixelFormat.rgba8888,
+      completer.complete,
+    );
     return completer.future;
   }
 
@@ -240,7 +256,12 @@ class StudioState extends ChangeNotifier {
   Future<void> pickAndSelect(double sx, double sy) async {
     final obj = selected;
     if (obj == null) return;
-    final ray = camera.screenToRay(sx, sy, frameWidth.toDouble(), frameHeight.toDouble());
+    final ray = camera.screenToRay(
+      sx,
+      sy,
+      frameWidth.toDouble(),
+      frameHeight.toDouble(),
+    );
     final bvh = TriangleBVH.build(obj.worldMesh());
     final hit = bvh.raycast(ray.origin, ray.direction);
     if (hit == null) {
@@ -258,8 +279,10 @@ class StudioState extends ChangeNotifier {
   Future<void> selectAll() async {
     final obj = selected;
     if (obj == null) return;
-    selection = Selection(Uint8List(obj.mesh.faceCount)..fillRange(0, obj.mesh.faceCount, 1),
-        obj.mesh.faceCount);
+    selection = Selection(
+      Uint8List(obj.mesh.faceCount)..fillRange(0, obj.mesh.faceCount, 1),
+      obj.mesh.faceCount,
+    );
     await render();
   }
 
@@ -286,7 +309,12 @@ class StudioState extends ChangeNotifier {
   Future<void> sculptAt(double sx, double sy, {bool secondary = false}) async {
     final obj = selected;
     if (obj == null) return;
-    final ray = camera.screenToRay(sx, sy, frameWidth.toDouble(), frameHeight.toDouble());
+    final ray = camera.screenToRay(
+      sx,
+      sy,
+      frameWidth.toDouble(),
+      frameHeight.toDouble(),
+    );
     final bvh = TriangleBVH.build(obj.mesh);
     final hit = bvh.raycast(ray.origin, ray.direction);
     if (hit == null) return;
@@ -297,15 +325,17 @@ class StudioState extends ChangeNotifier {
     final dir = ray.direction;
     doc.snapshot('Sculpt ${op.name}');
     final mesh = obj.mesh;
-    final result = await Isolate.run(() => Sculptor.apply(
-          mesh,
-          op: op,
-          center: center,
-          radius: radius,
-          strength: strength,
-          direction: <double>[-dir[0], -dir[1], -dir[2]],
-          refine: true,
-        ));
+    final result = await Isolate.run(
+      () => Sculptor.apply(
+        mesh,
+        op: op,
+        center: center,
+        radius: radius,
+        strength: strength,
+        direction: <double>[-dir[0], -dir[1], -dir[2]],
+        refine: true,
+      ),
+    );
     obj.mesh = result;
     status = 'Sculpted (${result.faceCount} faces)';
     await render();
@@ -328,7 +358,8 @@ class StudioState extends ChangeNotifier {
       overlay = AnalysisOverlay.none;
       overlayColors = null;
       refreshShellCount();
-      status = '$label done in ${sw.elapsedMilliseconds} ms '
+      status =
+          '$label done in ${sw.elapsedMilliseconds} ms '
           '(${result.vertexCount} verts, ${result.faceCount} faces)';
     } catch (e) {
       status = '$label failed: $e';
@@ -344,10 +375,17 @@ class StudioState extends ChangeNotifier {
     final target = obj.mesh.bounds().diagonal * (0.02 + remeshDensity * 0.06);
     final mesh = obj.mesh;
     final preserveGroups = groupAware && mesh.faceGroups != null;
-    await runOp('Remesh', () => Isolate.run(() => IsotropicRemesher.remesh(mesh,
-        targetEdgeLength: target,
-        iterations: 5,
-        preserveGroupBoundaries: preserveGroups)));
+    await runOp(
+      'Remesh',
+      () => Isolate.run(
+        () => IsotropicRemesher.remesh(
+          mesh,
+          targetEdgeLength: target,
+          iterations: 5,
+          preserveGroupBoundaries: preserveGroups,
+        ),
+      ),
+    );
   }
 
   Future<void> doReduce() async {
@@ -355,8 +393,10 @@ class StudioState extends ChangeNotifier {
     if (obj == null) return;
     final pct = reducePercent;
     final mesh = obj.mesh;
-    await runOp('Reduce', () => Isolate.run(
-        () => Decimator.reduce(mesh, percentage: pct)));
+    await runOp(
+      'Reduce',
+      () => Isolate.run(() => Decimator.reduce(mesh, percentage: pct)),
+    );
   }
 
   Future<void> doMakeSolid() async {
@@ -367,8 +407,18 @@ class StudioState extends ChangeNotifier {
     final mode = solidMode;
     final offset = solidOffset;
     final smooth = solidSmoothing;
-    await runOp('Make Solid', () => Isolate.run(() => Solidifier.makeSolid(mesh,
-        mode: mode, resolution: res, offset: offset, smoothing: smooth).mesh));
+    await runOp(
+      'Make Solid',
+      () => Isolate.run(
+        () => Solidifier.makeSolid(
+          mesh,
+          mode: mode,
+          resolution: res,
+          offset: offset,
+          smoothing: smooth,
+        ).mesh,
+      ),
+    );
   }
 
   Future<void> doHollow() async {
@@ -378,9 +428,18 @@ class StudioState extends ChangeNotifier {
     final t = hollowThickness;
     final holes = hollowHoles;
     final res = solidResolution.toInt();
-    await runOp('Hollow', () => Isolate.run(() => Solidifier.hollow(mesh,
-            thickness: t, holes: holes, holeRadius: t * 1.2, resolution: res)
-        .mesh));
+    await runOp(
+      'Hollow',
+      () => Isolate.run(
+        () => Solidifier.hollow(
+          mesh,
+          thickness: t,
+          holes: holes,
+          holeRadius: t * 1.2,
+          resolution: res,
+        ).mesh,
+      ),
+    );
   }
 
   Future<void> doPlaneCut() async {
@@ -390,8 +449,18 @@ class StudioState extends ChangeNotifier {
     final b = mesh.bounds();
     final y = (b.minY + b.maxY) / 2 + planeOffset;
     final fill = planeFill;
-    await runOp('Plane Cut', () => Isolate.run(() => PlaneCut.cut(mesh,
-        point: <double>[0, y, 0], normal: <double>[0, 1, 0], keepPositive: true, fill: fill)));
+    await runOp(
+      'Plane Cut',
+      () => Isolate.run(
+        () => PlaneCut.cut(
+          mesh,
+          point: <double>[0, y, 0],
+          normal: <double>[0, 1, 0],
+          keepPositive: true,
+          fill: fill,
+        ),
+      ),
+    );
   }
 
   Future<void> doMirror() async {
@@ -402,11 +471,18 @@ class StudioState extends ChangeNotifier {
     final keep = mirrorKeepOriginal;
     final weld = mirrorWeld;
     final diag = mesh.bounds().diagonal;
-    await runOp('Mirror', () => Isolate.run(() => Mirror.mirror(mesh,
-        point: <double>[offset, 0, 0],
-        normal: <double>[1, 0, 0],
-        keepOriginal: keep,
-        weldTolerance: weld ? diag * 1e-4 : 0)));
+    await runOp(
+      'Mirror',
+      () => Isolate.run(
+        () => Mirror.mirror(
+          mesh,
+          point: <double>[offset, 0, 0],
+          normal: <double>[1, 0, 0],
+          keepOriginal: keep,
+          weldTolerance: weld ? diag * 1e-4 : 0,
+        ),
+      ),
+    );
   }
 
   Future<void> doExtrude() async {
@@ -422,8 +498,17 @@ class StudioState extends ChangeNotifier {
     final mask = sel.faceMask;
     final distance = extrudeDistance;
     final smooth = extrudeSmooth;
-    await runOp('Extrude', () => Isolate.run(() => Extruder.extrude(mesh,
-        faceMask: mask, distance: distance, smoothBoundary: smooth)));
+    await runOp(
+      'Extrude',
+      () => Isolate.run(
+        () => Extruder.extrude(
+          mesh,
+          faceMask: mask,
+          distance: distance,
+          smoothBoundary: smooth,
+        ),
+      ),
+    );
   }
 
   Future<void> doSeparateShells() async {
@@ -447,21 +532,71 @@ class StudioState extends ChangeNotifier {
   }
 
   // ------------------------------------------------------- remaining edits
+  Future<void> doStamp() async {
+    final obj = selected;
+    if (obj == null) return;
+    final mesh = obj.mesh;
+    final mask = selection?.faceMask;
+    final pattern = stampPattern;
+    final radius = stampRadius;
+    final height = stampHeight;
+    await runOp(
+      'Stamp',
+      () => Isolate.run(() {
+        var cx = 0.0, cy = 0.0, cz = 0.0;
+        var n = 0;
+        if (mask != null) {
+          for (var f = 0; f < mesh.faceCount; f++) {
+            if (f >= mask.length || mask[f] == 0) continue;
+            for (var k = 0; k < 3; k++) {
+              final v = mesh.indices[f * 3 + k];
+              cx += mesh.vx(v);
+              cy += mesh.vy(v);
+              cz += mesh.vz(v);
+              n++;
+            }
+          }
+        }
+        if (n == 0) {
+          var best = 0;
+          for (var v = 1; v < mesh.vertexCount; v++) {
+            if (mesh.vy(v) > mesh.vy(best)) best = v;
+          }
+          cx = mesh.vx(best);
+          cy = mesh.vy(best);
+          cz = mesh.vz(best);
+          n = 1;
+        }
+        return StampTool.apply(
+          mesh,
+          center: <double>[cx / n, cy / n, cz / n],
+          radius: radius,
+          height: height,
+          pattern: pattern,
+        );
+      }),
+    );
+  }
+
   Future<void> doFlipNormals() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
     final mask = selection?.faceMask;
-    await runOp('Flip normals',
-        () => Isolate.run(() => Modify.flipNormals(mesh, faceMask: mask)));
+    await runOp(
+      'Flip normals',
+      () => Isolate.run(() => Modify.flipNormals(mesh, faceMask: mask)),
+    );
   }
 
   Future<void> doSmoothMesh() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp('Smooth',
-        () => Isolate.run(() => Modify.smooth(mesh, iterations: 8)));
+    await runOp(
+      'Smooth',
+      () => Isolate.run(() => Modify.smooth(mesh, iterations: 8)),
+    );
   }
 
   Future<void> doDropToBed() async {
@@ -475,8 +610,10 @@ class StudioState extends ChangeNotifier {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp('Center on bed',
-        () => Isolate.run(() => Modify.centerOnBed(mesh)));
+    await runOp(
+      'Center on bed',
+      () => Isolate.run(() => Modify.centerOnBed(mesh)),
+    );
   }
 
   Future<void> doDuplicate() async {
@@ -485,7 +622,8 @@ class StudioState extends ChangeNotifier {
     final mesh = obj.mesh;
     final offset = mesh.bounds().extentX + 2;
     final copy = await Isolate.run(
-        () => Modify.duplicate(mesh, offset: <double>[offset, 0, 0]));
+      () => Modify.duplicate(mesh, offset: <double>[offset, 0, 0]),
+    );
     doc.snapshot('Duplicate');
     final added = doc.add(copy, name: '${obj.name} copy');
     selectedObjectId = added.id;
@@ -522,8 +660,12 @@ class StudioState extends ChangeNotifier {
     final cx = patternCountX;
     final cz = patternCountZ;
     final gap = patternGap;
-    await runOp('Pattern', () => Isolate.run(
-        () => Modify.makePattern(mesh, countX: cx, countZ: cz, gap: gap)));
+    await runOp(
+      'Pattern',
+      () => Isolate.run(
+        () => Modify.makePattern(mesh, countX: cx, countZ: cz, gap: gap),
+      ),
+    );
   }
 
   Future<void> doFitPrimitive() async {
@@ -531,19 +673,24 @@ class StudioState extends ChangeNotifier {
     if (obj == null) return;
     final mesh = obj.mesh;
     final kind = primitiveKind;
-    await runOp('Fit primitive',
-        () => Isolate.run(() => Modify.fitPrimitive(mesh, kind)));
+    await runOp(
+      'Fit primitive',
+      () => Isolate.run(() => Modify.fitPrimitive(mesh, kind)),
+    );
   }
 
   Future<void> doGenerateFaceGroups() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp('Generate face groups', () => Isolate.run(() {
-          final m = mesh.clone();
-          m.faceGroups = FaceGroups.generate(m);
-          return m;
-        }));
+    await runOp(
+      'Generate face groups',
+      () => Isolate.run(() {
+        final m = mesh.clone();
+        m.faceGroups = FaceGroups.generate(m);
+        return m;
+      }),
+    );
   }
 
   Future<void> doMeasure() async {
@@ -554,7 +701,8 @@ class StudioState extends ChangeNotifier {
     final mesh = obj.mesh;
     final r = await Isolate.run(() => Modify.measure(mesh));
     final d = r.dimensions.map((v) => v.toStringAsFixed(2)).join(' x ');
-    status = 'Measure: $d | area ${r.surfaceArea.toStringAsFixed(1)} | '
+    status =
+        'Measure: $d | area ${r.surfaceArea.toStringAsFixed(1)} | '
         'volume ${r.volume.toStringAsFixed(1)} | ${r.shellCount} shell(s) | '
         '${r.watertight ? "watertight" : "${r.boundaryEdgeCount} boundary edges"}';
     busy = false;
@@ -588,15 +736,69 @@ class StudioState extends ChangeNotifier {
     notify();
   }
 
+  Future<void> doStitchCracks() async {
+    final obj = selected;
+    if (obj == null) return;
+    final mesh = obj.mesh;
+    await runOp(
+      'Stitch cracks',
+      () => Isolate.run(() => Bridge.stitchNearest(mesh)),
+    );
+  }
+
+  Future<void> doAlignToTarget() async {
+    final obj = selected;
+    if (obj == null) return;
+    SceneObject? target;
+    for (final o in doc.objects) {
+      if (o.id != obj.id) {
+        target = o;
+        break;
+      }
+    }
+    if (target == null) {
+      status = 'Align needs a second object';
+      notify();
+      return;
+    }
+    busy = true;
+    notify();
+    final source = obj.worldMesh();
+    final targetMesh = target.worldMesh();
+    final t = await Isolate.run(
+      () => AlignTool.solve(source, targetMesh, iterations: 40),
+    );
+    final aligned = obj.worldMesh();
+    aligned.transform(t);
+    doc.snapshot('Align to target');
+    obj.mesh = aligned;
+    obj.transform = identity4();
+    final rms = await Isolate.run(
+      () => AlignTool.rmsDistance(obj.mesh, targetMesh),
+    );
+    selection = null;
+    busy = false;
+    status =
+        'Aligned ${obj.name} to ${target.name} '
+        '(RMS ${rms.toStringAsFixed(2)} mm)';
+    await render();
+  }
+
   Future<void> doSupports() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.worldMesh();
     final angle = supportAngle;
     final density = supportDensity;
-    final result = await Isolate.run(() => SupportGenerator.generate(mesh,
+    final result = await Isolate.run(
+      () => SupportGenerator.generate(
+        mesh,
         settings: SupportSettings(
-            overhangAngleDegrees: angle, density: density)));
+          overhangAngleDegrees: angle,
+          density: density,
+        ),
+      ),
+    );
     if (result.supports.faceCount == 0) {
       status = 'No overhangs above ${angle.toStringAsFixed(0)}°';
       notify();
@@ -621,21 +823,28 @@ class StudioState extends ChangeNotifier {
     switch (mode) {
       case AnalysisOverlay.thickness:
         final th = thicknessThreshold;
-        final r = await Isolate.run(() => ThicknessAnalysis.run(mesh, threshold: th));
+        final r = await Isolate.run(
+          () => ThicknessAnalysis.run(mesh, threshold: th),
+        );
         colors = _normalizeToBytes(r.perVertex, th * 2);
-        summary = 'min ${r.minThickness.toStringAsFixed(2)}, '
+        summary =
+            'min ${r.minThickness.toStringAsFixed(2)}, '
             'mean ${r.meanThickness.toStringAsFixed(2)}, '
             '${r.belowThresholdCount} verts below $th';
       case AnalysisOverlay.overhang:
         final angle = overhangAngle;
-        final r = await Isolate.run(() => OverhangAnalysis.run(mesh, angleDegrees: angle));
+        final r = await Isolate.run(
+          () => OverhangAnalysis.run(mesh, angleDegrees: angle),
+        );
         colors = _normalizeToBytes(r.perVertexSeverity, 1.0);
-        summary = '${r.faceCount} overhang faces, '
+        summary =
+            '${r.faceCount} overhang faces, '
             '${(100 * r.overhangArea / (r.totalArea == 0 ? 1 : r.totalArea)).toStringAsFixed(1)}% of area';
       case AnalysisOverlay.stability:
         final r = await Isolate.run(() => StabilityAnalysis.run(mesh));
         colors = Uint8List(mesh.vertexCount);
-        summary = 'COM (${r.centerOfMass.map((v) => v.toStringAsFixed(1)).join(', ')}) '
+        summary =
+            'COM (${r.centerOfMass.map((v) => v.toStringAsFixed(1)).join(', ')}) '
             '${r.centerInsideSupport ? "inside" : "OUTSIDE"} base, '
             'tip ${r.minTipAngleDegrees.toStringAsFixed(1)}°';
       case AnalysisOverlay.deviation:
@@ -731,7 +940,8 @@ class StudioState extends ChangeNotifier {
       selectedObjectId = first!.id;
       selection = null;
       _frameObject(first);
-      status = 'Imported ${objects.length} object(s) from ${path.split('/').last}';
+      status =
+          'Imported ${objects.length} object(s) from ${path.split('/').last}';
       await render();
       return;
     }

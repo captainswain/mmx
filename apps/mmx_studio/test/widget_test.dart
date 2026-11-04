@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mmx_core/mmx_core.dart';
 import 'package:mmx_studio/main.dart';
 import 'package:mmx_studio/state/studio_state.dart';
 import 'package:mmx_studio/ui/viewport.dart';
@@ -32,8 +33,9 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('narrow layout hides the properties panel behind a drawer',
-      (tester) async {
+  testWidgets('narrow layout hides the properties panel behind a drawer', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(700, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -64,7 +66,9 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('modify rail item opens the remaining edit actions', (tester) async {
+  testWidgets('modify rail item opens the remaining edit actions', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1200, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -88,12 +92,50 @@ void main() {
       expect(state.selected, isNotNull);
       final volumeBefore = state.selected!.mesh.signedVolume();
       await state.doFlipNormals();
-      expect(state.selected!.mesh.signedVolume(),
-          closeTo(-volumeBefore, volumeBefore.abs() * 0.01));
+      expect(
+        state.selected!.mesh.signedVolume(),
+        closeTo(-volumeBefore, volumeBefore.abs() * 0.01),
+      );
       await state.doMeasure();
       expect(state.status, contains('Measure'));
       expect(state.status, contains('shell'));
       expect(state.status, contains('volume'));
+    });
+    state.dispose();
+  });
+
+  testWidgets('stamp runs through app state', (tester) async {
+    final state = StudioState();
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && state.selected == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(state.selected, isNotNull);
+      final before = state.selected!.mesh.signedVolume();
+      state.stampRadius = 8;
+      state.stampHeight = 2;
+      await state.doStamp();
+      expect(state.status, contains('Stamp'));
+      expect(state.selected!.mesh.signedVolume(), greaterThan(before));
+    });
+    state.dispose();
+  });
+
+  testWidgets('align to target runs through app state', (tester) async {
+    final state = StudioState();
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && state.selected == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(state.selected, isNotNull);
+      await state.doDuplicate();
+      final copy = state.selected!;
+      expect(state.doc.objects.length, 2);
+      await state.doAlignToTarget();
+      expect(state.status, contains('Aligned'));
+      final target = state.doc.objects.firstWhere((o) => o.id != copy.id);
+      final rms = AlignTool.rmsDistance(copy.mesh, target.mesh);
+      expect(rms, lessThan(0.5));
     });
     state.dispose();
   });
@@ -121,7 +163,11 @@ void main() {
     final before = state.camera.distance;
     final first = TestPointer(1, PointerDeviceKind.touch);
     final second = TestPointer(2, PointerDeviceKind.touch);
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: MeshViewport(state: state))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: MeshViewport(state: state)),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     final center = tester.getCenter(find.byType(MeshViewport));
     await tester.sendEventToBinding(first.down(center - const Offset(40, 0)));

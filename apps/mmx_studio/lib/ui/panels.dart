@@ -18,6 +18,7 @@ class LeftRail extends StatelessWidget {
       (StudioTool.navigate, Icons.pan_tool_alt_outlined, 'Navigate'),
       (StudioTool.select, Icons.highlight_alt, 'Select'),
       (StudioTool.sculpt, Icons.brush_outlined, 'Sculpt'),
+      (StudioTool.stamp, Icons.approval_outlined, 'Stamp'),
       (StudioTool.planeCut, Icons.content_cut, 'Plane Cut'),
       (StudioTool.mirror, Icons.flip, 'Mirror'),
       (StudioTool.extrude, Icons.open_in_full, 'Extrude'),
@@ -43,12 +44,16 @@ class LeftRail extends StatelessWidget {
               children: [
                 for (final item in items)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 2,
+                      horizontal: 6,
+                    ),
                     child: Tooltip(
                       message: item.$3,
                       child: Material(
                         color: state.tool == item.$1
-                            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)
+                            ? Theme.of(context).colorScheme.primary
+                                  .withValues(alpha: 0.25)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                         child: InkWell(
@@ -56,11 +61,13 @@ class LeftRail extends StatelessWidget {
                           onTap: () => state.setTool(item.$1),
                           child: SizedBox(
                             height: 40,
-                            child: Icon(item.$2,
-                                size: 21,
-                                color: state.tool == item.$1
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Colors.white70),
+                            child: Icon(
+                              item.$2,
+                              size: 21,
+                              color: state.tool == item.$1
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.white70,
+                            ),
                           ),
                         ),
                       ),
@@ -71,12 +78,18 @@ class LeftRail extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Wireframe',
-            icon: Icon(Icons.grid_4x4, color: state.wireframe ? Colors.tealAccent : Colors.white38),
+            icon: Icon(
+              Icons.grid_4x4,
+              color: state.wireframe ? Colors.tealAccent : Colors.white38,
+            ),
             onPressed: state.toggleWireframe,
           ),
           IconButton(
             tooltip: 'Print bed',
-            icon: Icon(Icons.crop_free, color: state.showBed ? Colors.tealAccent : Colors.white38),
+            icon: Icon(
+              Icons.crop_free,
+              color: state.showBed ? Colors.tealAccent : Colors.white38,
+            ),
             onPressed: state.toggleBed,
           ),
           IconButton(
@@ -120,32 +133,46 @@ class PropertiesPanel extends StatelessWidget {
           _kv('Camera', 'orbit / shift-drag pan / scroll zoom'),
           _kv('Objects', '${state.doc.objects.length}'),
           _kv('Undo depth', '${state.doc.undoDepth}'),
-          _kv('Memory', '${(state.doc.memoryBytes / 1e6).toStringAsFixed(1)} MB'),
+          _kv(
+            'Memory',
+            '${(state.doc.memoryBytes / 1e6).toStringAsFixed(1)} MB',
+          ),
         ];
       case StudioTool.select:
         return <Widget>[
           _sectionTitle('Selection'),
-          _slider('Brush radius', state.brushRadius, 0.5, 80,
-              (v) => state.brushRadius = v),
-          Row(children: [
-            _button(context, 'All', state.selectAll),
-            _button(context, 'Expand', state.expandSelection),
-            _button(context, 'Contract', state.contractSelection),
-            _button(context, 'Clear', state.clearSelection),
-          ]),
+          _slider(
+            'Brush radius',
+            state.brushRadius,
+            0.5,
+            80,
+            (v) => state.brushRadius = v,
+          ),
+          Row(
+            children: [
+              _button(context, 'All', state.selectAll),
+              _button(context, 'Expand', state.expandSelection),
+              _button(context, 'Contract', state.contractSelection),
+              _button(context, 'Clear', state.clearSelection),
+            ],
+          ),
           const SizedBox(height: 8),
           _kv('Selected faces', '${state.selection?.count ?? 0}'),
           const SizedBox(height: 8),
           _sectionTitle('Selection actions'),
-          Row(children: [
-            _button(context, 'Discard', _discardSelection),
-            _button(context, 'Remesh', state.doRemesh),
-            _button(context, 'Reduce', state.doReduce),
-          ]),
-          Row(children: [
-            _button(context, 'Extract', _extractSelection),
-            _button(context, 'Smooth', _smoothSelection),
-          ]),
+          Row(
+            children: [
+              _button(context, 'Discard', _discardSelection),
+              _button(context, 'Remesh', state.doRemesh),
+              _button(context, 'Reduce', state.doReduce),
+            ],
+          ),
+          Row(
+            children: [
+              _button(context, 'Extract', _extractSelection),
+              _button(context, 'Smooth', _smoothSelection),
+            ],
+          ),
         ];
       case StudioTool.sculpt:
         return <Widget>[
@@ -159,8 +186,20 @@ class PropertiesPanel extends StatelessWidget {
             onChanged: (v) => state.brushOp = v ?? BrushOp.draw,
           ),
           const SizedBox(height: 8),
-          _slider('Size', state.brushRadius, 0.5, 80, (v) => state.brushRadius = v),
-          _slider('Strength', state.brushStrength, 0.02, 1.0, (v) => state.brushStrength = v),
+          _slider(
+            'Size',
+            state.brushRadius,
+            0.5,
+            80,
+            (v) => state.brushRadius = v,
+          ),
+          _slider(
+            'Strength',
+            state.brushStrength,
+            0.02,
+            1.0,
+            (v) => state.brushStrength = v,
+          ),
           _kv('Secondary (right drag)', 'smooth'),
           const SizedBox(height: 6),
           const Text(
@@ -169,10 +208,55 @@ class PropertiesPanel extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: Colors.white54),
           ),
         ];
+      case StudioTool.stamp:
+        return <Widget>[
+          _sectionTitle('Stamp'),
+          DropdownButtonFormField<StampPattern>(
+            initialValue: state.stampPattern,
+            decoration: const InputDecoration(
+              labelText: 'Pattern',
+              isDense: true,
+            ),
+            items: StampPattern.values
+                .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+                .toList(),
+            onChanged: (v) => state.stampPattern = v ?? StampPattern.circle,
+          ),
+          const SizedBox(height: 8),
+          _slider(
+            'Radius',
+            state.stampRadius,
+            1,
+            40,
+            (v) => state.stampRadius = v,
+          ),
+          _slider(
+            'Height',
+            state.stampHeight,
+            0.2,
+            10,
+            (v) => state.stampHeight = v,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Displaces the surface with an analytic height field. Applies at '
+            'the selection centroid, or the topmost vertex when nothing is '
+            'selected.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+          const SizedBox(height: 8),
+          _button(context, 'Apply stamp', state.doStamp),
+        ];
       case StudioTool.planeCut:
         return <Widget>[
           _sectionTitle('Plane Cut'),
-          _slider('Offset', state.planeOffset, -50, 50, (v) => state.planeOffset = v),
+          _slider(
+            'Offset',
+            state.planeOffset,
+            -50,
+            50,
+            (v) => state.planeOffset = v,
+          ),
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -186,8 +270,13 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.mirror:
         return <Widget>[
           _sectionTitle('Mirror'),
-          _slider('Plane offset X', state.mirrorPlaneOffset, -60, 60,
-              (v) => state.mirrorPlaneOffset = v),
+          _slider(
+            'Plane offset X',
+            state.mirrorPlaneOffset,
+            -60,
+            60,
+            (v) => state.mirrorPlaneOffset = v,
+          ),
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -214,12 +303,20 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.extrude:
         return <Widget>[
           _sectionTitle('Extrude'),
-          _slider('Distance', state.extrudeDistance, 0.5, 40,
-              (v) => state.extrudeDistance = v),
+          _slider(
+            'Distance',
+            state.extrudeDistance,
+            0.5,
+            40,
+            (v) => state.extrudeDistance = v,
+          ),
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            title: const Text('Smooth boundary', style: TextStyle(fontSize: 13)),
+            title: const Text(
+              'Smooth boundary',
+              style: TextStyle(fontSize: 13),
+            ),
             value: state.extrudeSmooth,
             onChanged: (v) {
               state.extrudeSmooth = v;
@@ -254,12 +351,20 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.remesh:
         return <Widget>[
           _sectionTitle('Remesh'),
-          _slider('Density', state.remeshDensity, 0.05, 1.0, (v) => state.remeshDensity = v),
+          _slider(
+            'Density',
+            state.remeshDensity,
+            0.05,
+            1.0,
+            (v) => state.remeshDensity = v,
+          ),
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            title: const Text('Preserve group boundaries',
-                style: TextStyle(fontSize: 13)),
+            title: const Text(
+              'Preserve group boundaries',
+              style: TextStyle(fontSize: 13),
+            ),
             value: state.remeshGroupAware,
             onChanged: (v) {
               state.remeshGroupAware = v;
@@ -275,19 +380,31 @@ class PropertiesPanel extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: Colors.white54),
           ),
           const SizedBox(height: 8),
-          Row(children: [
-            _button(context, 'Face groups', state.doGenerateFaceGroups),
-            _button(context, 'Remesh',
-                () => state.doRemesh(groupAware: state.remeshGroupAware)),
-          ]),
+          Row(
+            children: [
+              _button(context, 'Face groups', state.doGenerateFaceGroups),
+              _button(
+                context,
+                'Remesh',
+                () => state.doRemesh(groupAware: state.remeshGroupAware),
+              ),
+            ],
+          ),
         ];
       case StudioTool.reduce:
         return <Widget>[
           _sectionTitle('Reduce'),
-          _slider('Keep fraction', state.reducePercent, 0.02, 0.95,
-              (v) => state.reducePercent = v),
-          _kv('Target faces',
-              '${(state.activeMesh?.faceCount ?? 0) * state.reducePercent ~/ 1}'),
+          _slider(
+            'Keep fraction',
+            state.reducePercent,
+            0.02,
+            0.95,
+            (v) => state.reducePercent = v,
+          ),
+          _kv(
+            'Target faces',
+            '${(state.activeMesh?.faceCount ?? 0) * state.reducePercent ~/ 1}',
+          ),
           const SizedBox(height: 8),
           _button(context, 'Reduce', state.doReduce),
         ];
@@ -296,39 +413,78 @@ class PropertiesPanel extends StatelessWidget {
           _sectionTitle('Make Solid'),
           DropdownButtonFormField<SolidMode>(
             initialValue: state.solidMode,
-            decoration: const InputDecoration(labelText: 'Routine', isDense: true),
+            decoration: const InputDecoration(
+              labelText: 'Routine',
+              isDense: true,
+            ),
             items: SolidMode.values
                 .map((m) => DropdownMenuItem(value: m, child: Text(m.name)))
                 .toList(),
             onChanged: (v) => state.solidMode = v ?? SolidMode.accurate,
           ),
-          _slider('Grid resolution', state.solidResolution, 32, 256,
-              (v) => state.solidResolution = v),
-          _slider('Offset', state.solidOffset, -20, 20, (v) => state.solidOffset = v),
-          _slider('Smoothing', state.solidSmoothing.toDouble(), 0, 8,
-              (v) => state.solidSmoothing = v.round()),
+          _slider(
+            'Grid resolution',
+            state.solidResolution,
+            32,
+            256,
+            (v) => state.solidResolution = v,
+          ),
+          _slider(
+            'Offset',
+            state.solidOffset,
+            -20,
+            20,
+            (v) => state.solidOffset = v,
+          ),
+          _slider(
+            'Smoothing',
+            state.solidSmoothing.toDouble(),
+            0,
+            8,
+            (v) => state.solidSmoothing = v.round(),
+          ),
           const SizedBox(height: 8),
           _button(context, 'Make Solid', state.doMakeSolid),
         ];
       case StudioTool.hollow:
         return <Widget>[
           _sectionTitle('Hollow'),
-          _slider('Wall thickness', state.hollowThickness, 0.4, 20,
-              (v) => state.hollowThickness = v),
-          _slider('Escape holes', state.hollowHoles.toDouble(), 0, 8,
-              (v) => state.hollowHoles = v.round()),
-          _slider('Grid resolution', state.solidResolution, 32, 256,
-              (v) => state.solidResolution = v),
+          _slider(
+            'Wall thickness',
+            state.hollowThickness,
+            0.4,
+            20,
+            (v) => state.hollowThickness = v,
+          ),
+          _slider(
+            'Escape holes',
+            state.hollowHoles.toDouble(),
+            0,
+            8,
+            (v) => state.hollowHoles = v.round(),
+          ),
+          _slider(
+            'Grid resolution',
+            state.solidResolution,
+            32,
+            256,
+            (v) => state.solidResolution = v,
+          ),
           const SizedBox(height: 8),
           _button(context, 'Hollow', state.doHollow),
         ];
       case StudioTool.modify:
         return <Widget>[
           _sectionTitle('Surface'),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            _button(context, 'Flip normals', state.doFlipNormals),
-            _button(context, 'Smooth', state.doSmoothMesh),
-          ]),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _button(context, 'Flip normals', state.doFlipNormals),
+              _button(context, 'Smooth', state.doSmoothMesh),
+              _button(context, 'Stitch cracks', state.doStitchCracks),
+            ],
+          ),
           const SizedBox(height: 4),
           const Text(
             'Flip normals honours the current face selection; Smooth is '
@@ -337,23 +493,46 @@ class PropertiesPanel extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _sectionTitle('Placement'),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            _button(context, 'Drop to bed', state.doDropToBed),
-            _button(context, 'Center on bed', state.doCenterOnBed),
-          ]),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _button(context, 'Drop to bed', state.doDropToBed),
+              _button(context, 'Center on bed', state.doCenterOnBed),
+            ],
+          ),
           const SizedBox(height: 10),
           _sectionTitle('Object'),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            _button(context, 'Duplicate', state.doDuplicate),
-            _button(context, 'Combine all', state.doCombineAll),
-          ]),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _button(context, 'Duplicate', state.doDuplicate),
+              _button(context, 'Combine all', state.doCombineAll),
+            ],
+          ),
           const SizedBox(height: 8),
-          _slider('Pattern columns', state.patternCountX.toDouble(), 1, 8,
-              (v) => state.patternCountX = v.round()),
-          _slider('Pattern rows', state.patternCountZ.toDouble(), 1, 8,
-              (v) => state.patternCountZ = v.round()),
-          _slider('Pattern gap', state.patternGap, 0.5, 20,
-              (v) => state.patternGap = v),
+          _slider(
+            'Pattern columns',
+            state.patternCountX.toDouble(),
+            1,
+            8,
+            (v) => state.patternCountX = v.round(),
+          ),
+          _slider(
+            'Pattern rows',
+            state.patternCountZ.toDouble(),
+            1,
+            8,
+            (v) => state.patternCountZ = v.round(),
+          ),
+          _slider(
+            'Pattern gap',
+            state.patternGap,
+            0.5,
+            20,
+            (v) => state.patternGap = v,
+          ),
           _button(context, 'Make pattern', state.doMakePattern),
           const SizedBox(height: 10),
           _sectionTitle('Primitive'),
@@ -372,38 +551,99 @@ class PropertiesPanel extends StatelessWidget {
           _button(context, 'Replace with primitive', state.doFitPrimitive),
           const SizedBox(height: 10),
           _sectionTitle('Measure'),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            _button(context, 'Measure', state.doMeasure),
-            _button(context, 'Clearance', state.doClearance),
-          ]),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _button(context, 'Measure', state.doMeasure),
+              _button(context, 'Clearance', state.doClearance),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _sectionTitle('Align'),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _button(context, 'Align to target', state.doAlignToTarget),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Rigid ICP onto the first other object in the scene. Use it to '
+            'register a scan or a duplicated part onto its reference.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
         ];
       case StudioTool.analysis:
         return <Widget>[
           _sectionTitle('Analysis'),
-          _slider('Thickness threshold', state.thicknessThreshold, 0.1, 20,
-              (v) => state.thicknessThreshold = v),
-          _slider('Overhang angle', state.overhangAngle, 10, 80,
-              (v) => state.overhangAngle = v),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            _button(context, 'Thickness', () => state.doAnalysis(AnalysisOverlay.thickness)),
-            _button(context, 'Overhang', () => state.doAnalysis(AnalysisOverlay.overhang)),
-            _button(context, 'Stability', () => state.doAnalysis(AnalysisOverlay.stability)),
-            _button(context, 'Clear', () => state.doAnalysis(AnalysisOverlay.none)),
-          ]),
+          _slider(
+            'Thickness threshold',
+            state.thicknessThreshold,
+            0.1,
+            20,
+            (v) => state.thicknessThreshold = v,
+          ),
+          _slider(
+            'Overhang angle',
+            state.overhangAngle,
+            10,
+            80,
+            (v) => state.overhangAngle = v,
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _button(
+                context,
+                'Thickness',
+                () => state.doAnalysis(AnalysisOverlay.thickness),
+              ),
+              _button(
+                context,
+                'Overhang',
+                () => state.doAnalysis(AnalysisOverlay.overhang),
+              ),
+              _button(
+                context,
+                'Stability',
+                () => state.doAnalysis(AnalysisOverlay.stability),
+              ),
+              _button(
+                context,
+                'Clear',
+                () => state.doAnalysis(AnalysisOverlay.none),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           _sectionTitle('Repair'),
-          Row(children: [
-            _button(context, 'Inspector', state.inspectMesh),
-            _button(context, 'Auto repair', state.autoRepair),
-          ]),
+          Row(
+            children: [
+              _button(context, 'Inspector', state.inspectMesh),
+              _button(context, 'Auto repair', state.autoRepair),
+            ],
+          ),
         ];
       case StudioTool.supports:
         return <Widget>[
           _sectionTitle('Supports'),
-          _slider('Overhang angle', state.supportAngle, 10, 80,
-              (v) => state.supportAngle = v),
-          _slider('Density', state.supportDensity, 0.05, 1.0,
-              (v) => state.supportDensity = v),
+          _slider(
+            'Overhang angle',
+            state.supportAngle,
+            10,
+            80,
+            (v) => state.supportAngle = v,
+          ),
+          _slider(
+            'Density',
+            state.supportDensity,
+            0.05,
+            1.0,
+            (v) => state.supportDensity = v,
+          ),
           const SizedBox(height: 8),
           _button(context, 'Generate support forest', state.doSupports),
           const SizedBox(height: 8),
@@ -426,36 +666,57 @@ class PropertiesPanel extends StatelessWidget {
   }
 
   Widget _sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text.toUpperCase(),
-            style: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.1)),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.1,
+      ),
+    ),
+  );
 
   Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(k, style: const TextStyle(fontSize: 12, color: Colors.white60)),
-            Flexible(
-              child: Text(v,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 12)),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(k, style: const TextStyle(fontSize: 12, color: Colors.white60)),
+        Flexible(
+          child: Text(
+            v,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 12),
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
-  Widget _slider(String label, double value, double min, double max,
-      void Function(double) onChanged) {
+  Widget _slider(
+    String label,
+    double value,
+    double min,
+    double max,
+    void Function(double) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
-          Text(value.toStringAsFixed(2), style: const TextStyle(fontSize: 12)),
-        ]),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            Text(
+              value.toStringAsFixed(2),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
         Slider(
           value: value.clamp(min, max),
           min: min,
@@ -469,7 +730,11 @@ class PropertiesPanel extends StatelessWidget {
     );
   }
 
-  Widget _button(BuildContext context, String label, Future<void> Function() fn) {
+  Widget _button(
+    BuildContext context,
+    String label,
+    Future<void> Function() fn,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(right: 4, bottom: 4),
       child: OutlinedButton(
@@ -519,8 +784,12 @@ class PropertiesPanel extends StatelessWidget {
       final ids = <int>[];
       for (var k = 0; k < 3; k++) {
         final v = mesh.indices[f * 3 + k];
-        ids.add(map.putIfAbsent(
-            v, () => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v))));
+        ids.add(
+          map.putIfAbsent(
+            v,
+            () => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)),
+          ),
+        );
       }
       builder.addTriangle(ids[0], ids[1], ids[2]);
     }
@@ -570,13 +839,19 @@ class PropertiesPanel extends StatelessWidget {
   Future<void> _packAll() async {
     final meshes = state.doc.objects.map((o) => o.worldMesh()).toList();
     if (meshes.isEmpty) return;
-    final result = Packer.pack(meshes, bedWidth: 200, bedDepth: 200, quality: 1);
+    final result = Packer.pack(
+      meshes,
+      bedWidth: 200,
+      bedDepth: 200,
+      quality: 1,
+    );
     for (var i = 0; i < result.placed.length; i++) {
       final p = result.placed[i];
       final obj = state.doc.objects[p.index];
       obj.transform = Float64List.fromList(p.transform);
     }
-    state.status = 'Packed ${result.placed.length} objects '
+    state.status =
+        'Packed ${result.placed.length} objects '
         '(${(result.bedUtilization * 100).toStringAsFixed(1)}% bed use)';
     await state.render();
   }
@@ -585,7 +860,8 @@ class PropertiesPanel extends StatelessWidget {
     final obj = state.selected;
     if (obj == null) return;
     final r = Slicer.slice(obj.worldMesh(), layerHeight: 0.2);
-    state.status = 'Slicing: ${r.layers.length} layers at 0.2mm '
+    state.status =
+        'Slicing: ${r.layers.length} layers at 0.2mm '
         '(${r.elapsedMs} ms)';
     state.notify();
   }
@@ -600,9 +876,14 @@ class _SceneSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('OBJECTS',
-            style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.1)),
+        const Text(
+          'OBJECTS',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+          ),
+        ),
         const SizedBox(height: 6),
         for (final o in state.doc.objects)
           InkWell(
@@ -617,26 +898,32 @@ class _SceneSection extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
                 color: o.id == state.selectedObjectId
-                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.18)
+                    ? Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.18)
                     : Colors.white.withValues(alpha: 0.03),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
                 children: [
                   Icon(
-                      o.id == state.selectedObjectId
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_off,
-                      size: 14,
-                      color: Colors.white54),
+                    o.id == state.selectedObjectId
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    size: 14,
+                    color: Colors.white54,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(o.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12)),
+                    child: Text(
+                      o.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ),
-                  Text('${o.mesh.faceCount}',
-                      style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                  Text(
+                    '${o.mesh.faceCount}',
+                    style: const TextStyle(fontSize: 10, color: Colors.white38),
+                  ),
                 ],
               ),
             ),

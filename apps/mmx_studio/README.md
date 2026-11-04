@@ -13,7 +13,9 @@ workflow.
   hollow, booleans, offset
 - edit tools: plane cut, mirror, extrude, separate shells, flip normals, Taubin
   smoothing, drop/center on bed, duplicate, combine, pattern arrays, primitive
-  fitting
+  fitting, boundary-loop stitching, rigid ICP alignment onto a reference object
+- stamps: analytic circle/ring/star/grid/noise height fields applied at the
+  selection centroid
 - analysis: wall thickness, overhang, stability, deviation, measurement,
   inter-object clearance
 - fabrication: support forest, orientation, bed packing, slicing

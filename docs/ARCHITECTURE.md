@@ -29,7 +29,8 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
                        components, manifold tests)
   lib/src/spatial/     BVH: raycast/closest-point/overlap
   lib/src/repair/      weld, crack closing, hole filling (ear clip + relaxation),
-                       non-manifold splitting, defect inspector
+                       boundary-loop bridging/stitching, non-manifold splitting,
+                       defect inspector
   lib/src/remesh/      isotropic remeshing (split/collapse/flip/relax/project),
                        QEM decimation with boundary quadrics
   lib/src/solid/       narrow-band SDF voxelizer (ray-parity sign, flood fill),
@@ -41,7 +42,8 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
   lib/src/tools/       plane cut, sculpt brushes with dynamic refinement,
                        selection sets, face groups, soft transform, flip normals,
                        Taubin smoothing, bed placement, duplicate/combine,
-                       pattern arrays, primitive fitting, measure, clearance
+                       pattern arrays, primitive fitting, measure, clearance,
+                       ICP alignment, procedural stamps
   lib/src/scene/       document, scene objects, snapshot undo with byte budget
   lib/src/io/          OBJ/PLY/STL/OFF/3MF plus the native .mix container
   lib/src/render/      orbit camera, software z-buffer rasterizer, PNG encoder
@@ -60,7 +62,7 @@ Mapping from the recovered Meshmixer sources to this tree:
 | `MeshBoolean`, `SurfaceOffset` | `solid/solidifier.dart` |
 | `SurfaceRemesher`, `VariationalRemesher`, `MeshRefinement` | `remesh/isotropic.dart` |
 | `MeshReducer` | `remesh/decimate.dart` |
-| `SimpleHoleFiller`, `LoopStitcher`, `BoundaryJoiner/Stitcher/Bridge` | `repair/holes.dart`, `repair/weld.dart` |
+| `SimpleHoleFiller`, `LoopStitcher`, `BoundaryJoiner/Stitcher/Bridge` | `repair/holes.dart`, `repair/weld.dart`, `repair/bridge.dart` |
 | `MeshThicknessAnalysis`, `OverhangTracker`, `StabilityTool` | `analysis/analysis.dart` |
 | `SupportForestGenerator`, `SupportPostGraph` | `fab/supports.dart` |
 | `ObjectPacker_2DRasterizeJob`, `ImagePacker` | `fab/packing.dart` |
@@ -68,6 +70,8 @@ Mapping from the recovered Meshmixer sources to this tree:
 | `BrushTool2`, `StandardBrushOps3D`, `RefineOp3D` | `tools/sculpt.dart` |
 | `MeshMirror`, `SurfaceExtruder`, `SeparateShellsTool` | `tools/edits.dart` |
 | `FlipNormalsTool`, `DuplicateTool`, `MakePatternTool`, `FitPrimitiveTool`, `MeasuringTool`, clearance tools | `tools/modify.dart` |
+| `AlignToTargetTool` (rigid registration) | `tools/align.dart` |
+| `StampTool` (height-field displacement) | `tools/stamp.dart` |
 | `lib3mf` (3MF import/export) | `io/threemf.dart`, `io/zip.dart` |
 | `VFMesh`/`GSurf`/`MMGS` (`.mix` binary blocks) | `io/mix.dart` |
 | `MeshSO`/`Scene`/`StoredCommands` | `scene/document.dart` |
@@ -134,7 +138,7 @@ the interface takes plain arrays and a camera rather than Flutter objects.
 
 ## 5. Correctness and verification
 
-`dart test` runs 53 tests against the models that ship inside the Meshmixer
+`dart test` runs 61 tests against the models that ship inside the Meshmixer
 installer, asserting invariants rather than snapshots:
 
 * import/export round trips for STL/OBJ/PLY preserve area within 1e-4;
@@ -155,6 +159,12 @@ installer, asserting invariants rather than snapshots:
 * group-aware remeshing preserves the face-group ids and both sides of a seam;
 * `.mix` round trips preserve vertex/face counts and volume, and files written
   by mmx_core open in Meshmixer 3.5.0 under Wine with matching counts;
+* ICP recovers a known rigid offset (RMS below 0.35 mm on a 25 mm sphere) and
+  leaves an already-aligned mesh fixed;
+* bridging a two-loop slit closes both boundary loops with no non-manifold
+  edges, and the crease/twist brushes keep the mesh valid and finite;
+* a circular stamp raises the surface and increases volume, while a ring stamp
+  leaves the centre vertex fixed;
 * undo/redo restores object state.
 
 ## 6. Limitations and next steps
