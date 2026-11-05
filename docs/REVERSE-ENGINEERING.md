@@ -427,6 +427,30 @@ Accurate with a negative offset. Detailed notes are in
   `MeshPolygons 1.0` trailer is constant in all observed scenes, so it carries
   no group table.
 
+### Status of the open items
+
+* **Method names** - 198 unique `Class::Method` strings recovered; 173 functions
+  renamed in the Ghidra project, including the boolean, plane-cut, reducer,
+  solid, rasterizer, support, hole-filler and remesher entry points
+  (`docs/METHODS.md`). Methods that never log or assert a name remain `FUN_`.
+  No public PDB exists (Autodesk's symbol server returns 404 for
+  `meshmixer.pdb`), so the string set is the complete set of names embedded in
+  the binary.
+* **`.mix` extras** - pass-through preservation is implemented; pivots, decals,
+  stamps and shaders are not decoded into typed objects, but they survive a
+  rewrite unchanged.
+* **Boolean** - mesh-level classify-and-stitch implementation exists with a
+  grid-CSG fallback (`PreciseBoolean`); exact density multipliers and merge
+  iteration counts remain unknown.
+* **Constants** - remesh edge-length bounds are 0.8 and 4/3 of the target
+  (matching older geometry3Sharp), vertex quadrics are area-weighted, and
+  geometry3Sharp's `VertexSnapTol` is 1e-5; reducer collapse thresholds, the
+  support objective and adaptive transition widths remain unknown.
+* **Tool breadth** - `addTube`, `unwrap`, `createPivot`, `generateComplex`,
+  `splitComplex`, `filterComplex`, `makePart`, `makeSolidPart`, `makePolygon`,
+  `warp` and `handle` are still UI-level gaps; the core kernel operators that
+  matter for mesh processing are implemented.
+
 ## 8. References
 
 * Autodesk Meshmixer 2019 help: Make Solid
