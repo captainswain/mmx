@@ -75,7 +75,8 @@ jobs:
               exit 1
             fi
             VERSION="${TAG#v}"
-            if [[ "$VERSION" != "$PUBSPEC_VERSION" ]]; then
+            # Prerelease tags (v0.1.0-rc.1) must match the pubspec's base version.
+            if [[ "${VERSION%%-*}" != "$PUBSPEC_VERSION" ]]; then
               echo "::error::Tag $TAG does not match packages/mmx_core/pubspec.yaml version $PUBSPEC_VERSION."
               exit 1
             fi
