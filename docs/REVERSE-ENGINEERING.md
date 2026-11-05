@@ -454,8 +454,9 @@ Accurate with a negative offset. Detailed notes are in
 * **Tool breadth** - `addTube`, planar `unwrap`, complex split/filter/join,
   `makePolygon`, `makePart`/`makeSolidPart`, `createPivot`, soft-move/bend,
   fixed-fill plane cuts, max-deviation reduce and adaptive-density remesh are
-  implemented. Remaining gaps: `generateComplex` and texture/UV/stamp semantics
-  in `.mix`.
+  implemented; `generateComplex` is covered by `ComplexTools.generate`/join.
+  Remaining gaps: texture/UV/stamp semantics in `.mix` and the exact
+  adaptive/transition constants.
 
 ## 8. References
 

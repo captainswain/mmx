@@ -109,4 +109,7 @@ class ComplexTools {
 
   /// Joins shells into one mesh (the Edit panel's Join/Combine action).
   static TriMesh join(List<TriMesh> parts) => Modify.combine(parts);
+
+  /// Generates a complex by joining the supplied parts (Generate Complex).
+  static TriMesh generate(List<TriMesh> parts) => join(parts);
 }
