@@ -67,14 +67,16 @@ void main() {
     test('adaptive density remeshing stays watertight', () {
       final mesh = loadModel('sphere.obj');
       final target = mesh.bounds().diagonal / 30.0;
-      final out = IsotropicRemesher.remesh(mesh,
-          targetEdgeLength: target,
-          iterations: 3,
-          adaptiveDensity: 0.5);
-      expect(out.faceCount, greaterThan(0));
-      expect(MeshTopology(out).boundaryLoops(), isEmpty);
-      expect(MeshTopology(out).components().$2, 1);
-      expect(MeshTopology(out).nonManifoldEdges(), isEmpty);
+      for (final density in <double>[0.2, 0.5, 0.8]) {
+        final out = IsotropicRemesher.remesh(mesh,
+            targetEdgeLength: target,
+            iterations: 3,
+            adaptiveDensity: density);
+        expect(out.faceCount, greaterThan(0));
+        expect(MeshTopology(out).boundaryLoops(), isEmpty);
+        expect(MeshTopology(out).components().$2, 1);
+        expect(MeshTopology(out).nonManifoldEdges(), isEmpty);
+      }
     });
 
     test('produces near-uniform edges', () {
