@@ -444,8 +444,13 @@ Accurate with a negative offset. Detailed notes are in
   iteration counts remain unknown.
 * **Constants** - remesh edge-length bounds are 0.8 and 4/3 of the target
   (matching older geometry3Sharp), vertex quadrics are area-weighted, and
-  geometry3Sharp's `VertexSnapTol` is 1e-5; reducer collapse thresholds, the
-  support objective and adaptive transition widths remain unknown.
+  geometry3Sharp's `VertexSnapTol` is 1e-5. Decompilation of the named entry
+  points adds: `MeshBoolean::Validate` scales one working resolution by 0.75;
+  `SupportForestGenerator::Generate` accepts angles in the 1..100 range;
+  `MeshReducer::ReduceToMinEdgeLength` compares squared edge lengths against the
+  minimum-edge parameter; `MeshToSolid::GenerateVoxelSolid` subtracts its float
+  offset from the bounds. Reducer collapse thresholds, the support objective and
+  adaptive transition widths remain unknown.
 * **Tool breadth** - `addTube`, `unwrap`, `createPivot`, `generateComplex`,
   `splitComplex`, `filterComplex`, `makePart`, `makeSolidPart`, `makePolygon`,
   `warp` and `handle` are still UI-level gaps; the core kernel operators that
