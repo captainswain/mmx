@@ -115,7 +115,8 @@ Future<void> main(List<String> args) async {
         final out = IsotropicRemesher.remesh(mesh,
             targetEdgeLength: edge,
             iterations: flag('iters', 6).toInt(),
-            adaptiveDensity: flag('adaptive', 0));
+            adaptiveDensity: flag('adaptive', 0),
+            debugTopology: flags.containsKey('debug-topology'));
         save(positional[1], out);
       }
     case 'reduce':

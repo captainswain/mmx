@@ -7,6 +7,7 @@ import '../repair/holes.dart';
 import '../repair/inspector.dart';
 import '../repair/weld.dart';
 import '../spatial/bvh.dart';
+import 'collapse_mesh.dart';
 
 /// Isotropic remeshing in the Botsch-Kobbelt style: split long edges, collapse
 /// short ones, flip toward valence six, then relax tangentially and project
@@ -76,6 +77,7 @@ class IsotropicRemesher {
     double sharpAngleDegrees = 45,
     bool preserveGroupBoundaries = false,
     double adaptiveDensity = 0.0,
+    bool debugTopology = false,
     void Function(int done, int total)? progress,
   }) {
     if (input.faceCount == 0) return input;
@@ -103,6 +105,10 @@ class IsotropicRemesher {
       double density(List<double> c, int a, int b) =>
           (1.0 + adaptiveDensity * (c[a] + c[b]) * 0.5).clamp(0.25, 4.0);
 
+      if (debugTopology) {
+        final t = MeshTopology(mesh);
+        print('before split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+      }
       mesh = _splitLong(mesh, targetEdgeLength * 4.0 / 3.0,
           maxFor: curvSplit == null
               ? null
@@ -110,13 +116,25 @@ class IsotropicRemesher {
                   4.0 /
                   3.0 *
                   density(curvSplit, a, b));
+      if (debugTopology) {
+        final t = MeshTopology(mesh);
+        print('after split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+      }
       final curvCollapse = adaptiveDensity > 0 ? _curvature(mesh) : null;
       mesh = _collapseShort(
           mesh, targetEdgeLength * 0.8, preserveBoundary, constraints(mesh),
           minFor: curvCollapse == null
               ? null
               : (a, b) => targetEdgeLength * 0.8 * density(curvCollapse, a, b));
+      if (debugTopology) {
+        final t = MeshTopology(mesh);
+        print('after collapse nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+      }
       mesh = _flipForValence(mesh, preserveBoundary, constraints(mesh));
+      if (debugTopology) {
+        final t = MeshTopology(mesh);
+        print('after flip nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+      }
       mesh = _tangentialRelax(
           mesh, originalBvh, preserveBoundary, constraints(mesh));
       mesh = _projectToSurface(
@@ -139,6 +157,24 @@ class IsotropicRemesher {
         }
         if (!changed) break;
       }
+    }
+    if (adaptiveDensity > 0 &&
+        MeshTopology(mesh).nonManifoldEdges().isNotEmpty) {
+      // The angle-defect density heuristic can create non-manifold junctions
+      // on aggressive settings. Fall back to the uniform pass, which is
+      // topology-safe, rather than returning a non-manifold result.
+      return remesh(
+        input,
+        targetEdgeLength: targetEdgeLength,
+        iterations: iterations,
+        preserveBoundary: preserveBoundary,
+        preserveSharp: preserveSharp,
+        sharpAngleDegrees: sharpAngleDegrees,
+        preserveGroupBoundaries: preserveGroupBoundaries,
+        adaptiveDensity: 0.0,
+        debugTopology: debugTopology,
+        progress: progress,
+      );
     }
     if (groupSegments.isNotEmpty) {
       mesh.faceGroups = _transferFaceGroups(input, mesh, originalBvh);
@@ -299,6 +335,14 @@ class IsotropicRemesher {
     final vmap = List<int>.generate(mesh.vertexCount, (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
     final midCache = <int, int>{};
     final n = mesh.vertexCount;
+    final topo = MeshTopology(mesh);
+    final splitEdges = <int>{};
+    for (final key in topo.edgeFaces.keys) {
+      final a = key ~/ n, b = key % n;
+      if (_len(mesh, a, b) > (maxFor?.call(a, b) ?? maxLen)) {
+        splitEdges.add(key);
+      }
+    }
 
     int midpoint(int a, int b) {
       final key = a < b ? a * n + b : b * n + a;
@@ -315,9 +359,9 @@ class IsotropicRemesher {
 
     for (var f = 0; f < mesh.faceCount; f++) {
       final va = mesh.indices[f * 3], vb = mesh.indices[f * 3 + 1], vc = mesh.indices[f * 3 + 2];
-      final ab = _len(mesh, va, vb) > (maxFor?.call(va, vb) ?? maxLen);
-      final bc = _len(mesh, vb, vc) > (maxFor?.call(vb, vc) ?? maxLen);
-      final ca = _len(mesh, vc, va) > (maxFor?.call(vc, va) ?? maxLen);
+      final ab = splitEdges.contains(topo.edgeKey(va, vb));
+      final bc = splitEdges.contains(topo.edgeKey(vb, vc));
+      final ca = splitEdges.contains(topo.edgeKey(vc, va));
       final A = vmap[va], B = vmap[vb], C = vmap[vc];
       final count = (ab ? 1 : 0) + (bc ? 1 : 0) + (ca ? 1 : 0);
       if (count == 0) {
@@ -379,139 +423,32 @@ class IsotropicRemesher {
   /// manifold and does not invert any incident triangle.
   static TriMesh _collapseShort(TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp,
       {double Function(int, int)? minFor}) {
-    final topo = MeshTopology(mesh);
-    final boundary = <int>{};
-    if (preserveBoundary) {
-      for (final e in topo.boundaryEdges()) {
-        boundary.add(e[0]);
-        boundary.add(e[1]);
-      }
-    }
-    // Union-find over vertices; collapsed vertices are merged into a target.
-    final parent = Int32List(mesh.vertexCount);
-    for (var i = 0; i < parent.length; i++) {
-      parent[i] = i;
-    }
-    int find(int x) {
-      while (parent[x] != x) {
-        parent[x] = parent[parent[x]];
-        x = parent[x];
-      }
-      return x;
-    }
-
-    final target = Int32List(mesh.vertexCount);
-    for (var i = 0; i < target.length; i++) {
-      target[i] = i;
-    }
-
-    final edges = topo.edgeFaces.keys.toList()
+    final state = CollapseMesh(mesh);
+    final n = mesh.vertexCount;
+    final edges = state.edgeCount.keys.toList()
       ..sort((a, b) {
-        final n = mesh.vertexCount;
         final la = _len(mesh, a ~/ n, a % n);
         final lb = _len(mesh, b ~/ n, b % n);
         return la.compareTo(lb);
       });
-
-    final n = mesh.vertexCount;
     for (final key in edges) {
-      final a0 = key ~/ n, b0 = key % n;
-      final a = find(a0), b = find(b0);
-      if (a == b) continue;
+      if ((state.edgeCount[key] ?? 0) == 0) continue;
+      final a = key ~/ n, b = key % n;
       if (_len(mesh, a, b) >= (minFor?.call(a, b) ?? minLen)) continue;
-      if (sharp.contains(a) && sharp.contains(b)) continue;
-      if (preserveBoundary) {
-        final aB = boundary.contains(a), bB = boundary.contains(b);
-        if (aB != bB) continue; // never collapse a boundary vertex into interior
-        if (aB && bB) {
-          // Only collapse along the boundary itself.
-          if (!topo.edgeFaces.containsKey(topo.edgeKey(a, b))) continue;
-        }
-      }
-      final na = topo.neighborsOfVertex(a).toSet();
-      final nb = topo.neighborsOfVertex(b).toSet();
-      final common = na.intersection(nb);
-      if (common.length > 2) continue; // link condition
-      final valenceA = na.length + nb.length - 2 * common.length;
-      if (valenceA < 3 || valenceA > 12) continue;
-      // Geometric validity: keep the merged vertex at the midpoint and ensure
-      // no incident face flips.
-      final mx = (mesh.vx(a) + mesh.vx(b)) * 0.5;
-      final my = (mesh.vy(a) + mesh.vy(b)) * 0.5;
-      final mz = (mesh.vz(a) + mesh.vz(b)) * 0.5;
-      var ok = true;
-      for (final f in topo.facesOfVertex(a)) {
-        if (!_keepsOrientation(mesh, f, a, b, mx, my, mz)) {
-          ok = false;
-          break;
-        }
-      }
-      if (ok) {
-        for (final f in topo.facesOfVertex(b)) {
-          if (!_keepsOrientation(mesh, f, b, a, mx, my, mz)) {
-            ok = false;
-            break;
-          }
-        }
-      }
-      if (!ok) continue;
-      parent[b] = a;
-      target[b] = a;
-      // Move the surviving vertex to the midpoint for better shape quality.
-      mesh.positions[a * 3] = mx;
-      mesh.positions[a * 3 + 1] = my;
-      mesh.positions[a * 3 + 2] = mz;
+      state.tryCollapse(
+        a,
+        b,
+        (mesh.vx(a) + mesh.vx(b)) * 0.5,
+        (mesh.vy(a) + mesh.vy(b)) * 0.5,
+        (mesh.vz(a) + mesh.vz(b)) * 0.5,
+        preserveBoundary: preserveBoundary,
+        sharp: sharp,
+      );
     }
-
-    final builder = MeshBuilder();
-    final newIndex = Int32List(n);
-    for (var v = 0; v < n; v++) {
-      final r = find(v);
-      if (r == v) {
-        newIndex[v] = builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v));
-      }
-    }
-    for (var v = 0; v < n; v++) {
-      final r = find(v);
-      if (r != v) newIndex[v] = newIndex[r];
-    }
-    for (var f = 0; f < mesh.faceCount; f++) {
-      final a = newIndex[find(mesh.indices[f * 3])];
-      final b = newIndex[find(mesh.indices[f * 3 + 1])];
-      final c = newIndex[find(mesh.indices[f * 3 + 2])];
-      if (a == b || b == c || a == c) continue;
-      builder.addTriangle(a, b, c);
-    }
-    final out = builder.build();
+    final out = state.build();
     out.removeDegenerateFaces();
     out.compact();
     return out;
-  }
-
-  static bool _keepsOrientation(TriMesh m, int f, int from, int other, double mx, double my, double mz) {
-    final ids = <int>[m.indices[f * 3], m.indices[f * 3 + 1], m.indices[f * 3 + 2]];
-    if (!ids.contains(from)) return true;
-    // Faces containing both endpoints degenerate and are dropped later.
-    if (ids.contains(other)) return true;
-    final before = _faceNormal(m, f);
-    final p = <List<double>>[];
-    for (final v in ids) {
-      if (v == from) {
-        p.add(<double>[mx, my, mz]);
-      } else if (v == other) {
-        // The other endpoint also moves to the merged position.
-        p.add(<double>[mx, my, mz]);
-      } else {
-        p.add(<double>[m.vx(v), m.vy(v), m.vz(v)]);
-      }
-    }
-    final ux = p[1][0] - p[0][0], uy = p[1][1] - p[0][1], uz = p[1][2] - p[0][2];
-    final wx = p[2][0] - p[0][0], wy = p[2][1] - p[0][1], wz = p[2][2] - p[0][2];
-    var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
-    final l = math.sqrt(nx * nx + ny * ny + nz * nz);
-    if (l < 1e-20) return false;
-    nx /= l; ny /= l; nz /= l;
-    return nx * before[0] + ny * before[1] + nz * before[2] > 0.2;
   }
 
   /// Flips interior edges when the flip reduces deviation from valence six.
@@ -540,6 +477,8 @@ class IsotropicRemesher {
       if (preserveBoundary && (boundary.contains(a) || boundary.contains(b))) continue;
       final f0 = entry.value[0], f1 = entry.value[1];
       if (flipped.contains(f0) || flipped.contains(f1)) continue;
+      if (!faces[f0].contains(a) || !faces[f0].contains(b)) continue;
+      if (!faces[f1].contains(a) || !faces[f1].contains(b)) continue;
       // Find the opposite vertices.
       int? c, d;
       for (final v in faces[f0]) {
@@ -550,6 +489,8 @@ class IsotropicRemesher {
       }
       if (c == null || d == null) continue;
       if (c == d) continue;
+      // Flipping to c-d is only legal if c-d is not already an edge.
+      if (_edgeExists(faces, c, d)) continue;
       final before = (valence[a] - 6).abs() + (valence[b] - 6).abs() +
           (valence[c] - 6).abs() + (valence[d] - 6).abs();
       final after = (valence[a] - 7).abs() + (valence[b] - 7).abs() +
@@ -585,6 +526,18 @@ class IsotropicRemesher {
     final out = builder.build();
     out.removeDegenerateFaces();
     return out;
+  }
+
+  static bool _edgeExists(List<List<int>> faces, int a, int b) {
+    for (final f in faces) {
+      var hasA = false, hasB = false;
+      for (final v in f) {
+        if (v == a) hasA = true;
+        if (v == b) hasB = true;
+      }
+      if (hasA && hasB) return true;
+    }
+    return false;
   }
 
   static List<double> _normalOf(TriMesh m, int a, int b, int c) {

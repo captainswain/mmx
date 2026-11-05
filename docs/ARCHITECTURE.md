@@ -32,7 +32,8 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
                        boundary-loop bridging/stitching, non-manifold splitting,
                        defect inspector
   lib/src/remesh/      isotropic remeshing (split/collapse/flip/relax/project),
-                       adaptive-density remeshing, linear subdivision, QEM
+                       adaptive-density remeshing with a live validated
+                       topology, linear subdivision, QEM
                        decimation (area-weighted quadrics) with a uniform
                        shortest-edge mode and max-deviation stop
   lib/src/solid/       narrow-band SDF voxelizer (ray-parity sign, flood fill),

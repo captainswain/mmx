@@ -74,6 +74,7 @@ void main() {
       expect(out.faceCount, greaterThan(0));
       expect(MeshTopology(out).boundaryLoops(), isEmpty);
       expect(MeshTopology(out).components().$2, 1);
+      expect(MeshTopology(out).nonManifoldEdges(), isEmpty);
     });
 
     test('produces near-uniform edges', () {
