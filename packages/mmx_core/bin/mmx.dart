@@ -8,7 +8,7 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
 
   mmx info <file>
   mmx repair <in> <out> [--weld 1e-5]
-  mmx remesh <in> <out> --edge <len> [--iters 6]
+  mmx remesh <in> <out> --edge <len> [--iters 6] [--adaptive 0-1]
   mmx reduce <in> <out> --percent <0-1> | --faces <n> [--uniform] [--max-dev <d>]
   mmx solid <in> <out> [--mode fast|accurate|blocky] [--res 128] [--offset 0] [--smooth 0]
   mmx boolean <a> <b> <out> --op union|intersection|difference [--precise] [--edge <len>]
@@ -113,7 +113,9 @@ Future<void> main(List<String> args) async {
         final mesh = load(positional[0]);
         final edge = flag('edge', mesh.bounds().diagonal / 100);
         final out = IsotropicRemesher.remesh(mesh,
-            targetEdgeLength: edge, iterations: flag('iters', 6).toInt());
+            targetEdgeLength: edge,
+            iterations: flag('iters', 6).toInt(),
+            adaptiveDensity: flag('adaptive', 0));
         save(positional[1], out);
       }
     case 'reduce':

@@ -32,8 +32,9 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
                        boundary-loop bridging/stitching, non-manifold splitting,
                        defect inspector
   lib/src/remesh/      isotropic remeshing (split/collapse/flip/relax/project),
-                       linear subdivision, QEM decimation (area-weighted quadrics)
-                       with a uniform shortest-edge mode
+                       adaptive-density remeshing, linear subdivision, QEM
+                       decimation (area-weighted quadrics) with a uniform
+                       shortest-edge mode and max-deviation stop
   lib/src/solid/       narrow-band SDF voxelizer (ray-parity sign, flood fill),
                        surface-nets polygonizer, make-solid (Fast reprojects onto
                        the input), offset, hollow with escape holes, grid CSG,
@@ -144,7 +145,7 @@ the interface takes plain arrays and a camera rather than Flutter objects.
 
 ## 5. Correctness and verification
 
-`dart test` runs 80 tests against the models that ship inside the Meshmixer
+`dart test` runs 81 tests against the models that ship inside the Meshmixer
 installer, asserting invariants rather than snapshots:
 
 * import/export round trips for STL/OBJ/PLY preserve area within 1e-4;

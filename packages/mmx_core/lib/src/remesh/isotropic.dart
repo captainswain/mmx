@@ -72,6 +72,7 @@ class IsotropicRemesher {
     bool preserveSharp = false,
     double sharpAngleDegrees = 45,
     bool preserveGroupBoundaries = false,
+    double adaptiveDensity = 0.0,
     void Function(int done, int total)? progress,
   }) {
     if (input.faceCount == 0) return input;
@@ -95,9 +96,23 @@ class IsotropicRemesher {
 
     for (var it = 0; it < iterations; it++) {
       progress?.call(it, iterations);
-      mesh = _splitLong(mesh, targetEdgeLength * 4.0 / 3.0);
+      final curvSplit = adaptiveDensity > 0 ? _curvature(mesh) : null;
+      double density(List<double> c, int a, int b) =>
+          (1.0 + adaptiveDensity * (c[a] + c[b]) * 0.5).clamp(0.25, 4.0);
+
+      mesh = _splitLong(mesh, targetEdgeLength * 4.0 / 3.0,
+          maxFor: curvSplit == null
+              ? null
+              : (a, b) => targetEdgeLength *
+                  4.0 /
+                  3.0 *
+                  density(curvSplit, a, b));
+      final curvCollapse = adaptiveDensity > 0 ? _curvature(mesh) : null;
       mesh = _collapseShort(
-          mesh, targetEdgeLength * 0.8, preserveBoundary, constraints(mesh));
+          mesh, targetEdgeLength * 0.8, preserveBoundary, constraints(mesh),
+          minFor: curvCollapse == null
+              ? null
+              : (a, b) => targetEdgeLength * 0.8 * density(curvCollapse, a, b));
       mesh = _flipForValence(mesh, preserveBoundary, constraints(mesh));
       mesh = _tangentialRelax(
           mesh, originalBvh, preserveBoundary, constraints(mesh));
@@ -212,9 +227,56 @@ class IsotropicRemesher {
     return <double>[nx / l, ny / l, nz / l];
   }
 
+  /// Per-vertex normalized curvature (angle defect), used by adaptive density.
+  static List<double> _curvature(TriMesh mesh) {
+    final topo = MeshTopology(mesh);
+    final sum = List<double>.filled(mesh.vertexCount, 0.0);
+    for (var f = 0; f < mesh.faceCount; f++) {
+      final a = mesh.indices[f * 3];
+      final b = mesh.indices[f * 3 + 1];
+      final c = mesh.indices[f * 3 + 2];
+      void angleAt(int v, int p, int q) {
+        final ux = mesh.vx(p) - mesh.vx(v);
+        final uy = mesh.vy(p) - mesh.vy(v);
+        final uz = mesh.vz(p) - mesh.vz(v);
+        final wx = mesh.vx(q) - mesh.vx(v);
+        final wy = mesh.vy(q) - mesh.vy(v);
+        final wz = mesh.vz(q) - mesh.vz(v);
+        final lu = math.sqrt(ux * ux + uy * uy + uz * uz);
+        final lw = math.sqrt(wx * wx + wy * wy + wz * wz);
+        if (lu < 1e-20 || lw < 1e-20) return;
+        final cosA = ((ux * wx + uy * wy + uz * wz) / (lu * lw)).clamp(-1.0, 1.0);
+        sum[v] += math.acos(cosA);
+      }
+
+      angleAt(a, b, c);
+      angleAt(b, c, a);
+      angleAt(c, a, b);
+    }
+    final boundary = <int>{};
+    for (final e in topo.boundaryEdges()) {
+      boundary.add(e[0]);
+      boundary.add(e[1]);
+    }
+    final defect = List<double>.filled(mesh.vertexCount, 0.0);
+    var maxDefect = 0.0;
+    for (var v = 0; v < mesh.vertexCount; v++) {
+      final full = boundary.contains(v) ? math.pi : 2 * math.pi;
+      final d = (full - sum[v]).clamp(0.0, full);
+      defect[v] = d;
+      if (d > maxDefect) maxDefect = d;
+    }
+    if (maxDefect < 1e-20) return List<double>.filled(mesh.vertexCount, 0.0);
+    for (var v = 0; v < defect.length; v++) {
+      defect[v] /= maxDefect;
+    }
+    return defect;
+  }
+
   /// Splits every edge longer than [maxLen]. Handles faces with one, two or
   /// three long edges so the result stays conforming.
-  static TriMesh _splitLong(TriMesh mesh, double maxLen) {
+  static TriMesh _splitLong(TriMesh mesh, double maxLen,
+      {double Function(int, int)? maxFor}) {
     final builder = MeshBuilder();
     final vmap = List<int>.generate(mesh.vertexCount, (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
     final midCache = <int, int>{};
@@ -235,9 +297,9 @@ class IsotropicRemesher {
 
     for (var f = 0; f < mesh.faceCount; f++) {
       final va = mesh.indices[f * 3], vb = mesh.indices[f * 3 + 1], vc = mesh.indices[f * 3 + 2];
-      final ab = _len(mesh, va, vb) > maxLen;
-      final bc = _len(mesh, vb, vc) > maxLen;
-      final ca = _len(mesh, vc, va) > maxLen;
+      final ab = _len(mesh, va, vb) > (maxFor?.call(va, vb) ?? maxLen);
+      final bc = _len(mesh, vb, vc) > (maxFor?.call(vb, vc) ?? maxLen);
+      final ca = _len(mesh, vc, va) > (maxFor?.call(vc, va) ?? maxLen);
       final A = vmap[va], B = vmap[vb], C = vmap[vc];
       final count = (ab ? 1 : 0) + (bc ? 1 : 0) + (ca ? 1 : 0);
       if (count == 0) {
@@ -297,7 +359,8 @@ class IsotropicRemesher {
 
   /// Collapses edges shorter than [minLen] when the collapse keeps the mesh
   /// manifold and does not invert any incident triangle.
-  static TriMesh _collapseShort(TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp) {
+  static TriMesh _collapseShort(TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp,
+      {double Function(int, int)? minFor}) {
     final topo = MeshTopology(mesh);
     final boundary = <int>{};
     if (preserveBoundary) {
@@ -337,7 +400,7 @@ class IsotropicRemesher {
       final a0 = key ~/ n, b0 = key % n;
       final a = find(a0), b = find(b0);
       if (a == b) continue;
-      if (_len(mesh, a, b) >= minLen) continue;
+      if (_len(mesh, a, b) >= (minFor?.call(a, b) ?? minLen)) continue;
       if (sharp.contains(a) && sharp.contains(b)) continue;
       if (preserveBoundary) {
         final aB = boundary.contains(a), bB = boundary.contains(b);

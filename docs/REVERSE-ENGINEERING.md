@@ -449,13 +449,13 @@ Accurate with a negative offset. Detailed notes are in
   `SupportForestGenerator::Generate` accepts angles in the 1..100 range;
   `MeshReducer::ReduceToMinEdgeLength` compares squared edge lengths against the
   minimum-edge parameter; `MeshToSolid::GenerateVoxelSolid` subtracts its float
-  offset from the bounds. Reducer collapse thresholds, the support objective and
-  adaptive transition widths remain unknown.
+  offset from the bounds. The adaptive-density remesh uses an angle-defect
+  heuristic; the exact Meshmixer falloff mapping remains unknown.
 * **Tool breadth** - `addTube`, planar `unwrap`, complex split/filter/join,
   `makePolygon`, `makePart`/`makeSolidPart`, `createPivot`, soft-move/bend,
-  fixed-fill plane cuts and max-deviation reduce are implemented. Remaining
-  gaps: `generateComplex`, adaptive-density/transition remesh, and
-  texture/UV/stamp semantics in `.mix`.
+  fixed-fill plane cuts, max-deviation reduce and adaptive-density remesh are
+  implemented. Remaining gaps: `generateComplex` and texture/UV/stamp semantics
+  in `.mix`.
 
 ## 8. References
 
