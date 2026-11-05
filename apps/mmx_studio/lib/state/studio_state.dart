@@ -441,6 +441,7 @@ class StudioState extends ChangeNotifier {
         }
       }
     }
+    doc.snapshot('Pivot');
     obj.pivot = Pivot.atVertex(obj.mesh, vertex);
     status = 'Pivot created';
     notify();
