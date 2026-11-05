@@ -450,7 +450,8 @@ Accurate with a negative offset. Detailed notes are in
   `MeshReducer::ReduceToMinEdgeLength` compares squared edge lengths against the
   minimum-edge parameter; `MeshToSolid::GenerateVoxelSolid` subtracts its float
   offset from the bounds. The adaptive-density remesh uses an angle-defect
-  heuristic; the exact Meshmixer falloff mapping remains unknown.
+  heuristic; the exact Meshmixer falloff mapping remains unknown, and aggressive
+  settings can leave a few non-manifold edges after best-effort repair.
 * **Tool breadth** - `addTube`, planar `unwrap`, complex split/filter/join,
   `makePolygon`, `makePart`/`makeSolidPart`, `createPivot`, soft-move/bend,
   fixed-fill plane cuts, max-deviation reduce and adaptive-density remesh are

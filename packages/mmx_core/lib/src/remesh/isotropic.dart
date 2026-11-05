@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import '../mesh/topology.dart';
 import '../mesh/tri_mesh.dart';
+import '../repair/inspector.dart';
+import '../repair/weld.dart';
 import '../spatial/bvh.dart';
 
 /// Isotropic remeshing in the Botsch-Kobbelt style: split long edges, collapse
@@ -122,6 +124,13 @@ class IsotropicRemesher {
     progress?.call(iterations, iterations);
     mesh.removeDegenerateFaces();
     mesh.compact();
+    if (adaptiveDensity > 0) {
+      Weld.removeDuplicateFaces(mesh);
+      for (var pass = 0; pass < 2; pass++) {
+        if (MeshTopology(mesh).nonManifoldEdges().isEmpty) break;
+        mesh = MeshInspector.splitNonManifold(mesh);
+      }
+    }
     if (groupSegments.isNotEmpty) {
       mesh.faceGroups = _transferFaceGroups(input, mesh, originalBvh);
     }
