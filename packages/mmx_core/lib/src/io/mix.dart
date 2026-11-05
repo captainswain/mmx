@@ -82,7 +82,30 @@ class MixIO {
     final surfLen = _u32(payload, off);
     off += 4 + surfLen;
     final meshLen = _u32(payload, off);
+    if (off + 4 + meshLen > payload.length) return null;
+    final meshTag =
+        String.fromCharCodes(payload.sublist(off + 4, off + 4 + meshLen));
     off += 4 + meshLen;
+
+    var vStride = _vertexRecordSize;
+    var vPosOffset = 8;
+    var fStride = _faceRecordSize;
+    var fIndexOffset = 8;
+    if (meshTag.startsWith('VFMesh 1.2')) {
+      // Older layout: four counts, then 56-byte vertex records with the id
+      // first and the position at +4, and 20-byte face records
+      // (id, a, b, c, 0).
+      if (off + 16 > payload.length) return null;
+      final nv12 = _u32(payload, off);
+      final nf12 = _u32(payload, off + 8);
+      off += 16;
+      vStride = 56;
+      vPosOffset = 4;
+      fStride = 20;
+      fIndexOffset = 4;
+      return _readRecords(payload, off, nv12, nf12, vStride, vPosOffset,
+          fStride, fIndexOffset);
+    }
     if (off + 24 > payload.length) return null;
 
     final nv = _u32(payload, off);
@@ -90,14 +113,28 @@ class MixIO {
     final vPayload = _u32(payload, off + 16);
     final fPayload = _u32(payload, off + 20);
     off += 24;
-    final vStride = vPayload + 4;
-    final fStride = fPayload + 4;
+    vStride = vPayload + 4;
+    fStride = fPayload + 4;
+    return _readRecords(
+        payload, off, nv, nf, vStride, vPosOffset, fStride, fIndexOffset);
+  }
+
+  static MixObject? _readRecords(
+    Uint8List payload,
+    int off,
+    int nv,
+    int nf,
+    int vStride,
+    int vPosOffset,
+    int fStride,
+    int fIndexOffset,
+  ) {
     if (nv <= 0 || nf <= 0) return null;
     if (off + nv * vStride + nf * fStride > payload.length) return null;
 
     final positions = Float32List(nv * 3);
     for (var i = 0; i < nv; i++) {
-      final base = off + i * vStride + 8;
+      final base = off + i * vStride + vPosOffset;
       positions[i * 3] = _f32(payload, base);
       positions[i * 3 + 1] = _f32(payload, base + 4);
       positions[i * 3 + 2] = _f32(payload, base + 8);
@@ -105,7 +142,7 @@ class MixIO {
     final faceOff = off + nv * vStride;
     final indices = Uint32List(nf * 3);
     for (var i = 0; i < nf; i++) {
-      final base = faceOff + i * fStride + 8;
+      final base = faceOff + i * fStride + fIndexOffset;
       indices[i * 3] = _u32(payload, base);
       indices[i * 3 + 1] = _u32(payload, base + 4);
       indices[i * 3 + 2] = _u32(payload, base + 8);
@@ -132,7 +169,7 @@ class MixIO {
       if (payload.length > 5 && payload[0] == 0x3c && payload[1] == 0x3f) {
         // XML record: pull names and visibility per mesh block id.
         final xml = utf8.decode(payload, allowMalformed: true);
-        final objectRe = RegExp(r'<MeshSO9>(.*?)</MeshSO9>', dotAll: true);
+        final objectRe = RegExp(r'<MeshSO\d*>(.*?)</MeshSO\d*>', dotAll: true);
         for (final m in objectRe.allMatches(xml)) {
           final body = m.group(1) ?? '';
           final file = RegExp(r'<Filename>(.*?)</Filename>').firstMatch(body);

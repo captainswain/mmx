@@ -25,6 +25,21 @@ void main() {
       expect(objects.first.name, contains('bunny'));
     });
 
+    test('reads the older VFMesh 1.2 sample from the official mm-api repo', () {
+      final file = File('test/fixtures/mmapi_sphere.mix');
+      if (!file.existsSync()) {
+        markTestSkipped('mm-api sphere.mix fixture not present');
+        return;
+      }
+      final objects = MixIO.read(file.readAsBytesSync());
+      expect(objects.length, 1);
+      expect(objects.first.mesh.vertexCount, 6302);
+      expect(objects.first.mesh.faceCount, 12600);
+      expect(objects.first.name, 'sphere.obj');
+      expect(objects.first.mesh.signedVolume(), closeTo(4.18879, 0.01));
+      expect(MeshTopology(objects.first.mesh).boundaryLoops(), isEmpty);
+    });
+
     test('MeshIO dispatches .mix to the scene reader', () {
       final file = File('/data/re/meshmixer/sample.mix');
       if (!file.existsSync()) {

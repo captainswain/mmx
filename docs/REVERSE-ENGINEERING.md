@@ -242,25 +242,78 @@ Scene graph objects: `MeshSO`, `PivotSO`, `DecalSO`, `Camera`, `Scene`,
 **[observed]** A scene saved by the running 3.5.0 build under Wine was parsed
 directly. The file is a sequence of length-prefixed records:
 
-1. `[uint32 LE length][XML]` describing `SceneObjects`, one `MeshSO9` record per
-   object (Filename, MeshBlockID, Visibility, transforms) and `SemanticDB`.
+1. `[uint32 LE length][XML]` describing `SceneObjects`, one `MeshSO<n>` record
+   per object (Filename, MeshBlockID, Visibility, transforms) and
+   `SemanticDB`. The 3.5.0 build writes `MeshSO9`; the 3.0 API sample writes
+   `MeshSO11`.
 2. `[length][block index]`: block count, block id/size pairs, semantic block id
    and size.
 3. `[length][MMGS block]`: `u32 5` + `MMGS\0`, `u32 12` + `GSurf 01.01\0`,
-   `u32 11` + `VFMesh 1.3\0`, six u32 counts/strides (vertices, vertices,
-   faces, faces, 56, 24), then 60-byte vertex records (`u32 56`, vertex id,
-   3f position, 3f normal, u32 vertexCount, u32 0, 4f RGBA, u32 0) and
-   28-byte face records (`u32 24`, face id, three indices, u32 0, u32
-   0xFFFFFFFF), followed by a constant 194-byte `MeshPolygons 1.0` trailer.
+   then a mesh chunk. Two chunk versions exist:
+   * `VFMesh 1.3`: six u32 counts/strides (vertices, vertices, faces, faces,
+     56, 24), 60-byte vertex records (`u32 56`, vertex id, 3f position, 3f
+     normal, u32 vertexCount, u32 0, 4f RGBA, u32 0) and 28-byte face records
+     (`u32 24`, face id, three indices, u32 0, u32 0xFFFFFFFF).
+   * `VFMesh 1.2` (older): four u32 counts (vertices, vertices, faces, faces),
+     56-byte vertex records (`u32 vertexId`, 3f position, 3f normal, u32
+     vertexCount, u32 0, 4f RGBA, u32 0) and 20-byte face records (face id,
+     three indices, u32 0).
+   Both end with the constant 194-byte `MeshPolygons 1.0` trailer.
 4. `[length][MMSDB block]`: `u32 6` + `MMSDB\0`, `u32 17` +
    `SemanticDB 01.20\0` and a fixed 55-byte body.
 
 A `.mix` written by `mmx_core` for `bunnyr.obj` and `sphere.obj` opens in the
 unmodified Meshmixer 3.5.0 under Wine with the correct vertex and triangle
-counts, so the writer is byte-compatible with the shipped reader. Multi-object
+counts, so the writer is byte-compatible with the shipped reader. The reader
+also parses the official API sample
+(`mm-api/python/examples/sphere.mix`, VFMesh 1.2, 6302 vertices, 12600 faces,
+volume 4.18879) and the 3.5.0 scene saved under Wine (VFMesh 1.3). Multi-object
 scenes are written as one `MeshSO9`/`MMGS` pair per object and round-trip through
 mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
 (its Import dialog merges appended meshes into one object).
+
+### Official API headers (mm-api)
+
+**[observed]** Autodesk published the remote-scripting API for Meshmixer 3.0 at
+<https://github.com/meshmixer/mm-api>. Its `build/` directory contains the
+actual internal headers `StoredCommands.h`, `StoredCommands.cpp`,
+`BinarySerializer.h` and `LiveMesh.h`, carrying Autodesk's 2016 copyright. This
+is source-level documentation, not a leak, and it resolves several points that
+strings alone could not:
+
+* `StoredCommands.h` lists every tool accepted by `BeginTool` and its parameter
+  names, ranges and enum values. Examples: Reduce exposes
+  `goalType=Percentage|TriangleBudget|MaxDeviation` and
+  `reduceMetric=Uniform|QuadricError`; Remesh exposes
+  `goalType=RelativeDensity|AdaptiveDensity|TargetEdgeLength|LinearSubdivision`,
+  `transitionWidth`, `sharpThreshold` and
+  `boundaryMode=FreeBoundary|FixedBoundary|RefinedFixedBoundary`; Make Solid
+  exposes `solidType=Blocky|Fast|Accurate|FastSharp` plus
+  `solidResolution`/`meshResolution`; Hollow exposes `holesPerComponent`;
+  Make Pattern lists ten pattern generators (mesh edges, dual edges, Delaunay,
+  tubes, spheres, lattice, Poisson 2D/3D, face-group edges, custom).
+* The boolean command documents `solutionType=FastApproximate|Precise|
+  ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `robustModeDelta`,
+  `maxRefineDepth` and `postReduce`. This shows the precise path is a
+  mesh-intersection algorithm with boundary resampling, not only voxel CSG.
+* `LiveMesh.h` documents `PackedLiveMesh` (version, vertex/triangle counts,
+  flags for normals/colors/UVs/groups) and the `rms::VFTriangleMesh` kernel
+  class, confirming the kernel namespace and mesh layout.
+* The full tool inventory includes tools not yet in mmx: `addTube`,
+  `createPivot`, `unwrap`, `generateComplex`, `splitComplex`, `filterComplex`,
+  `makePart`, `makeSolidPart`, `makePolygon`, `warp`, `handle`.
+
+Copies and a generated parameter index are kept in `docs/reference/`
+(`StoredCommands.h`, `LiveMesh.h`, `BinarySerializer.h`, `API-PARAMETERS.md`).
+
+The same author (Ryan Schmidt, `[RMS]` in the headers) maintains the
+open-source `geometry3Sharp` C# library, whose class list overlaps the kernel
+almost one-for-one: `MeshBoolean`/`MeshMeshCut`, `MeshStitchLoops`, `MeshICP`,
+`MeshPlaneCut`, `MeshIterativeSmooth`, `Reducer`, `Remesher`,
+`SimpleHoleFiller`, `MeshLoopClosure`. It is the closest available source-level
+reference for the algorithms Meshmixer used. His successor application,
+Cotangent2, states it implements "better versions of Meshmixer Tools" and uses
+geometry3Sharp for the geometry work.
 
 ## 6. Algorithms (inferred from module names, parameter names and log strings)
 
@@ -268,11 +321,11 @@ mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
 |---|---|---|
 | Voxelization | `MeshRasterizer::RasterizeVolume_RayCast`, log `find surface voxels took %f`, `MeshToSolid::GenerateVoxelSolid: m_nTargetGridResolution is %d`; decompiled grid loop indexes `x + nx*(y + ny*z)` and tests sign changes against six neighbours | Ray-cast voxelization into a signed field with target grid resolution |
 | Solid conversion | `ImplicitPolygonizer.cpp`, `Make Solid` modes Blocky/Fast/Accurate, offset, min thickness, auto-repair | Implicit surface polygonization of the voxel field |
-| Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`, union/intersection/difference actions | Grid/implicit CSG on voxelized operands |
+| Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`, union/intersection/difference actions; API exposes `solutionType=FastApproximate|Precise|ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `maxRefineDepth`, `postReduce` | FastApproximate is voxel/implicit CSG; Precise/ExtraPrecise are mesh-intersection algorithms with boundary resampling and refinement |
 | Remeshing | `SurfaceRemesher.cpp`, `VariationalRemesher.cpp`, `MeshRefinement.cpp`, `RefinementConstraint.cpp`, params Target Edge Length/Regularity/Adaptive Density/Transition | Isotropic + adaptive remeshing with edge split/collapse/flip and density transition |
 | Decimation | `MeshReducer.cpp`, `Reduce Type` Percentage/Triangle Budget/Max Deviation, `Shape Preserving` | Quadric-error edge collapse with boundary constraints |
 | Hole filling | `SimpleHoleFiller.cpp`, `LoopStitcher.cpp`, `BoundaryJoiner/Stitcher/Bridge`, fill types Flat Minimal/Flat Remeshed/Smooth MVC | Boundary-loop triangulation with relaxation variants |
-| Deformation | `ARAPDeformer.cpp`, `LaplacianDeformer.cpp`, part attachment help text naming COILS/RotInvCoord deformation | As-rigid-as-possible and Laplacian solvers, dense linear algebra via ACML |
+| Deformation | `ARAPDeformer.cpp`, `LaplacianDeformer.cpp`, part attachment help text naming COILS/RotInvCoord deformation; the SIGGRAPH 2010 sketch states composition uses dynamic mesh parameterization (Schmidt et al. 2006) and linear variational deformation (Botsch & Sorkine 2008), plus a topology-independent geometric differential deformation | As-rigid-as-possible and Laplacian solvers, dense linear algebra via ACML |
 | Curves | `DiscreteRod.cpp`, `DiscreteRodSimulator.cpp` | Discrete elastic rods for curve handles / hair |
 | Spatial index | `IMeshOctree.cpp`, `OctreeFaceDecomposition.cpp`, `VoxelGrid`, `ParticleGrid`, `MeshVertexAOJob` | Octree/grid acceleration for queries, AO and nearest-point work |
 | 2D geometry | `Delaunay2D.cpp` with `Wm4::Delaunay2/3` RTTI (Wild Magic) | Delaunay triangulation for patterns and parameterization |
@@ -312,11 +365,38 @@ mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
   inside the reducer's edge queue, quadric weighting, the support optimization
   objective, and the adaptive-density transition widths. The reimplementation
   uses standard published formulations and documents each one.
-* Whether booleans are implicit-grid based or exact-mesh based is still
-  **[unknown]**; `MeshBoolean::Validate` and `FindJoinLoopPairs` are real mesh
-  operations over boundary loops, which suggests the pipeline is grid CSG
-  followed by a mesh-level join/validate pass, but the ordering was not proven.
+* The boolean pipeline is now partly resolved: the API header documents
+  `FastApproximate`, `Precise` and `ExtraPrecise` solution types with
+  `useIntersectionCurves`, `robustMode`, `maxRefineDepth` and `postReduce`.
+  That makes the precise path a mesh-intersection algorithm rather than pure
+  voxel CSG; the exact refinement thresholds and robustness constants are still
+  **[unknown]**.
 * The `.mix` container is parsed and written for triangle meshes (see section
   5). What remains unparsed inside it: `PivotSO`, `DecalSO`, stamps, shaders,
   and the per-face polygon-group table in the `MeshPolygons 1.0` trailer
   (mmx writes the constant single-group trailer Meshmixer itself emits).
+
+## 8. References
+
+* Autodesk Meshmixer API headers: <https://github.com/meshmixer/mm-api>
+  (`build/StoredCommands.h`, `build/LiveMesh.h`, `build/BinarySerializer.h`;
+  local copies in `docs/reference/`).
+* Autodesk Meshmixer API Python wrapper and examples:
+  <https://github.com/meshmixer/mm-api/tree/master/python>
+  (`examples/sphere.mix` is the VFMesh 1.2 test vector).
+* Ryan Schmidt and Karan Singh, "meshmixer: an interface for rapid mesh
+  composition", SIGGRAPH 2010 Talks:
+  <https://dl.acm.org/doi/10.1145/1837026.1837034>
+  (PDF: <https://papervideos.s3.amazonaws.com/meshmixerSketch10.pdf>).
+* geometry3Sharp, open-source geometry library by the Meshmixer author:
+  <https://github.com/gradientspace/geometry3Sharp>
+  (`MeshBoolean`, `MeshMeshCut`, `MeshStitchLoops`, `MeshICP`, `MeshPlaneCut`,
+  `MeshIterativeSmooth`, `Reducer`, `Remesher`, `SimpleHoleFiller`).
+* Cotangent2, the Meshmixer successor by the same author:
+  <https://www.cotangent.io/> and
+  <https://github.com/gradientspace/Cotangent2>.
+* Ryan Schmidt's project page for Meshmixer:
+  <https://www.rms80.com/projects/meshmixer>.
+* Just Solve the File Format Problem, MeshMixer entry:
+  <https://fileformats.archiveteam.org/wiki/MeshMixer>.
+
