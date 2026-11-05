@@ -114,6 +114,34 @@ class PlaneCut {
     return out;
   }
 
+  /// Assigns a new face group to triangles on one side of the plane without
+  /// changing geometry (Meshmixer's Plane Cut "Slice Groups" mode).
+  static TriMesh sliceGroups(
+    TriMesh mesh, {
+    required List<double> point,
+    required List<double> normal,
+    int groupId = 1,
+  }) {
+    final nx = normal[0], ny = normal[1], nz = normal[2];
+    final nl = math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (nl < 1e-12) return mesh;
+    final ux = nx / nl, uy = ny / nl, uz = nz / nl;
+    final px = point[0], py = point[1], pz = point[2];
+    final groups = Uint16List.fromList(
+        mesh.faceGroups ?? List<int>.filled(mesh.faceCount, 0));
+    for (var f = 0; f < mesh.faceCount; f++) {
+      final a = mesh.indices[f * 3];
+      final b = mesh.indices[f * 3 + 1];
+      final c = mesh.indices[f * 3 + 2];
+      final cx = (mesh.vx(a) + mesh.vx(b) + mesh.vx(c)) / 3.0;
+      final cy = (mesh.vy(a) + mesh.vy(b) + mesh.vy(c)) / 3.0;
+      final cz = (mesh.vz(a) + mesh.vz(b) + mesh.vz(c)) / 3.0;
+      final side = (cx - px) * ux + (cy - py) * uy + (cz - pz) * uz;
+      if (side > 0) groups[f] = groupId;
+    }
+    return TriMesh(mesh.positions, mesh.indices, faceGroups: groups);
+  }
+
   /// Splits the mesh into shells separated by the plane without discarding
   /// either side.
   static TriMesh slice(TriMesh mesh,

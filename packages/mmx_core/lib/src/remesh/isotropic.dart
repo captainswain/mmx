@@ -13,6 +13,48 @@ import '../spatial/bvh.dart';
 /// (the tool panel exposes "Remesh Mode / Remesh Type / Target Edge Length /
 /// Regularity / Adaptive Density / Preserve Sharp Edges / Boundary Mode").
 class IsotropicRemesher {
+  /// Linear subdivision: splits every triangle into four by adding edge
+  /// midpoints. This exactly preserves the input surface, matching Meshmixer's
+  /// Linear Subdivision remesh mode. Face groups are inherited by the children.
+  static TriMesh linearSubdivide(TriMesh input) {
+    final positions = <double>[...input.positions];
+    final indices = <int>[];
+    final groups = input.faceGroups == null
+        ? null
+        : <int>[];
+    final mids = <String, int>{};
+    int mid(int a, int b) {
+      final key = a < b ? '$a:$b' : '$b:$a';
+      final existing = mids[key];
+      if (existing != null) return existing;
+      final idx = positions.length ~/ 3;
+      positions.add((input.vx(a) + input.vx(b)) * 0.5);
+      positions.add((input.vy(a) + input.vy(b)) * 0.5);
+      positions.add((input.vz(a) + input.vz(b)) * 0.5);
+      mids[key] = idx;
+      return idx;
+    }
+
+    for (var f = 0; f < input.faceCount; f++) {
+      final a = input.indices[f * 3];
+      final b = input.indices[f * 3 + 1];
+      final c = input.indices[f * 3 + 2];
+      final ab = mid(a, b);
+      final bc = mid(b, c);
+      final ca = mid(c, a);
+      indices.addAll([a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca]);
+      if (groups != null) {
+        final g = input.faceGroups![f];
+        groups.addAll([g, g, g, g]);
+      }
+    }
+    return TriMesh(
+      Float32List.fromList(positions),
+      Uint32List.fromList(indices),
+      faceGroups: groups == null ? null : Uint16List.fromList(groups),
+    );
+  }
+
   /// [targetEdgeLength] is in mesh units. [iterations] controls quality vs
   /// speed. [preserveBoundary] pins open boundaries, matching the
   /// "Preserve Mesh Boundary" parameter in the shipped tool.

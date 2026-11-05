@@ -32,20 +32,22 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
                        boundary-loop bridging/stitching, non-manifold splitting,
                        defect inspector
   lib/src/remesh/      isotropic remeshing (split/collapse/flip/relax/project),
-                       QEM decimation with boundary quadrics
+                       linear subdivision, QEM decimation (area-weighted quadrics)
+                       with a uniform shortest-edge mode
   lib/src/solid/       narrow-band SDF voxelizer (ray-parity sign, flood fill),
                        surface-nets polygonizer, make-solid (Fast reprojects onto
                        the input), offset, hollow with escape holes, boolean CSG
   lib/src/analysis/    thickness, overhang, stability, deviation, mass properties
   lib/src/fab/         support forest (posts + struts + bases), orientation
                        search, 2D raster packing, layer slicing
-  lib/src/tools/       plane cut, sculpt brushes with dynamic refinement,
-                       selection sets, face groups, soft transform, flip normals,
-                       Taubin smoothing, bed placement, duplicate/combine,
-                       pattern arrays, primitive fitting, measure, clearance,
-                       ICP alignment, procedural stamps
+  lib/src/tools/       plane cut (with Slice Groups), sculpt brushes with dynamic
+                       refinement, selection sets, face groups, soft transform,
+                       flip normals, Taubin smoothing, bed placement,
+                       duplicate/combine, pattern arrays, primitive fitting,
+                       measure, clearance, ICP alignment, procedural stamps
   lib/src/scene/       document, scene objects, snapshot undo with byte budget
   lib/src/io/          OBJ/PLY/STL/OFF/3MF plus the native .mix container
+                       (VFMesh 1.2/1.3, face groups, pass-through rewrite)
   lib/src/render/      orbit camera, software z-buffer rasterizer, PNG encoder
   bin/mmx.dart         CLI for every operator
 apps/mmx_studio/                   Flutter app (Windows/macOS/Linux today)
@@ -138,7 +140,7 @@ the interface takes plain arrays and a camera rather than Flutter objects.
 
 ## 5. Correctness and verification
 
-`dart test` runs 66 tests against the models that ship inside the Meshmixer
+`dart test` runs 70 tests against the models that ship inside the Meshmixer
 installer, asserting invariants rather than snapshots:
 
 * import/export round trips for STL/OBJ/PLY preserve area within 1e-4;

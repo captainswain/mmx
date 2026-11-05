@@ -169,6 +169,86 @@ class MixIO {
             faceGroups: hasGroups ? groups : null));
   }
 
+  /// Rewrites mesh blocks in an existing scene while preserving every other
+  /// record byte-for-byte: XML scene objects (including PivotSO/DecalSO),
+  /// semantic blocks and any unknown blocks. Falls back to [write] when the
+  /// object count differs or the XML cannot be mapped to the block table.
+  static Uint8List rewrite(Uint8List original, List<MixObject> objects) {
+    final usable = objects.where((o) => o.mesh.faceCount > 0).toList();
+    final recs = _splitRecords(original);
+    if (recs.length < 4 || usable.isEmpty) return write(objects);
+
+    final xml = utf8.decode(recs[0], allowMalformed: true);
+    final ids = <int>[];
+    final objectRe = RegExp(r'<MeshSO\d*>(.*?)</MeshSO\d*>', dotAll: true);
+    for (final m in objectRe.allMatches(xml)) {
+      final body = m.group(1) ?? '';
+      final vis = RegExp(r'<Visibility>(\d+)</Visibility>').firstMatch(body);
+      if (vis != null && vis.group(1) == '0') continue;
+      final block = RegExp(r'<MeshBlockID>(\d+)</MeshBlockID>').firstMatch(body);
+      if (block != null) ids.add(int.parse(block.group(1)!));
+    }
+    if (ids.length != usable.length) return write(objects);
+
+    final index = recs[1];
+    var off = 0;
+    final count = _u32(index, off);
+    off += 4;
+    final entries = <List<int>>[];
+    for (var i = 0; i < count; i++) {
+      entries.add([_u32(index, off), _u32(index, off + 4)]);
+      off += 8;
+    }
+
+    final replacements = <int, Uint8List>{};
+    for (var i = 0; i < ids.length; i++) {
+      replacements[ids[i]] = _meshBlock(usable[i].mesh);
+    }
+
+    final newIndex = BytesBuilder();
+    _writeU32(newIndex, count);
+    for (final e in entries) {
+      _writeU32(newIndex, e[0]);
+      _writeU32(newIndex, replacements[e[0]]?.length ?? e[1]);
+    }
+
+    final out = BytesBuilder();
+    void record(List<int> payload) {
+      _writeU32(out, payload.length);
+      out.add(payload);
+    }
+
+    record(recs[0]);
+    record(newIndex.toBytes());
+    var pos = 2;
+    for (final e in entries) {
+      final replacement = replacements[e[0]];
+      if (replacement != null) {
+        record(replacement);
+      } else if (pos < recs.length) {
+        record(recs[pos++]);
+      } else {
+        return write(objects);
+      }
+    }
+    while (pos < recs.length) {
+      record(recs[pos++]);
+    }
+    return out.toBytes();
+  }
+
+  static List<Uint8List> _splitRecords(Uint8List bytes) {
+    final out = <Uint8List>[];
+    var off = 0;
+    while (off + 4 <= bytes.length) {
+      final len = _u32(bytes, off);
+      if (len == 0 || off + 4 + len > bytes.length) break;
+      out.add(bytes.sublist(off + 4, off + 4 + len));
+      off += 4 + len;
+    }
+    return out;
+  }
+
   /// Reads every mesh object in the scene. Returns an empty list when the
   /// container has no readable MMGS block.
   static List<MixObject> read(Uint8List bytes) {

@@ -117,6 +117,20 @@ void main() {
       expect(MeshTopology(cut).boundaryLoops(), isEmpty);
     });
 
+    test('plane cut slice groups tags one side without changing geometry', () {
+      final mesh = loadModel('sphere.obj');
+      final b = mesh.bounds();
+      final grouped = PlaneCut.sliceGroups(mesh,
+          point: <double>[0, b.minY + b.extentY * 0.5, 0],
+          normal: <double>[0, 1, 0],
+          groupId: 7);
+      expect(grouped.faceCount, mesh.faceCount);
+      expect(grouped.signedVolume(), closeTo(mesh.signedVolume(), 1e-6));
+      expect(grouped.faceGroups, isNotNull);
+      expect(grouped.faceGroups!.contains(7), isTrue);
+      expect(grouped.faceGroups!.contains(0), isTrue);
+    });
+
     test('sculpt draw displaces the surface', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();

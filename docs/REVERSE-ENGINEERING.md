@@ -413,10 +413,11 @@ Accurate with a negative offset. Detailed notes are in
   the voxel boolean path is Make Pattern. The exact density multipliers, merge
   iteration counts and robustness thresholds are still **[unknown]**.
 * The `.mix` container is parsed and written for triangle meshes (see section
-  5), including per-face group ids. What remains unparsed inside it: `PivotSO`,
-  `DecalSO`, stamps and shaders; unknown XML records and binary blocks are lost
-  when mmx rewrites a scene. The `MeshPolygons 1.0` trailer is constant in all
-  observed scenes, so it carries no group table.
+  5), including per-face group ids. `PivotSO`, `DecalSO`, stamps and shaders are
+  not decoded, but `MixIO.rewrite` rebuilds only the mesh blocks and keeps every
+  other record byte-for-byte, so those objects survive an edit round-trip. The
+  `MeshPolygons 1.0` trailer is constant in all observed scenes, so it carries
+  no group table.
 
 ## 8. References
 

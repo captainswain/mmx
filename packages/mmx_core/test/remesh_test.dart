@@ -35,9 +35,28 @@ void main() {
       expect(reduced.faceCount, lessThanOrEqualTo(2000 + 50));
       expect(reduced.faceCount, greaterThan(1000));
     });
+
+    test('uniform mode uses shortest-edge collapses', () {
+      final mesh = loadModel('bunnyr.obj');
+      final reduced = Decimator.reduce(mesh,
+          targetFaceCount: 2000, uniform: true);
+      print('bunny uniform: ${mesh.faceCount} -> ${reduced.faceCount}');
+      expect(reduced.faceCount, lessThanOrEqualTo(2050));
+      expect(reduced.validate(), isEmpty);
+      expect(reduced.signedVolume(), greaterThan(0));
+    });
   });
 
   group('isotropic remeshing', () {
+    test('linear subdivision preserves the surface exactly', () {
+      final mesh = loadModel('sphere.obj');
+      final sub = IsotropicRemesher.linearSubdivide(mesh);
+      expect(sub.faceCount, mesh.faceCount * 4);
+      expect(sub.signedVolume(),
+          closeTo(mesh.signedVolume(), mesh.signedVolume().abs() * 1e-6));
+      expect(MeshTopology(sub).boundaryLoops(), isEmpty);
+    });
+
     test('produces near-uniform edges', () {
       final mesh = loadModel('sphere.obj');
       final target = mesh.bounds().diagonal / 30.0;

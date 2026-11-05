@@ -69,6 +69,36 @@ void main() {
       expect(back.faceGroups!.sublist(groups.length - 10), groups.sublist(groups.length - 10));
     });
 
+    test('rewrite preserves the scene XML and updates the mesh', () {
+      final file = File('test/fixtures/grouped.mix');
+      if (!file.existsSync()) {
+        markTestSkipped('grouped.mix fixture not present');
+        return;
+      }
+      final original = file.readAsBytesSync();
+      final objects = MixIO.read(original);
+      final mesh = objects.first.mesh;
+      final scaledPositions = Float32List.fromList(
+          mesh.positions.map((v) => v * 2.0).toList());
+      final scaled = TriMesh(scaledPositions, mesh.indices,
+          faceGroups: mesh.faceGroups);
+      final rewritten =
+          MixIO.rewrite(original, [MixObject(name: 'scaled', mesh: scaled)]);
+      final back = MixIO.read(rewritten).first.mesh;
+      expect(back.faceCount, mesh.faceCount);
+      expect(back.signedVolume(),
+          closeTo(mesh.signedVolume() * 8.0, mesh.signedVolume().abs() * 0.01));
+      expect(back.faceGroups, isNotNull);
+      expect(back.faceGroups!.every((g) => g == 4), isTrue);
+      // XML record must be preserved byte-for-byte.
+      final bdOriginal = ByteData.sublistView(original);
+      final bdRewritten = ByteData.sublistView(rewritten);
+      final xmlLen = bdOriginal.getUint32(0, Endian.little);
+      expect(bdRewritten.getUint32(0, Endian.little), xmlLen);
+      expect(rewritten.sublist(4, 4 + xmlLen),
+          original.sublist(4, 4 + xmlLen));
+    });
+
     test('MeshIO dispatches .mix to the scene reader', () {
       final file = File('/data/re/meshmixer/sample.mix');
       if (!file.existsSync()) {

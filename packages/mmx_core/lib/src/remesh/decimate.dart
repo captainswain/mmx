@@ -18,6 +18,7 @@ class Decimator {
     int? targetFaceCount,
     double? percentage,
     bool preserveBoundary = true,
+    bool uniform = false,
     void Function(int current, int target)? progress,
   }) {
     final target = targetFaceCount ??
@@ -82,6 +83,23 @@ class Decimator {
     void pushEdges(int v) {
       for (final w in _neighbors(vFaces[v], faces)) {
         if (!vAlive[w] || w == v) continue;
+        if (uniform) {
+          // Meshmixer's Uniform reduce uses a shortest-edges-first criterion
+          // and collapses to the midpoint, producing regularly shaped
+          // triangles rather than preserving the shape.
+          final dx = positions[v * 3] - positions[w * 3];
+          final dy = positions[v * 3 + 1] - positions[w * 3 + 1];
+          final dz = positions[v * 3 + 2] - positions[w * 3 + 2];
+          final len = math.sqrt(dx * dx + dy * dy + dz * dz);
+          heap.push(
+              len,
+              v,
+              w,
+              (positions[v * 3] + positions[w * 3]) * 0.5,
+              (positions[v * 3 + 1] + positions[w * 3 + 1]) * 0.5,
+              (positions[v * 3 + 2] + positions[w * 3 + 2]) * 0.5);
+          continue;
+        }
         final cost = _collapseCost(quadrics[v], quadrics[w], positions, v, w);
         heap.push(cost.cost, v, w, cost.x, cost.y, cost.z);
       }
