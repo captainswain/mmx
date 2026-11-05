@@ -6,6 +6,14 @@ import '../repair/weld.dart';
 import '../spatial/bvh.dart';
 import 'solidifier.dart';
 
+class BooleanResult {
+  final TriMesh mesh;
+  final bool usedFallback;
+  final String? fallbackReason;
+
+  const BooleanResult(this.mesh, {this.usedFallback = false, this.fallbackReason});
+}
+
 /// Mesh-level boolean composition: classify triangles by containment, keep the
 /// requested side of each input, then stitch the resulting boundary loops.
 ///
@@ -15,6 +23,16 @@ import 'solidifier.dart';
 /// result.
 class PreciseBoolean {
   static TriMesh compute(
+    TriMesh a,
+    TriMesh b,
+    BooleanOp op, {
+    double? edgeLength,
+    int resolution = 160,
+  }) {
+    return computeDetailed(a, b, op, edgeLength: edgeLength, resolution: resolution).mesh;
+  }
+
+  static BooleanResult computeDetailed(
     TriMesh a,
     TriMesh b,
     BooleanOp op, {
@@ -64,7 +82,11 @@ class PreciseBoolean {
 
     var out = builder.build();
     if (out.faceCount == 0) {
-      return Solidifier.boolean(a, b, op, resolution: resolution).mesh;
+      return BooleanResult(
+        Solidifier.boolean(a, b, op, resolution: resolution).mesh,
+        usedFallback: true,
+        fallbackReason: 'empty mesh-level result',
+      );
     }
     out = Weld.weldVertices(out, tolerance: 1e-5);
     out = Bridge.stitchNearest(
@@ -77,9 +99,15 @@ class PreciseBoolean {
 
     if (MeshTopology(out).boundaryLoops().isNotEmpty ||
         out.signedVolume().abs() < 1e-9) {
-      return Solidifier.boolean(a, b, op, resolution: resolution).mesh;
+      return BooleanResult(
+        Solidifier.boolean(a, b, op, resolution: resolution).mesh,
+        usedFallback: true,
+        fallbackReason: MeshTopology(out).boundaryLoops().isNotEmpty
+            ? 'stitching left boundary loops'
+            : 'zero-volume result',
+      );
     }
-    return out;
+    return BooleanResult(out);
   }
 
   static TriMesh _remesh(TriMesh mesh, double edgeLength) {

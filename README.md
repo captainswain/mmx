@@ -65,7 +65,7 @@ work on touch screens. Android and iOS targets are scaffolded (`android/`,
 Requires Flutter 3.47+ and Dart 3.13+.
 
 ```bash
-# kernel tests (98 tests, uses models shipped inside the Meshmixer installer)
+# kernel tests (106 tests, uses models shipped inside the Meshmixer installer)
 cd packages/mmx_core
 dart pub get
 dart test

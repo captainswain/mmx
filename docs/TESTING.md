@@ -19,8 +19,8 @@ separately with `flutter test` under `apps/mmx_studio`.
 
 ## Current status (2026-11-04)
 
-- Kernel: 98 tests, all passing; `dart analyze` clean.
-- Studio: 10 widget/state tests passing; `flutter analyze` clean.
+- Kernel: 106 tests, all passing; `dart analyze` clean.
+- Studio: 11 widget/state tests passing; `flutter analyze` clean.
 - Measured line coverage for the newly added kernel modules:
 
 | Module | Line coverage |
@@ -47,26 +47,24 @@ have tests. Do not treat the 76.8% figure as an untested feature.
 
 ## Coverage gaps worth closing
 
-- `PreciseBoolean` empty-result fallback is tested; the second fallback when
-  stitching leaves a boundary loop is still not forced by a test.
+- `PreciseBoolean` both fallback branches are tested; `computeDetailed` exposes
+  `usedFallback` and the reason.
 - `CollapseMesh.tryCollapse` now has direct tests for sharp constraints and
   boundary-to-interior rejection; duplicate-face rejection is exercised through
   remesh but has no dedicated test.
-- Studio has no widget tests for the kernel tools added in the tool-breadth
-  phase (`Pivot`, `MakePolygon`, `AddTube`, `Unwrap`, `SoftMove`,
-  `ComplexTools.generate`/`makePart`). `Extract` in the UI still has its own
-  copy of the region-extraction code instead of calling `ComplexTools.extract`.
+- Studio now covers `Extract`, `Make Part` and `Pivot` through app-state
+  widget tests. `MakePolygon`, `AddTube`, `Unwrap`, `SoftMove` and
+  `ComplexTools.generate` remain kernel-only until they get parameter UI.
 - `MakePolygon` uses ear clipping; concave loops are covered.
 - `Unwrap` is planar-only; there is no UV layer storage in `TriMesh` or `.mix`.
-- `.mix` `PivotSO`, `DecalSO`, texture/UV and stamp records are preserved by
-  `MixIO.rewrite` but not decoded.
+- `.mix` unknown records are preserved by `MixIO.rewrite`; observed samples
+  do not contain `PivotSO`/`DecalSO`, so those schemas are not decoded yet.
 
 ## Known product caveats
 
 - Adaptive-density remeshing is a heuristic based on angle defect, not the
-  exact Meshmixer falloff. If the validated collapse pass still detects a
-  non-manifold result, the kernel falls back to uniform remeshing.
+  exact Meshmixer falloff. `remeshDetailed` reports `usedUniformFallback` when
+  the validated pass falls back to uniform remeshing.
 - `Solidifier._enforceMinThickness` is a simple erosion heuristic, not an exact
   wall-thickness solver.
 - `PlaneCut.sliceGroups` supports an optional negative-side group.
-- Pivot creation is kernel-only; the Studio UI does not expose it yet.

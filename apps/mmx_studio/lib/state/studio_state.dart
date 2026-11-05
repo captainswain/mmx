@@ -399,6 +399,53 @@ class StudioState extends ChangeNotifier {
     );
   }
 
+  Future<void> extractSelection() async {
+    final obj = selected;
+    final sel = selection;
+    if (obj == null || sel == null) return;
+    final faces = <int>{
+      for (var f = 0; f < obj.mesh.faceCount; f++)
+        if (sel.faceMask[f] != 0) f,
+    };
+    if (faces.isEmpty) return;
+    final out = ComplexTools.extract(obj.mesh, faces);
+    if (out.faceCount == 0) return;
+    await addObject(out, 'Extracted region');
+    status = 'Extracted ${out.faceCount} faces';
+  }
+
+  Future<void> makePart() async {
+    final obj = selected;
+    final sel = selection;
+    if (obj == null || sel == null) return;
+    final faces = <int>{
+      for (var f = 0; f < obj.mesh.faceCount; f++)
+        if (sel.faceMask[f] != 0) f,
+    };
+    if (faces.isEmpty) return;
+    final out = ComplexTools.makeSolidPart(obj.mesh, faces, resolution: 64);
+    await addObject(out, 'Solid part');
+    status = 'Made solid part (${out.faceCount} faces)';
+  }
+
+  Future<void> doCreatePivot() async {
+    final obj = selected;
+    if (obj == null) return;
+    var vertex = 0;
+    final sel = selection;
+    if (sel != null) {
+      for (var f = 0; f < obj.mesh.faceCount; f++) {
+        if (sel.faceMask[f] != 0) {
+          vertex = obj.mesh.indices[f * 3];
+          break;
+        }
+      }
+    }
+    obj.pivot = Pivot.atVertex(obj.mesh, vertex);
+    status = 'Pivot created';
+    notify();
+  }
+
   Future<void> doMakeSolid() async {
     final obj = selected;
     if (obj == null) return;

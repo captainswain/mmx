@@ -180,4 +180,29 @@ void main() {
     await tester.sendEventToBinding(second.up());
     state.dispose();
   });
+
+  testWidgets('extract and make part are wired through app state', (
+    tester,
+  ) async {
+    final state = StudioState();
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && state.selected == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(state.selected, isNotNull);
+      await state.selectAll();
+      final before = state.doc.objects.length;
+      await state.extractSelection();
+      expect(state.doc.objects.length, greaterThan(before));
+      expect(state.status, contains('Extracted'));
+      final afterExtract = state.doc.objects.length;
+      await state.makePart();
+      expect(state.doc.objects.length, greaterThan(afterExtract));
+      expect(state.status, contains('solid part'));
+      await state.doCreatePivot();
+      expect(state.selected!.pivot, isNotNull);
+      expect(state.status, contains('Pivot'));
+    });
+    state.dispose();
+  });
 }

@@ -43,10 +43,43 @@ void main() {
 
     test('empty mesh-level result falls back to grid CSG', () {
       final a = loadModel('sphere.obj');
-      final out = PreciseBoolean.compute(a, a.clone(), BooleanOp.union);
-      expect(out.faceCount, greaterThan(0));
-      expect(out.signedVolume(), closeTo(a.signedVolume(), a.signedVolume() * 0.05));
-      expect(MeshTopology(out).boundaryLoops(), isEmpty);
+      final b = a.clone();
+      final bounds = a.bounds();
+      final c = <double>[
+        (bounds.minX + bounds.maxX) / 2,
+        (bounds.minY + bounds.maxY) / 2,
+        (bounds.minZ + bounds.maxZ) / 2,
+      ];
+      b.transform(Float64List.fromList(<double>[
+        1.5, 0, 0, 0,
+        0, 1.5, 0, 0,
+        0, 0, 1.5, 0,
+        c[0] * (1 - 1.5), c[1] * (1 - 1.5), c[2] * (1 - 1.5), 1,
+      ]));
+      final result = PreciseBoolean.computeDetailed(a, b, BooleanOp.difference);
+      expect(result.usedFallback, isTrue);
+      expect(result.fallbackReason, contains('empty'));
+      expect(result.mesh.signedVolume().abs(), lessThan(1e-6));
+      expect(MeshTopology(result.mesh).boundaryLoops(), isEmpty);
+    });
+
+    test('stitching failure falls back to grid CSG', () {
+      final a = loadModel('sphere.obj');
+      final keep = <int>[];
+      for (var f = 0; f < a.faceCount; f++) {
+        if (f % 211 == 0) continue;
+        keep.addAll(<int>[
+          a.indices[f * 3],
+          a.indices[f * 3 + 1],
+          a.indices[f * 3 + 2],
+        ]);
+      }
+      final open = TriMesh(a.positions, Uint32List.fromList(keep));
+      final result = PreciseBoolean.computeDetailed(open, a.clone(), BooleanOp.union);
+      expect(result.mesh.faceCount, greaterThan(0));
+      expect(result.usedFallback, isTrue);
+      expect(result.fallbackReason, isNotNull);
+      expect(MeshTopology(result.mesh).boundaryLoops(), isEmpty);
     });
   });
 

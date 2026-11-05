@@ -81,6 +81,35 @@ void main() {
       }
     });
 
+    test('reports whether adaptive remeshing fell back', () {
+      final mesh = loadModel('sphere.obj');
+      final target = mesh.bounds().diagonal / 30.0;
+      final adaptive = IsotropicRemesher.remeshDetailed(mesh,
+          targetEdgeLength: target, iterations: 2, adaptiveDensity: 0.5);
+      expect(adaptive.usedUniformFallback, isFalse);
+      expect(adaptive.fallbackReason, isNull);
+      expect(adaptive.mesh.faceCount, greaterThan(0));
+
+      final bowtie = TriMesh(
+        Float32List.fromList(<double>[
+          -1, 0, 0,
+          1, 0, 0,
+          0, 1, 0,
+          0, -1, 0,
+          0, 0, 1,
+        ]),
+        Uint32List.fromList(<int>[
+          0, 1, 2,
+          0, 1, 3,
+          0, 1, 4,
+        ]),
+      );
+      final fallback = IsotropicRemesher.remeshDetailed(bowtie,
+          targetEdgeLength: 1.0, iterations: 2, adaptiveDensity: 0.5);
+      expect(fallback.usedUniformFallback, isTrue);
+      expect(fallback.fallbackReason, isNotNull);
+    });
+
     test('produces near-uniform edges', () {
       final mesh = loadModel('sphere.obj');
       final target = mesh.bounds().diagonal / 30.0;
@@ -220,6 +249,28 @@ void main() {
             preserveBoundary: true,
           ),
           isFalse);
+    });
+
+    test('rejects a collapse that would duplicate a face', () {
+      final mesh = TriMesh(
+        Float32List.fromList(<double>[
+          0, 0, 0,
+          1, 0, 0,
+          0, 1, 0,
+          0, 0, 1,
+          1, 1, 1,
+        ]),
+        Uint32List.fromList(<int>[
+          0, 1, 2,
+          0, 3, 2,
+          1, 3, 4,
+        ]),
+      );
+      final cm = CollapseMesh(mesh);
+      expect(
+          cm.tryCollapse(1, 3, 0.5, 0.0, 0.5),
+          isFalse);
+      expect(cm.build().faceCount, 3);
     });
   });
 }

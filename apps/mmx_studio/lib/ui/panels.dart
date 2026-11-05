@@ -170,6 +170,8 @@ class PropertiesPanel extends StatelessWidget {
           Row(
             children: [
               _button(context, 'Extract', _extractSelection),
+              _button(context, 'Make Part', _makePart),
+              _button(context, 'Pivot', state.doCreatePivot),
               _button(context, 'Smooth', _smoothSelection),
             ],
           ),
@@ -771,31 +773,9 @@ class PropertiesPanel extends StatelessWidget {
     });
   }
 
-  Future<void> _extractSelection() async {
-    final obj = state.selected;
-    final sel = state.selection;
-    if (obj == null || sel == null) return;
-    final mesh = obj.mesh;
-    final mask = sel.faceMask;
-    final builder = MeshBuilder();
-    final map = <int, int>{};
-    for (var f = 0; f < mesh.faceCount; f++) {
-      if (mask[f] == 0) continue;
-      final ids = <int>[];
-      for (var k = 0; k < 3; k++) {
-        final v = mesh.indices[f * 3 + k];
-        ids.add(
-          map.putIfAbsent(
-            v,
-            () => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)),
-          ),
-        );
-      }
-      builder.addTriangle(ids[0], ids[1], ids[2]);
-    }
-    if (builder.faceCount == 0) return;
-    await state.addObject(builder.build(), 'Extracted region');
-  }
+  Future<void> _extractSelection() => state.extractSelection();
+
+  Future<void> _makePart() => state.makePart();
 
   Future<void> _smoothSelection() async {
     final obj = state.selected;

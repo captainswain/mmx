@@ -9,6 +9,15 @@ import '../repair/weld.dart';
 import '../spatial/bvh.dart';
 import 'collapse_mesh.dart';
 
+class RemeshResult {
+  final TriMesh mesh;
+  final bool usedUniformFallback;
+  final String? fallbackReason;
+
+  const RemeshResult(this.mesh,
+      {this.usedUniformFallback = false, this.fallbackReason});
+}
+
 /// Isotropic remeshing in the Botsch-Kobbelt style: split long edges, collapse
 /// short ones, flip toward valence six, then relax tangentially and project
 /// back onto the input surface.
@@ -80,7 +89,33 @@ class IsotropicRemesher {
     bool debugTopology = false,
     void Function(int done, int total)? progress,
   }) {
-    if (input.faceCount == 0) return input;
+    return remeshDetailed(
+      input,
+      targetEdgeLength: targetEdgeLength,
+      iterations: iterations,
+      preserveBoundary: preserveBoundary,
+      preserveSharp: preserveSharp,
+      sharpAngleDegrees: sharpAngleDegrees,
+      preserveGroupBoundaries: preserveGroupBoundaries,
+      adaptiveDensity: adaptiveDensity,
+      debugTopology: debugTopology,
+      progress: progress,
+    ).mesh;
+  }
+
+  static RemeshResult remeshDetailed(
+    TriMesh input, {
+    required double targetEdgeLength,
+    int iterations = 6,
+    bool preserveBoundary = true,
+    bool preserveSharp = false,
+    double sharpAngleDegrees = 45,
+    bool preserveGroupBoundaries = false,
+    double adaptiveDensity = 0.0,
+    bool debugTopology = false,
+    void Function(int done, int total)? progress,
+  }) {
+    if (input.faceCount == 0) return RemeshResult(input);
     final originalBvh = TriangleBVH.build(input);
     var mesh = input.clone();
     final groupSegments = (preserveGroupBoundaries && input.faceGroups != null)
@@ -163,23 +198,27 @@ class IsotropicRemesher {
       // The angle-defect density heuristic can create non-manifold junctions
       // on aggressive settings. Fall back to the uniform pass, which is
       // topology-safe, rather than returning a non-manifold result.
-      return remesh(
-        input,
-        targetEdgeLength: targetEdgeLength,
-        iterations: iterations,
-        preserveBoundary: preserveBoundary,
-        preserveSharp: preserveSharp,
-        sharpAngleDegrees: sharpAngleDegrees,
-        preserveGroupBoundaries: preserveGroupBoundaries,
-        adaptiveDensity: 0.0,
-        debugTopology: debugTopology,
-        progress: progress,
+      return RemeshResult(
+        remesh(
+          input,
+          targetEdgeLength: targetEdgeLength,
+          iterations: iterations,
+          preserveBoundary: preserveBoundary,
+          preserveSharp: preserveSharp,
+          sharpAngleDegrees: sharpAngleDegrees,
+          preserveGroupBoundaries: preserveGroupBoundaries,
+          adaptiveDensity: 0.0,
+          debugTopology: debugTopology,
+          progress: progress,
+        ),
+        usedUniformFallback: true,
+        fallbackReason: 'adaptive remesh produced non-manifold edges',
       );
     }
     if (groupSegments.isNotEmpty) {
       mesh.faceGroups = _transferFaceGroups(input, mesh, originalBvh);
     }
-    return mesh;
+    return RemeshResult(mesh);
   }
 
   /// Endpoints of every edge whose adjacent faces carry different group ids.

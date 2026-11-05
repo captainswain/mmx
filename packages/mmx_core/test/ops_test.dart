@@ -156,6 +156,35 @@ void main() {
       expect(MeshTopology(both).boundaryLoops(), isEmpty);
     });
 
+    test('plane cut handles a plane through existing vertices', () {
+      final mesh = loadModel('sphere.obj');
+      final y = mesh.vy(0);
+      for (final keepPositive in <bool>[true, false]) {
+        final cut = PlaneCut.cut(mesh,
+            point: <double>[0, y, 0],
+            normal: <double>[0, 1, 0],
+            keepPositive: keepPositive,
+            fill: true);
+        expect(cut.faceCount, greaterThan(0));
+        expect(cut.signedVolume(), greaterThan(0));
+        expect(MeshTopology(cut).boundaryLoops(), isEmpty);
+        expect(cut.validate(), isEmpty);
+      }
+    });
+
+    test('plane cut handles an oblique plane', () {
+      final mesh = loadModel('sphere.obj');
+      final cut = PlaneCut.cut(mesh,
+          point: <double>[0, 0, 0],
+          normal: <double>[1, 1, 1],
+          keepPositive: true,
+          fill: true);
+      expect(cut.faceCount, greaterThan(0));
+      expect(cut.signedVolume(), greaterThan(0));
+      expect(MeshTopology(cut).boundaryLoops(), isEmpty);
+      expect(cut.validate(), isEmpty);
+    });
+
     test('plane cut slice groups tags one side without changing geometry', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();
@@ -214,6 +243,18 @@ void main() {
       expect(doc.objects.first.mesh.faceCount, greaterThan(reduced));
       expect(doc.redo(), isTrue);
       expect(doc.objects.first.mesh.faceCount, reduced);
+    });
+
+    test('snapshots preserve pivots', () {
+      final doc = Document();
+      final obj = doc.add(loadModel('sphere.obj'));
+      obj.pivot = Pivot.atPoint(<double>[1, 2, 3]);
+      doc.snapshot('pivot');
+      obj.pivot = Pivot.atPoint(<double>[4, 5, 6]);
+      expect(doc.undo(), isTrue);
+      expect(doc.objects.first.pivot!.position, <double>[1, 2, 3]);
+      expect(doc.redo(), isTrue);
+      expect(doc.objects.first.pivot!.position, <double>[4, 5, 6]);
     });
   });
 }

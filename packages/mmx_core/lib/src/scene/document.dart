@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../geom/bbox.dart';
 import '../mesh/tri_mesh.dart';
+import '../tools/pivot.dart';
 
 /// A named object in the scene: mesh plus transform, visibility and metadata.
 class SceneObject {
@@ -11,6 +12,7 @@ class SceneObject {
   Float64List transform;
   bool visible;
   bool isTarget;
+  Pivot? pivot;
 
   SceneObject(this.id, this.name, this.mesh, {Float64List? transform})
       : transform = transform ?? identity4(),
@@ -19,7 +21,8 @@ class SceneObject {
 
   SceneObject clone() => SceneObject(id, name, mesh.clone(), transform: Float64List.fromList(transform))
     ..visible = visible
-    ..isTarget = isTarget;
+    ..isTarget = isTarget
+    ..pivot = pivot;
 
   BBox worldBounds() {
     final m = mesh.clone();
