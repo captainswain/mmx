@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'add-release-build-script'
   workflow_dispatch:
     inputs:
       tag_name:
@@ -62,6 +64,10 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
 
+      - name: Enable Flutter desktop support
+        run: |
+          flutter config --enable-${{ matrix.platform }}-desktop
+
       - name: Build release packages
         shell: bash
         run: |
@@ -76,6 +82,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -125,6 +132,6 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           files: release-assets/*
           draft: ${{ github.event.inputs.draft == 'true' }}
-          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(steps.release_info.outputs.tag, '-rc') || contains(steps.release_info.outputs.tag, '-beta') || contains(steps.release_info.outputs.tag, '-alpha') }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(steps.release_info.outputs.tag, '-rc') || contains(steps.release_info.outputs.tag, '-beta') || contains(steps.release_info.outputs.tag, '-alpha') || contains(steps.release_info.outputs.tag, '-test') }}
           generate_release_notes: true
           fail_on_unmatched_files: true

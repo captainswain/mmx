@@ -16,6 +16,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Normalize Windows paths if in MSYS/Cygwin/Git Bash
+if command -v cygpath >/dev/null 2>&1; then
+  ROOT_DIR="$(cygpath -m "$ROOT_DIR")"
+fi
+
 # Detect platform
 detect_platform() {
   case "$(uname -s)" in
@@ -111,11 +116,17 @@ if [[ -z "$VERSION" ]]; then
   VERSION="$(detect_version)"
 fi
 
-# Ensure OUT_DIR is absolute path
 mkdir -p "$OUT_DIR"
-OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+if command -v cygpath >/dev/null 2>&1; then
+  OUT_DIR="$(cygpath -m "$(cd "$OUT_DIR" && pwd)")"
+else
+  OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+fi
 
 TEMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mmx-build')"
+if command -v cygpath >/dev/null 2>&1; then
+  TEMP_DIR="$(cygpath -m "$TEMP_DIR")"
+fi
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 echo "=================================================="
@@ -149,7 +160,7 @@ create_zip() {
   base_name="$(basename "$src_dir")"
 
   if command -v zip >/dev/null 2>&1; then
-    (cd "$parent_dir" && zip -r -q "$dest_archive" "$base_name")
+    (cd "$parent_dir" && zip -r -q -y "$dest_archive" "$base_name")
   elif command -v python3 >/dev/null 2>&1; then
     python3 -c "import shutil, sys; shutil.make_archive(sys.argv[1][:-4] if sys.argv[1].endswith('.zip') else sys.argv[1], 'zip', sys.argv[2], sys.argv[3])" "$dest_archive" "$parent_dir" "$base_name"
   elif command -v powershell >/dev/null 2>&1; then
