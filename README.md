@@ -10,6 +10,7 @@ the reverse-engineering report itself.
 * Architecture and technology rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 * Testing and coverage: [`docs/TESTING.md`](docs/TESTING.md)
 * Remaining-work plan: [`docs/REMEDIATION-PLAN.md`](docs/REMEDIATION-PLAN.md)
+* Finish plan (RE closure, parity, validation): [`docs/FINISH-PLAN.md`](docs/FINISH-PLAN.md)
 * Kernel: [`packages/mmx_core`](packages/mmx_core) (pure Dart, no Flutter dependency)
 * App: [`apps/mmx_studio`](apps/mmx_studio) (Flutter: Windows, macOS, Linux;
   Android/iOS scaffolds included)
