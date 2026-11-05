@@ -8,6 +8,7 @@ the reverse-engineering report itself.
 * RTTI class and vtable attribution: [`docs/RTTI.md`](docs/RTTI.md)
 * Method-name recovery and open-source relatives: [`docs/METHODS.md`](docs/METHODS.md)
 * Architecture and technology rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+* Testing and coverage: [`docs/TESTING.md`](docs/TESTING.md)
 * Kernel: [`packages/mmx_core`](packages/mmx_core) (pure Dart, no Flutter dependency)
 * App: [`apps/mmx_studio`](apps/mmx_studio) (Flutter: Windows, macOS, Linux;
   Android/iOS scaffolds included)
