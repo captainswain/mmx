@@ -324,6 +324,16 @@ namespace and class inventory: `rms::MeshBoolean`, `rms::MeshReducer`,
 `rms::SupportMesherGridImplicit`. That inventory is consistent with the
 module-name evidence and with the geometry3Sharp class list.
 
+Recovering the vtables behind those names (`tools/extract_rtti.py`) attributes
+method slots to classes: 2,314 classes and 28,240 slots, of which 913 classes
+have at least one method in the Ghidra corpus. `SurfaceRemesher::rms` has 39
+slots (8 decompiled, including `0x1409df4b0` and `0x1409e09a0`),
+`SurfaceReducer::rms` 39 (8), `BoundaryJoiner::rms` 39 (11),
+`M2SGridImplicit` 8 (2), `MeshFileWriter::rms` 3 (1), and the tool layer has
+`RemeshTool` 104, `MakeSolidTool` 88, `BooleanTool` 77 and `MakePatternTool`
+126 slots. This does not recover method names, but it turns anonymous `FUN_`
+addresses into class-attributed methods. See `docs/RTTI.md`.
+
 Autodesk's 2019 help pages go further than the strings: they describe the
 internal steps. Make Solid voxelizes at Solid Accuracy and again at Mesh
 Density, with Fast reprojecting onto the input, Accurate meshing a signed
@@ -373,8 +383,10 @@ Accurate with a negative offset. Detailed notes are in
   (`/data/re/meshmixer/ghidra_decomp2.txt`), 13 callers of 6 key addresses
   (`ghidra_key_callers.txt`), and a broad caller corpus of 15,968 functions for
   383 target addresses (`ghidra_callers.txt`). There is no PDB, so the functions
-  are still named `FUN_<address>`; the source-path and log strings are what tie
-  them to `libgeometry`/`libmeshtools` modules.
+  are still named `FUN_<address>`; RTTI vtable recovery attributes 913 classes
+  to functions in that corpus (see `docs/RTTI.md`), but individual method names
+  remain unknown. The source-path and log strings are what tie functions to
+  `libgeometry`/`libmeshtools` modules.
 * From that decompilation, these behaviours are now **[observed]** rather than
   inferred:
   * `MeshToSolid::GenerateVoxelSolid` rejects a target grid resolution below 1

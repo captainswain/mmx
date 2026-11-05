@@ -5,6 +5,7 @@ Meshmixer 3.5.0**, based on reverse engineering the shipped Windows binary, plus
 the reverse-engineering report itself.
 
 * Reverse engineering: [`docs/REVERSE-ENGINEERING.md`](docs/REVERSE-ENGINEERING.md)
+* RTTI class and vtable attribution: [`docs/RTTI.md`](docs/RTTI.md)
 * Architecture and technology rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 * Kernel: [`packages/mmx_core`](packages/mmx_core) (pure Dart, no Flutter dependency)
 * App: [`apps/mmx_studio`](apps/mmx_studio) (Flutter: Windows, macOS, Linux;
