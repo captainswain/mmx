@@ -128,6 +128,34 @@ void main() {
       expect(MeshTopology(cut).boundaryLoops(), isEmpty);
     });
 
+    test('plane cut honors the requested side', () {
+      final mesh = loadModel('sphere.obj');
+      final b = mesh.bounds();
+      final point = <double>[0, b.minY + b.extentY * 0.5, 0];
+      final normal = <double>[0, 1, 0];
+      final positive = PlaneCut.cut(mesh,
+          point: point, normal: normal, keepPositive: true, fill: true);
+      final negative = PlaneCut.cut(mesh,
+          point: point, normal: normal, keepPositive: false, fill: true);
+      expect(positive.signedVolume(), greaterThan(0));
+      expect(negative.signedVolume(), greaterThan(0));
+      expect(positive.signedVolume() + negative.signedVolume(),
+          closeTo(mesh.signedVolume(), mesh.signedVolume() * 0.02));
+      expect(MeshTopology(positive).boundaryLoops(), isEmpty);
+      expect(MeshTopology(negative).boundaryLoops(), isEmpty);
+    });
+
+    test('slice keeps both halves as separate shells', () {
+      final mesh = loadModel('sphere.obj');
+      final b = mesh.bounds();
+      final both = PlaneCut.slice(mesh,
+          point: <double>[0, b.minY + b.extentY * 0.5, 0],
+          normal: <double>[0, 1, 0]);
+      expect(both.signedVolume(), closeTo(mesh.signedVolume(), mesh.signedVolume() * 0.02));
+      expect(MeshTopology(both).components().$2, 2);
+      expect(MeshTopology(both).boundaryLoops(), isEmpty);
+    });
+
     test('plane cut slice groups tags one side without changing geometry', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();

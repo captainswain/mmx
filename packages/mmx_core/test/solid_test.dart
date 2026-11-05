@@ -28,6 +28,18 @@ void main() {
         expect(out.signedVolume(), greaterThan(0));
       }
     });
+
+    test('edgeLength remeshes the inputs before cutting', () {
+      final a = loadModel('sphere.obj');
+      final b = a.clone();
+      for (var i = 0; i < b.vertexCount; i++) {
+        b.positions[i * 3] += 1.0;
+      }
+      final out = PreciseBoolean.compute(a, b, BooleanOp.union,
+          edgeLength: a.bounds().diagonal / 80.0);
+      expect(out.faceCount, greaterThan(0));
+      expect(MeshTopology(out).boundaryLoops(), isEmpty);
+    });
   });
 
   group('make solid', () {
@@ -116,6 +128,27 @@ void main() {
       expect(vol, greaterThan(0));
       expect(vol, lessThan(mesh.signedVolume() * 0.6));
       expect(MeshTopology(result.mesh).boundaryLoops(), isEmpty);
+    });
+
+    test('hollow enforces a minimum wall thickness', () {
+      final mesh = loadModel('sphere.obj');
+      final t = mesh.bounds().extentX * 0.08;
+      final result = Solidifier.hollow(mesh,
+          thickness: t,
+          holes: 0,
+          resolution: 64,
+          minThickness: t * 0.5);
+      expect(result.mesh.faceCount, greaterThan(0));
+      expect(result.mesh.signedVolume(), greaterThan(0));
+      expect(MeshTopology(result.mesh).boundaryLoops(), isEmpty);
+    });
+
+    test('hollow supports an open top', () {
+      final mesh = loadModel('sphere.obj');
+      final t = mesh.bounds().extentX * 0.08;
+      final result = Solidifier.hollow(mesh,
+          thickness: t, holes: 0, resolution: 64, openTop: true);
+      expect(result.mesh.faceCount, greaterThan(0));
     });
   });
 }

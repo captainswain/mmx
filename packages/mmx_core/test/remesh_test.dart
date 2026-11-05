@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
@@ -111,6 +112,59 @@ void main() {
       final b = remeshed.bounds();
       final original = mesh.bounds();
       expect((b.diagonal - original.diagonal).abs() / original.diagonal, lessThan(0.1));
+    });
+
+    test('reports progress and preserves sharp features', () {
+      final mesh = loadModel('sphere.obj');
+      var calls = 0;
+      final out = IsotropicRemesher.remesh(mesh,
+          targetEdgeLength: mesh.bounds().diagonal / 20.0,
+          iterations: 2,
+          progress: (done, total) {
+            calls++;
+            expect(done, lessThanOrEqualTo(total));
+          });
+      expect(calls, greaterThanOrEqualTo(2));
+      expect(out.validate(), isEmpty);
+
+      final cube = TriMesh(
+        Float32List.fromList(<double>[
+          -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1,
+          -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
+        ]),
+        Uint32List.fromList(<int>[
+          0, 2, 1, 0, 3, 2,
+          4, 5, 6, 4, 6, 7,
+          0, 1, 5, 0, 5, 4,
+          1, 2, 6, 1, 6, 5,
+          2, 3, 7, 2, 7, 6,
+          3, 0, 4, 3, 4, 7,
+        ]),
+      );
+      final sharp = IsotropicRemesher.remesh(cube,
+          targetEdgeLength: cube.bounds().diagonal / 8.0,
+          iterations: 1,
+          preserveSharp: true,
+          sharpAngleDegrees: 30);
+      expect(sharp.faceCount, greaterThan(0));
+      expect(sharp.validate(), isEmpty);
+      expect(MeshTopology(sharp).boundaryLoops(), isEmpty);
+    });
+
+    test('preserves an open boundary', () {
+      final mesh = loadModel('sphere.obj');
+      final b = mesh.bounds();
+      final open = PlaneCut.cut(mesh,
+          point: <double>[0, b.minY + b.extentY * 0.5, 0],
+          normal: <double>[0, 1, 0],
+          fill: false);
+      final before = MeshTopology(open).boundaryLoops().length;
+      final out = IsotropicRemesher.remesh(open,
+          targetEdgeLength: open.bounds().diagonal / 25.0,
+          iterations: 1,
+          preserveBoundary: true);
+      expect(out.validate(), isEmpty);
+      expect(MeshTopology(out).boundaryLoops().length, before);
     });
   });
 }

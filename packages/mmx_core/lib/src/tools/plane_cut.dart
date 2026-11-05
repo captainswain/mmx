@@ -24,9 +24,13 @@ class PlaneCut {
     if (nl < 1e-12) return mesh;
     final ux = nx / nl, uy = ny / nl, uz = nz / nl;
     final px = point[0], py = point[1], pz = point[2];
+    final sign = keepPositive ? 1.0 : -1.0;
 
     double side(int v) =>
-        (mesh.vx(v) - px) * ux + (mesh.vy(v) - py) * uy + (mesh.vz(v) - pz) * uz;
+        sign *
+        ((mesh.vx(v) - px) * ux +
+            (mesh.vy(v) - py) * uy +
+            (mesh.vz(v) - pz) * uz);
 
     final builderPos = <double>[...mesh.positions];
     final indices = <int>[];

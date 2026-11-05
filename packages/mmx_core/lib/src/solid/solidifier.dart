@@ -146,6 +146,7 @@ class Solidifier {
     double holeRadius = 3.0,
     int resolution = 128,
     bool openTop = false,
+    double minThickness = 0.0,
   }) {
     final sw = Stopwatch()..start();
     final bounds = mesh.bounds();
@@ -174,6 +175,9 @@ class Solidifier {
     }
     if (holes > 0) {
       _drillEscapeHoles(grid, bounds, holes, holeRadius, thickness);
+    }
+    if (minThickness > 0) {
+      _enforceMinThickness(grid, minThickness);
     }
     var out = SurfaceNets.polygonize(grid);
     if (out.signedVolume() < 0) out = _flip(out);

@@ -24,6 +24,7 @@ class HoleFiller {
     final positions = <double>[...mesh.positions];
     final indices = <int>[...mesh.indices];
     var added = 0;
+    final filledVertices = <int>{};
 
     for (final loop in loops) {
       if (loop.length < 3) continue;
@@ -99,6 +100,7 @@ class HoleFiller {
           ? _fan(pts.length, wantCcw)
           : _earClip(pts, wantCcw);
       if (tris.isEmpty) continue;
+      filledVertices.addAll(loop);
       for (final t in tris) {
         final ia = loop[t[0]], ib = loop[t[1]], ic = loop[t[2]];
         indices.addAll(<int>[ia, ib, ic]);
@@ -108,7 +110,7 @@ class HoleFiller {
 
     final out = TriMesh(Float32List.fromList(positions), Uint32List.fromList(indices));
     if (mode == HoleFillMode.smooth && added > 0) {
-      _relax(out, smoothIterations);
+      _relax(out, smoothIterations, movable: filledVertices);
     }
     return out;
   }
@@ -204,22 +206,24 @@ class HoleFiller {
     return ((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])).abs() * 0.5;
   }
 
-  /// Laplacian relaxation restricted to vertices that were added by the fill
-  /// (i.e. vertices with no original incident geometry beyond the patch).
-  static void _relax(TriMesh mesh, int iterations) {
+  /// Laplacian relaxation restricted to the fill patch. When [movable] is
+  /// supplied only those vertices move; otherwise all non-boundary vertices do.
+  static void _relax(TriMesh mesh, int iterations, {Set<int>? movable}) {
     final topo = MeshTopology(mesh);
     final boundary = <int>{};
     for (final e in topo.boundaryEdges()) {
       boundary.add(e[0]);
       boundary.add(e[1]);
     }
-    final movable = <int>[];
-    for (var v = 0; v < mesh.vertexCount; v++) {
-      if (!boundary.contains(v)) movable.add(v);
-    }
+    final candidates = movable ??
+        <int>{
+          for (var v = 0; v < mesh.vertexCount; v++)
+            if (!boundary.contains(v)) v,
+        };
+    final movableVertices = candidates.where((v) => !boundary.contains(v)).toList();
     for (var it = 0; it < iterations; it++) {
       final next = Float32List.fromList(mesh.positions);
-      for (final v in movable) {
+      for (final v in movableVertices) {
         final nb = topo.neighborsOfVertex(v);
         if (nb.isEmpty) continue;
         var sx = 0.0, sy = 0.0, sz = 0.0;
