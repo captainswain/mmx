@@ -117,6 +117,17 @@ void main() {
       expect(MeshTopology(cut).boundaryLoops(), isEmpty);
     });
 
+    test('plane cut fixed fill caps the cut', () {
+      final mesh = loadModel('sphere.obj');
+      final b = mesh.bounds();
+      final cut = PlaneCut.cut(mesh,
+          point: <double>[0, b.minY + b.extentY * 0.5, 0],
+          normal: <double>[0, 1, 0],
+          fill: true,
+          fillMode: HoleFillMode.fixed);
+      expect(MeshTopology(cut).boundaryLoops(), isEmpty);
+    });
+
     test('plane cut slice groups tags one side without changing geometry', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();

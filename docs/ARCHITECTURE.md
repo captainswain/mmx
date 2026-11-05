@@ -41,11 +41,14 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
   lib/src/analysis/    thickness, overhang, stability, deviation, mass properties
   lib/src/fab/         support forest (posts + struts + bases), orientation
                        search, 2D raster packing, layer slicing
-  lib/src/tools/       plane cut (with Slice Groups), sculpt brushes with dynamic
-                       refinement, selection sets, face groups, soft transform,
-                       flip normals, Taubin smoothing, bed placement,
+  lib/src/tools/       plane cut (Slice Groups, fixed fill), sculpt brushes with
+                       dynamic refinement, selection sets, face groups, soft
+                       transform, flip normals, Taubin smoothing, bed placement,
                        duplicate/combine, pattern arrays, primitive fitting,
-                       measure, clearance, ICP alignment, procedural stamps
+                       measure, clearance, ICP alignment, procedural stamps,
+                       complex split/filter/join, add-tube, make-polygon,
+                       make-part/solid-part, pivot, planar unwrap,
+                       soft-move/bend
   lib/src/scene/       document, scene objects, snapshot undo with byte budget
   lib/src/io/          OBJ/PLY/STL/OFF/3MF plus the native .mix container
                        (VFMesh 1.2/1.3, face groups, pass-through rewrite)
@@ -141,7 +144,7 @@ the interface takes plain arrays and a camera rather than Flutter objects.
 
 ## 5. Correctness and verification
 
-`dart test` runs 71 tests against the models that ship inside the Meshmixer
+`dart test` runs 80 tests against the models that ship inside the Meshmixer
 installer, asserting invariants rather than snapshots:
 
 * import/export round trips for STL/OBJ/PLY preserve area within 1e-4;

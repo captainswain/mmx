@@ -45,6 +45,13 @@ void main() {
       expect(reduced.validate(), isEmpty);
       expect(reduced.signedVolume(), greaterThan(0));
     });
+    test('max deviation stops collapsing early', () {
+      final mesh = loadModel('sphere.obj');
+      final reduced = Decimator.reduce(mesh,
+          targetFaceCount: 1000, maxDeviation: 0.01);
+      expect(reduced.faceCount, greaterThan(1000));
+      expect(reduced.validate(), isEmpty);
+    });
   });
 
   group('isotropic remeshing', () {

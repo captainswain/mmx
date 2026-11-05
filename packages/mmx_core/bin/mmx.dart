@@ -9,7 +9,7 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
   mmx info <file>
   mmx repair <in> <out> [--weld 1e-5]
   mmx remesh <in> <out> --edge <len> [--iters 6]
-  mmx reduce <in> <out> --percent <0-1> | --faces <n>
+  mmx reduce <in> <out> --percent <0-1> | --faces <n> [--uniform] [--max-dev <d>]
   mmx solid <in> <out> [--mode fast|accurate|blocky] [--res 128] [--offset 0] [--smooth 0]
   mmx boolean <a> <b> <out> --op union|intersection|difference [--precise] [--edge <len>]
   mmx hollow <in> <out> --thickness <t> [--holes 3] [--hole-radius <r>]
@@ -121,7 +121,12 @@ Future<void> main(List<String> args) async {
         final mesh = load(positional[0]);
         final faces = flags.containsKey('faces') ? int.parse(flags['faces']!) : null;
         final pct = flags.containsKey('percent') ? flag('percent', 0.5) : null;
-        final out = Decimator.reduce(mesh, targetFaceCount: faces, percentage: pct);
+        final maxDev = flags.containsKey('max-dev') ? flag('max-dev', 0.0) : null;
+        final out = Decimator.reduce(mesh,
+            targetFaceCount: faces,
+            percentage: pct,
+            uniform: flags.containsKey('uniform'),
+            maxDeviation: maxDev == null || maxDev <= 0 ? null : maxDev);
         save(positional[1], out);
       }
     case 'solid':

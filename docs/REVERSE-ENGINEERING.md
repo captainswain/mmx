@@ -451,10 +451,11 @@ Accurate with a negative offset. Detailed notes are in
   minimum-edge parameter; `MeshToSolid::GenerateVoxelSolid` subtracts its float
   offset from the bounds. Reducer collapse thresholds, the support objective and
   adaptive transition widths remain unknown.
-* **Tool breadth** - `addTube`, `unwrap`, `createPivot`, `generateComplex`,
-  `splitComplex`, `filterComplex`, `makePart`, `makeSolidPart`, `makePolygon`,
-  `warp` and `handle` are still UI-level gaps; the core kernel operators that
-  matter for mesh processing are implemented.
+* **Tool breadth** - `addTube`, planar `unwrap`, complex split/filter/join,
+  `makePolygon`, `makePart`/`makeSolidPart`, `createPivot`, soft-move/bend,
+  fixed-fill plane cuts and max-deviation reduce are implemented. Remaining
+  gaps: `generateComplex`, adaptive-density/transition remesh, and
+  texture/UV/stamp semantics in `.mix`.
 
 ## 8. References
 

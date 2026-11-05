@@ -19,6 +19,7 @@ class Decimator {
     double? percentage,
     bool preserveBoundary = true,
     bool uniform = false,
+    double? maxDeviation,
     void Function(int current, int target)? progress,
   }) {
     final target = targetFaceCount ??
@@ -112,6 +113,7 @@ class Decimator {
     var guard = 0;
     while (liveFaces > target && heap.isNotEmpty && guard++ < n * 20) {
       final e = heap.pop();
+      if (maxDeviation != null && e.cost > maxDeviation * maxDeviation) break;
       final a = e.a, b = e.b;
       if (!vAlive[a] || !vAlive[b]) continue;
       if (!_isEdge(vFaces[a], vFaces[b], faces)) continue;

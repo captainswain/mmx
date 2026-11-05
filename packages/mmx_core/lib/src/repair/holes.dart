@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import '../mesh/topology.dart';
 import '../mesh/tri_mesh.dart';
 
-enum HoleFillMode { flatMinimal, flatRemeshed, smooth }
+enum HoleFillMode { flatMinimal, flatRemeshed, smooth, fixed }
 
 /// Boundary-loop hole filling.
 ///
@@ -95,7 +95,9 @@ class HoleFiller {
       }
       final area2 = _signedArea(pts);
       final wantCcw = area2 > 0;
-      final tris = _earClip(pts, wantCcw);
+      final tris = mode == HoleFillMode.fixed
+          ? _fan(pts.length, wantCcw)
+          : _earClip(pts, wantCcw);
       if (tris.isEmpty) continue;
       for (final t in tris) {
         final ia = loop[t[0]], ib = loop[t[1]], ic = loop[t[2]];
@@ -107,6 +109,14 @@ class HoleFiller {
     final out = TriMesh(Float32List.fromList(positions), Uint32List.fromList(indices));
     if (mode == HoleFillMode.smooth && added > 0) {
       _relax(out, smoothIterations);
+    }
+    return out;
+  }
+
+  static List<List<int>> _fan(int n, bool ccw) {
+    final out = <List<int>>[];
+    for (var i = 1; i + 1 < n; i++) {
+      out.add(ccw ? <int>[0, i, i + 1] : <int>[0, i + 1, i]);
     }
     return out;
   }
