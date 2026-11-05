@@ -104,6 +104,19 @@ void main() {
       expect(loops, isEmpty, reason: 'filled cut should be watertight');
     });
 
+    test('plane cut supports the remeshed fill mode', () {
+      final mesh = loadModel('sphere.obj');
+      final b = mesh.bounds();
+      final cut = PlaneCut.cut(mesh,
+          point: <double>[0, b.minY + b.extentY * 0.5, 0],
+          normal: <double>[0, 1, 0],
+          fill: true,
+          fillMode: HoleFillMode.flatRemeshed);
+      expect(cut.faceCount, greaterThan(0));
+      expect(cut.signedVolume(), greaterThan(0));
+      expect(MeshTopology(cut).boundaryLoops(), isEmpty);
+    });
+
     test('sculpt draw displaces the surface', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();
