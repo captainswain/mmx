@@ -10,8 +10,7 @@ class MakePolygon {
   static TriMesh fromLoop(TriMesh mesh, List<int> loop) {
     if (loop.length < 3) return TriMesh(Float32List(0), Uint32List(0));
     final points = <List<double>>[
-      for (final v in loop)
-        <double>[mesh.vx(v), mesh.vy(v), mesh.vz(v)],
+      for (final v in loop) <double>[mesh.vx(v), mesh.vy(v), mesh.vz(v)],
     ];
     return _build(points);
   }
@@ -171,8 +170,7 @@ class MakePolygon {
   static bool _pointInTriangle(
       List<double> p, List<double> a, List<double> b, List<double> c) {
     double sign(List<double> p1, List<double> p2, List<double> p3) =>
-        (p1[0] - p3[0]) * (p2[1] - p3[1]) -
-        (p2[0] - p3[0]) * (p1[1] - p3[1]);
+        (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
     final d1 = sign(p, a, b), d2 = sign(p, b, c), d3 = sign(p, c, a);
     final hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
     final hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
@@ -180,9 +178,8 @@ class MakePolygon {
   }
 
   static double _triArea(List<double> a, List<double> b, List<double> c) {
-    return ((b[0] - a[0]) * (c[1] - a[1]) -
-            (c[0] - a[0]) * (b[1] - a[1]))
-        .abs() *
+    return ((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]))
+            .abs() *
         0.5;
   }
 }

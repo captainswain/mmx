@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());

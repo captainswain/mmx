@@ -187,8 +187,8 @@ class Modify {
     var fOffset = 0;
     var groupId = 0;
     for (final m in usable) {
-      positions.setRange(vOffset * 3, vOffset * 3 + m.positions.length,
-          m.positions);
+      positions.setRange(
+          vOffset * 3, vOffset * 3 + m.positions.length, m.positions);
       for (var i = 0; i < m.indices.length; i++) {
         indices[fOffset * 3 + i] = m.indices[i] + vOffset;
       }
@@ -298,23 +298,57 @@ class Modify {
 
   // ------------------------------------------------------------- primitives
 
-  static TriMesh _box(double x0, double y0, double z0, double x1, double y1,
-      double z1) {
+  static TriMesh _box(
+      double x0, double y0, double z0, double x1, double y1, double z1) {
     final b = MeshBuilder();
     final v = <int>[
-      b.addVertex(x0, y0, z0), b.addVertex(x1, y0, z0),
-      b.addVertex(x1, y0, z1), b.addVertex(x0, y0, z1),
-      b.addVertex(x0, y1, z0), b.addVertex(x1, y1, z0),
-      b.addVertex(x1, y1, z1), b.addVertex(x0, y1, z1),
+      b.addVertex(x0, y0, z0),
+      b.addVertex(x1, y0, z0),
+      b.addVertex(x1, y0, z1),
+      b.addVertex(x0, y0, z1),
+      b.addVertex(x0, y1, z0),
+      b.addVertex(x1, y1, z0),
+      b.addVertex(x1, y1, z1),
+      b.addVertex(x0, y1, z1),
     ];
     // Bottom, top, then the four sides, wound outward.
     const faces = <int>[
-      0, 2, 1, 0, 3, 2,
-      4, 5, 6, 4, 6, 7,
-      0, 1, 5, 0, 5, 4,
-      1, 2, 6, 1, 6, 5,
-      2, 3, 7, 2, 7, 6,
-      3, 0, 4, 3, 4, 7,
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      3,
+      0,
+      4,
+      3,
+      4,
+      7,
     ];
     for (var i = 0; i < faces.length; i += 3) {
       b.addTriangle(v[faces[i]], v[faces[i + 1]], v[faces[i + 2]]);
@@ -322,8 +356,8 @@ class Modify {
     return b.build();
   }
 
-  static TriMesh _uvSphere(double cx, double cy, double cz, double r,
-      int segments, int rings) {
+  static TriMesh _uvSphere(
+      double cx, double cy, double cz, double r, int segments, int rings) {
     final b = MeshBuilder();
     final top = b.addVertex(cx, cy + r, cz);
     final rows = <List<int>>[];

@@ -37,7 +37,8 @@ class SoftMove {
     double angle = math.pi / 4,
     double radius = 1.0,
   }) {
-    final len = math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+    final len =
+        math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
     if (len < 1e-20 || radius <= 0) return mesh.clone();
     final ax = axis[0] / len, ay = axis[1] / len, az = axis[2] / len;
     final out = mesh.clone();

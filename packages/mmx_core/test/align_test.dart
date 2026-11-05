@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -17,10 +17,22 @@ Float64List rigid(double ax, double ay, double az, double angle, double tx,
   final x = ax / l, y = ay / l, z = az / l;
   final t = 1 - c;
   return Float64List.fromList(<double>[
-    t * x * x + c, t * x * y - s * z, t * x * z + s * y, 0,
-    t * x * y + s * z, t * y * y + c, t * y * z - s * x, 0,
-    t * x * z - s * y, t * y * z + s * x, t * z * z + c, 0,
-    tx, ty, tz, 1,
+    t * x * x + c,
+    t * x * y - s * z,
+    t * x * z + s * y,
+    0,
+    t * x * y + s * z,
+    t * y * y + c,
+    t * y * z - s * x,
+    0,
+    t * x * z - s * y,
+    t * y * z + s * x,
+    t * z * z + c,
+    0,
+    tx,
+    ty,
+    tz,
+    1,
   ]);
 }
 

@@ -57,7 +57,9 @@ class MeshTopology {
     final seen = <int>{};
     final lists = List<List<int>>.generate(vc, (_) => <int>[]);
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       void link(int x, int y) {
         final k = x * vc + y;
         if (seen.add(k)) lists[x].add(y);
@@ -90,7 +92,9 @@ class MeshTopology {
 
   void _buildEdges() {
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       for (final e in <List<int>>[
         <int>[a, b],
         <int>[b, c],
@@ -189,7 +193,9 @@ class MeshTopology {
     }
 
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       union(a, b);
       union(b, c);
     }
@@ -209,7 +215,9 @@ class MeshTopology {
     final out = <List<int>>[];
     final n = vertexCount;
     for (final e in edgeFaces.entries) {
-      if (e.value.length > 2) out.add(<int>[e.key ~/ n, e.key % n, e.value.length]);
+      if (e.value.length > 2) {
+        out.add(<int>[e.key ~/ n, e.key % n, e.value.length]);
+      }
     }
     return out;
   }

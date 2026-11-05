@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -14,7 +14,8 @@ void main() {
     test('thickness finds a thin spot on a hollowed shell', () {
       final mesh = loadModel('sphere.obj');
       final thin = Solidifier.hollow(mesh,
-          thickness: mesh.bounds().extentX * 0.04, holes: 0, resolution: 80).mesh;
+              thickness: mesh.bounds().extentX * 0.04, holes: 0, resolution: 80)
+          .mesh;
       final t = ThicknessAnalysis.run(thin, threshold: 0);
       print('thickness: min=${t.minThickness.toStringAsFixed(3)} '
           'mean=${t.meanThickness.toStringAsFixed(3)}');
@@ -45,11 +46,27 @@ void main() {
       // Lift the sphere so its bottom overhangs above the bed.
       final lifted = mesh.clone();
       lifted.transform(Float64List.fromList(<double>[
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, mesh.bounds().extentY * 0.5, 0, 1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        mesh.bounds().extentY * 0.5,
+        0,
+        1,
       ]));
       final sw = Stopwatch()..start();
       final result = SupportGenerator.generate(lifted,
-          settings: const SupportSettings(density: 0.4, postDiameter: 1.5), bedY: 0);
+          settings: const SupportSettings(density: 0.4, postDiameter: 1.5),
+          bedY: 0);
       sw.stop();
       print('supports: posts=${result.postCount} struts=${result.strutCount} '
           'faces=${result.supports.faceCount} ${sw.elapsedMilliseconds}ms');
@@ -67,8 +84,13 @@ void main() {
         loadModel('elephant.obj'),
       ];
       final result = Packer.pack(meshes,
-          bedWidth: 300, bedDepth: 300, border: 5, quality: 1, allowRotation: true);
-      print('packing: placed=${result.placed.length} unplaced=${result.unplaced.length} '
+          bedWidth: 300,
+          bedDepth: 300,
+          border: 5,
+          quality: 1,
+          allowRotation: true);
+      print(
+          'packing: placed=${result.placed.length} unplaced=${result.unplaced.length} '
           'util=${(result.bedUtilization * 100).toStringAsFixed(1)}%');
       expect(result.placed.length, 3);
       for (final p in result.placed) {
@@ -81,8 +103,10 @@ void main() {
   group('slicing', () {
     test('produces closed contours per layer', () {
       final mesh = loadModel('sphere.obj');
-      final result = Slicer.slice(mesh, layerHeight: mesh.bounds().extentY / 20);
-      final closed = result.layers.expand((l) => l.loops).where((l) => l.closed).length;
+      final result =
+          Slicer.slice(mesh, layerHeight: mesh.bounds().extentY / 20);
+      final closed =
+          result.layers.expand((l) => l.loops).where((l) => l.closed).length;
       print('slicing: ${result.layers.length} layers, closed loops=$closed');
       expect(result.layers.length, greaterThan(5));
       expect(closed, greaterThan(0));
@@ -151,7 +175,8 @@ void main() {
       final both = PlaneCut.slice(mesh,
           point: <double>[0, b.minY + b.extentY * 0.5, 0],
           normal: <double>[0, 1, 0]);
-      expect(both.signedVolume(), closeTo(mesh.signedVolume(), mesh.signedVolume() * 0.02));
+      expect(both.signedVolume(),
+          closeTo(mesh.signedVolume(), mesh.signedVolume() * 0.02));
       expect(MeshTopology(both).components().$2, 2);
       expect(MeshTopology(both).boundaryLoops(), isEmpty);
     });
@@ -204,10 +229,17 @@ void main() {
     test('sculpt draw displaces the surface', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();
-      final center = <double>[(b.minX + b.maxX) / 2, b.maxY, (b.minZ + b.maxZ) / 2];
+      final center = <double>[
+        (b.minX + b.maxX) / 2,
+        b.maxY,
+        (b.minZ + b.maxZ) / 2
+      ];
       final before = mesh.bounds().maxY;
       final sculpted = Sculptor.apply(mesh,
-          op: BrushOp.draw, center: center, radius: b.extentX * 0.25, strength: 0.8);
+          op: BrushOp.draw,
+          center: center,
+          radius: b.extentX * 0.25,
+          strength: 0.8);
       expect(sculpted.bounds().maxY, greaterThan(before));
       expect(sculpted.validate(), isEmpty);
     });
@@ -215,8 +247,10 @@ void main() {
     test('brush selection and expand work', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();
-      final sel = Selection.sphereBrush(mesh,
-          <double>[(b.minX + b.maxX) / 2, b.maxY, (b.minZ + b.maxZ) / 2], b.extentX * 0.3);
+      final sel = Selection.sphereBrush(
+          mesh,
+          <double>[(b.minX + b.maxX) / 2, b.maxY, (b.minZ + b.maxZ) / 2],
+          b.extentX * 0.3);
       final n = sel.count;
       expect(n, greaterThan(0));
       sel.expand(mesh);

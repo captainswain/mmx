@@ -32,7 +32,8 @@ class Selection {
 
   Selection(this.faceMask, this.faceCount);
 
-  factory Selection.empty(int faceCount) => Selection(Uint8List(faceCount), faceCount);
+  factory Selection.empty(int faceCount) =>
+      Selection(Uint8List(faceCount), faceCount);
 
   int get count {
     var c = 0;
@@ -113,22 +114,32 @@ class Selection {
 
   /// Sphere brush selection, optionally restricted to front-facing faces.
   static Selection sphereBrush(TriMesh mesh, List<double> center, double radius,
-      {bool frontFacingOnly = false, List<double>? viewDirection, double facingBias = 0.0}) {
+      {bool frontFacingOnly = false,
+      List<double>? viewDirection,
+      double facingBias = 0.0}) {
     final sel = Selection.empty(mesh.faceCount);
     final r2 = radius * radius;
     final cx = center[0], cy = center[1], cz = center[2];
     final vd = viewDirection;
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final fx = (mesh.vx(a) + mesh.vx(b) + mesh.vx(c)) / 3;
       final fy = (mesh.vy(a) + mesh.vy(b) + mesh.vy(c)) / 3;
       final fz = (mesh.vz(a) + mesh.vz(b) + mesh.vz(c)) / 3;
       final dx = fx - cx, dy = fy - cy, dz = fz - cz;
       if (dx * dx + dy * dy + dz * dz > r2) continue;
       if (frontFacingOnly && vd != null) {
-        final nx = mesh.vx(b) - mesh.vx(a), ny = mesh.vy(b) - mesh.vy(a), nz = mesh.vz(b) - mesh.vz(a);
-        final wx = mesh.vx(c) - mesh.vx(a), wy = mesh.vy(c) - mesh.vy(a), wz = mesh.vz(c) - mesh.vz(a);
-        final fnx = ny * wz - nz * wy, fny = nz * wx - nx * wz, fnz = nx * wy - ny * wx;
+        final nx = mesh.vx(b) - mesh.vx(a),
+            ny = mesh.vy(b) - mesh.vy(a),
+            nz = mesh.vz(b) - mesh.vz(a);
+        final wx = mesh.vx(c) - mesh.vx(a),
+            wy = mesh.vy(c) - mesh.vy(a),
+            wz = mesh.vz(c) - mesh.vz(a);
+        final fnx = ny * wz - nz * wy,
+            fny = nz * wx - nx * wz,
+            fnz = nx * wy - ny * wx;
         final l = math.sqrt(fnx * fnx + fny * fny + fnz * fnz);
         if (l > 1e-20) {
           final dot = (fnx * vd[0] + fny * vd[1] + fnz * vd[2]) / l;
@@ -156,7 +167,10 @@ class Sculptor {
     bool symmetry = false,
   }) {
     var work = mesh.clone();
-    if (refine && (op == BrushOp.draw || op == BrushOp.inflate || op == BrushOp.flatten)) {
+    if (refine &&
+        (op == BrushOp.draw ||
+            op == BrushOp.inflate ||
+            op == BrushOp.flatten)) {
       work = _refineRegion(work, center, radius, radius / 6.0);
     }
     final topo = MeshTopology(work);
@@ -261,7 +275,8 @@ class Sculptor {
             next[v * 3 + 1] = vy + toY * w * 0.3;
             next[v * 3 + 2] = vz + toZ * w * 0.3;
           case BrushOp.crease:
-            final nx = normals[v * 3], ny = normals[v * 3 + 1],
+            final nx = normals[v * 3],
+                ny = normals[v * 3 + 1],
                 nz = normals[v * 3 + 2];
             final toX = ccx - vx, toY = ccy - vy, toZ = ccz - vz;
             final dn = toX * nx + toY * ny + toZ * nz;
@@ -332,7 +347,8 @@ class Sculptor {
   }
 
   /// Splits edges inside the brush so sculpting has enough resolution.
-  static TriMesh _refineRegion(TriMesh mesh, List<double> center, double radius, double maxEdge) {
+  static TriMesh _refineRegion(
+      TriMesh mesh, List<double> center, double radius, double maxEdge) {
     final builder = MeshBuilder();
     final vmap = List<int>.generate(mesh.vertexCount,
         (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
@@ -349,7 +365,9 @@ class Sculptor {
     }
 
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final fx = (mesh.vx(a) + mesh.vx(b) + mesh.vx(c)) / 3;
       final fy = (mesh.vy(a) + mesh.vy(b) + mesh.vy(c)) / 3;
       final fz = (mesh.vz(a) + mesh.vz(b) + mesh.vz(c)) / 3;
@@ -392,7 +410,8 @@ class Sculptor {
   }
 
   /// Collapses edges inside the brush that are shorter than [minEdge].
-  static TriMesh _reduceRegion(TriMesh mesh, List<double> center, double radius, double minEdge) {
+  static TriMesh _reduceRegion(
+      TriMesh mesh, List<double> center, double radius, double minEdge) {
     final topo = MeshTopology(mesh);
     final parent = Int32List(mesh.vertexCount);
     for (var i = 0; i < parent.length; i++) {
@@ -445,7 +464,9 @@ class Sculptor {
   }
 
   static double _edgeLen(TriMesh m, int a, int b) {
-    final dx = m.vx(a) - m.vx(b), dy = m.vy(a) - m.vy(b), dz = m.vz(a) - m.vz(b);
+    final dx = m.vx(a) - m.vx(b),
+        dy = m.vy(a) - m.vy(b),
+        dz = m.vz(a) - m.vz(b);
     return math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
@@ -454,9 +475,15 @@ class Sculptor {
     for (var v = 0; v < m.vertexCount; v++) {
       var nx = 0.0, ny = 0.0, nz = 0.0;
       for (final f in topo.facesOfVertex(v)) {
-        final a = m.indices[f * 3], b = m.indices[f * 3 + 1], c = m.indices[f * 3 + 2];
-        final ux = m.vx(b) - m.vx(a), uy = m.vy(b) - m.vy(a), uz = m.vz(b) - m.vz(a);
-        final wx = m.vx(c) - m.vx(a), wy = m.vy(c) - m.vy(a), wz = m.vz(c) - m.vz(a);
+        final a = m.indices[f * 3],
+            b = m.indices[f * 3 + 1],
+            c = m.indices[f * 3 + 2];
+        final ux = m.vx(b) - m.vx(a),
+            uy = m.vy(b) - m.vy(a),
+            uz = m.vz(b) - m.vz(a);
+        final wx = m.vx(c) - m.vx(a),
+            wy = m.vy(c) - m.vy(a),
+            wz = m.vz(c) - m.vz(a);
         nx += uy * wz - uz * wy;
         ny += uz * wx - ux * wz;
         nz += ux * wy - uy * wx;
@@ -537,9 +564,15 @@ class FaceGroups {
   }
 
   static List<double> _normal(TriMesh m, int f) {
-    final a = m.indices[f * 3], b = m.indices[f * 3 + 1], c = m.indices[f * 3 + 2];
-    final ux = m.vx(b) - m.vx(a), uy = m.vy(b) - m.vy(a), uz = m.vz(b) - m.vz(a);
-    final wx = m.vx(c) - m.vx(a), wy = m.vy(c) - m.vy(a), wz = m.vz(c) - m.vz(a);
+    final a = m.indices[f * 3],
+        b = m.indices[f * 3 + 1],
+        c = m.indices[f * 3 + 2];
+    final ux = m.vx(b) - m.vx(a),
+        uy = m.vy(b) - m.vy(a),
+        uz = m.vz(b) - m.vz(a);
+    final wx = m.vx(c) - m.vx(a),
+        wy = m.vy(c) - m.vy(a),
+        wz = m.vz(c) - m.vz(a);
     var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
     final l = math.sqrt(nx * nx + ny * ny + nz * nz);
     if (l < 1e-20) return <double>[0, 0, 1];
@@ -550,8 +583,9 @@ class FaceGroups {
 /// Soft transform: weighted translation with a falloff, followed by a
 /// relaxation pass so the boundary blends into the surrounding surface.
 class SoftTransform {
-  static TriMesh translate(TriMesh mesh, List<double> center, double radius,
-      List<double> delta, {int relaxIterations = 6}) {
+  static TriMesh translate(
+      TriMesh mesh, List<double> center, double radius, List<double> delta,
+      {int relaxIterations = 6}) {
     final topo = MeshTopology(mesh);
     final next = Float32List.fromList(mesh.positions);
     for (var v = 0; v < mesh.vertexCount; v++) {

@@ -32,9 +32,7 @@ class IsotropicRemesher {
   static TriMesh linearSubdivide(TriMesh input) {
     final positions = <double>[...input.positions];
     final indices = <int>[];
-    final groups = input.faceGroups == null
-        ? null
-        : <int>[];
+    final groups = input.faceGroups == null ? null : <int>[];
     final mids = <String, int>{};
     int mid(int a, int b) {
       final key = a < b ? '$a:$b' : '$b:$a';
@@ -142,18 +140,18 @@ class IsotropicRemesher {
 
       if (debugTopology) {
         final t = MeshTopology(mesh);
-        print('before split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+        print(
+            'before split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
       }
       mesh = _splitLong(mesh, targetEdgeLength * 4.0 / 3.0,
           maxFor: curvSplit == null
               ? null
-              : (a, b) => targetEdgeLength *
-                  4.0 /
-                  3.0 *
-                  density(curvSplit, a, b));
+              : (a, b) =>
+                  targetEdgeLength * 4.0 / 3.0 * density(curvSplit, a, b));
       if (debugTopology) {
         final t = MeshTopology(mesh);
-        print('after split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+        print(
+            'after split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
       }
       final curvCollapse = adaptiveDensity > 0 ? _curvature(mesh) : null;
       mesh = _collapseShort(
@@ -163,12 +161,14 @@ class IsotropicRemesher {
               : (a, b) => targetEdgeLength * 0.8 * density(curvCollapse, a, b));
       if (debugTopology) {
         final t = MeshTopology(mesh);
-        print('after collapse nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+        print(
+            'after collapse nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
       }
       mesh = _flipForValence(mesh, preserveBoundary, constraints(mesh));
       if (debugTopology) {
         final t = MeshTopology(mesh);
-        print('after flip nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
+        print(
+            'after flip nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
       }
       mesh = _tangentialRelax(
           mesh, originalBvh, preserveBoundary, constraints(mesh));
@@ -249,7 +249,8 @@ class IsotropicRemesher {
     for (var v = 0; v < mesh.vertexCount; v++) {
       final px = mesh.vx(v), py = mesh.vy(v), pz = mesh.vz(v);
       for (var s = 0; s < segments.length; s += 2) {
-        if (_pointSegmentDistSq(px, py, pz, segments[s], segments[s + 1]) <= t2) {
+        if (_pointSegmentDistSq(px, py, pz, segments[s], segments[s + 1]) <=
+            t2) {
           out.add(v);
           break;
         }
@@ -258,8 +259,8 @@ class IsotropicRemesher {
     return out;
   }
 
-  static double _pointSegmentDistSq(double px, double py, double pz,
-      List<double> a, List<double> b) {
+  static double _pointSegmentDistSq(
+      double px, double py, double pz, List<double> a, List<double> b) {
     final abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2];
     final apx = px - a[0], apy = py - a[1], apz = pz - a[2];
     final denom = abx * abx + aby * aby + abz * abz;
@@ -291,7 +292,6 @@ class IsotropicRemesher {
     return out;
   }
 
-
   static Set<int> _sharpVertices(TriMesh mesh, double angleRad) {
     final topo = MeshTopology(mesh);
     final out = <int>{};
@@ -311,9 +311,15 @@ class IsotropicRemesher {
   }
 
   static List<double> _faceNormal(TriMesh m, int f) {
-    final a = m.indices[f * 3], b = m.indices[f * 3 + 1], c = m.indices[f * 3 + 2];
-    final ux = m.vx(b) - m.vx(a), uy = m.vy(b) - m.vy(a), uz = m.vz(b) - m.vz(a);
-    final wx = m.vx(c) - m.vx(a), wy = m.vy(c) - m.vy(a), wz = m.vz(c) - m.vz(a);
+    final a = m.indices[f * 3],
+        b = m.indices[f * 3 + 1],
+        c = m.indices[f * 3 + 2];
+    final ux = m.vx(b) - m.vx(a),
+        uy = m.vy(b) - m.vy(a),
+        uz = m.vz(b) - m.vz(a);
+    final wx = m.vx(c) - m.vx(a),
+        wy = m.vy(c) - m.vy(a),
+        wz = m.vz(c) - m.vz(a);
     var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
     final l = math.sqrt(nx * nx + ny * ny + nz * nz);
     if (l < 1e-20) return <double>[0, 0, 1];
@@ -338,7 +344,8 @@ class IsotropicRemesher {
         final lu = math.sqrt(ux * ux + uy * uy + uz * uz);
         final lw = math.sqrt(wx * wx + wy * wy + wz * wz);
         if (lu < 1e-20 || lw < 1e-20) return;
-        final cosA = ((ux * wx + uy * wy + uz * wz) / (lu * lw)).clamp(-1.0, 1.0);
+        final cosA =
+            ((ux * wx + uy * wy + uz * wz) / (lu * lw)).clamp(-1.0, 1.0);
         sum[v] += math.acos(cosA);
       }
 
@@ -371,7 +378,8 @@ class IsotropicRemesher {
   static TriMesh _splitLong(TriMesh mesh, double maxLen,
       {double Function(int, int)? maxFor}) {
     final builder = MeshBuilder();
-    final vmap = List<int>.generate(mesh.vertexCount, (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
+    final vmap = List<int>.generate(mesh.vertexCount,
+        (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
     final midCache = <int, int>{};
     final n = mesh.vertexCount;
     final topo = MeshTopology(mesh);
@@ -397,7 +405,9 @@ class IsotropicRemesher {
     }
 
     for (var f = 0; f < mesh.faceCount; f++) {
-      final va = mesh.indices[f * 3], vb = mesh.indices[f * 3 + 1], vc = mesh.indices[f * 3 + 2];
+      final va = mesh.indices[f * 3],
+          vb = mesh.indices[f * 3 + 1],
+          vc = mesh.indices[f * 3 + 2];
       final ab = splitEdges.contains(topo.edgeKey(va, vb));
       final bc = splitEdges.contains(topo.edgeKey(vb, vc));
       final ca = splitEdges.contains(topo.edgeKey(vc, va));
@@ -454,13 +464,16 @@ class IsotropicRemesher {
   }
 
   static double _len(TriMesh m, int a, int b) {
-    final dx = m.vx(a) - m.vx(b), dy = m.vy(a) - m.vy(b), dz = m.vz(a) - m.vz(b);
+    final dx = m.vx(a) - m.vx(b),
+        dy = m.vy(a) - m.vy(b),
+        dz = m.vz(a) - m.vz(b);
     return math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
   /// Collapses edges shorter than [minLen] when the collapse keeps the mesh
   /// manifold and does not invert any incident triangle.
-  static TriMesh _collapseShort(TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp,
+  static TriMesh _collapseShort(
+      TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp,
       {double Function(int, int)? minFor}) {
     final state = CollapseMesh(mesh);
     final n = mesh.vertexCount;
@@ -491,7 +504,8 @@ class IsotropicRemesher {
   }
 
   /// Flips interior edges when the flip reduces deviation from valence six.
-  static TriMesh _flipForValence(TriMesh mesh, bool preserveBoundary, Set<int> sharp) {
+  static TriMesh _flipForValence(
+      TriMesh mesh, bool preserveBoundary, Set<int> sharp) {
     final topo = MeshTopology(mesh);
     final n = mesh.vertexCount;
     final boundary = <int>{};
@@ -504,7 +518,11 @@ class IsotropicRemesher {
     // Work on a mutable face list.
     final faces = <List<int>>[];
     for (var f = 0; f < mesh.faceCount; f++) {
-      faces.add(<int>[mesh.indices[f * 3], mesh.indices[f * 3 + 1], mesh.indices[f * 3 + 2]]);
+      faces.add(<int>[
+        mesh.indices[f * 3],
+        mesh.indices[f * 3 + 1],
+        mesh.indices[f * 3 + 2]
+      ]);
     }
     final valence = List<int>.generate(n, (v) => topo.valence(v));
     final flipped = <int>{};
@@ -513,7 +531,9 @@ class IsotropicRemesher {
       if (entry.value.length != 2) continue;
       final a = entry.key ~/ n, b = entry.key % n;
       if (sharp.contains(a) && sharp.contains(b)) continue;
-      if (preserveBoundary && (boundary.contains(a) || boundary.contains(b))) continue;
+      if (preserveBoundary && (boundary.contains(a) || boundary.contains(b))) {
+        continue;
+      }
       final f0 = entry.value[0], f1 = entry.value[1];
       if (flipped.contains(f0) || flipped.contains(f1)) continue;
       if (!faces[f0].contains(a) || !faces[f0].contains(b)) continue;
@@ -530,10 +550,14 @@ class IsotropicRemesher {
       if (c == d) continue;
       // Flipping to c-d is only legal if c-d is not already an edge.
       if (_edgeExists(faces, c, d)) continue;
-      final before = (valence[a] - 6).abs() + (valence[b] - 6).abs() +
-          (valence[c] - 6).abs() + (valence[d] - 6).abs();
-      final after = (valence[a] - 7).abs() + (valence[b] - 7).abs() +
-          (valence[c] - 5).abs() + (valence[d] - 5).abs();
+      final before = (valence[a] - 6).abs() +
+          (valence[b] - 6).abs() +
+          (valence[c] - 6).abs() +
+          (valence[d] - 6).abs();
+      final after = (valence[a] - 7).abs() +
+          (valence[b] - 7).abs() +
+          (valence[c] - 5).abs() +
+          (valence[d] - 5).abs();
       if (after >= before) continue;
       // Replace the two faces with (a,c,d) and (c,b,d), preserving the
       // original winding by comparing normals.
@@ -580,8 +604,12 @@ class IsotropicRemesher {
   }
 
   static List<double> _normalOf(TriMesh m, int a, int b, int c) {
-    final ux = m.vx(b) - m.vx(a), uy = m.vy(b) - m.vy(a), uz = m.vz(b) - m.vz(a);
-    final wx = m.vx(c) - m.vx(a), wy = m.vy(c) - m.vy(a), wz = m.vz(c) - m.vz(a);
+    final ux = m.vx(b) - m.vx(a),
+        uy = m.vy(b) - m.vy(a),
+        uz = m.vz(b) - m.vz(a);
+    final wx = m.vx(c) - m.vx(a),
+        wy = m.vy(c) - m.vy(a),
+        wz = m.vz(c) - m.vz(a);
     var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
     final l = math.sqrt(nx * nx + ny * ny + nz * nz);
     if (l < 1e-20) return <double>[0, 0, 0];
@@ -590,7 +618,8 @@ class IsotropicRemesher {
 
   /// Tangential Laplacian relaxation: move toward the neighbour centroid, but
   /// only within the tangent plane, so the surface does not shrink.
-  static TriMesh _tangentialRelax(TriMesh mesh, TriangleBVH original, bool preserveBoundary, Set<int> sharp) {
+  static TriMesh _tangentialRelax(TriMesh mesh, TriangleBVH original,
+      bool preserveBoundary, Set<int> sharp) {
     final topo = MeshTopology(mesh);
     final boundary = <int>{};
     if (preserveBoundary) {
@@ -623,7 +652,11 @@ class IsotropicRemesher {
       cz /= nb.length;
       var dx = cx - mesh.vx(v), dy = cy - mesh.vy(v), dz = cz - mesh.vz(v);
       // Project displacement onto the vertex tangent plane.
-      final nrm = <double>[normals[v * 3], normals[v * 3 + 1], normals[v * 3 + 2]];
+      final nrm = <double>[
+        normals[v * 3],
+        normals[v * 3 + 1],
+        normals[v * 3 + 2]
+      ];
       final d = dx * nrm[0] + dy * nrm[1] + dz * nrm[2];
       dx -= d * nrm[0];
       dy -= d * nrm[1];
@@ -651,7 +684,8 @@ class IsotropicRemesher {
   }
 
   /// Snaps vertices back onto the original surface (shape preservation).
-  static TriMesh _projectToSurface(TriMesh mesh, TriangleBVH original, bool preserveBoundary, Set<int> sharp) {
+  static TriMesh _projectToSurface(TriMesh mesh, TriangleBVH original,
+      bool preserveBoundary, Set<int> sharp) {
     final topo = MeshTopology(mesh);
     final boundary = <int>{};
     if (preserveBoundary) {

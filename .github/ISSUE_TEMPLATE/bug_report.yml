@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible defect in mmx
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include a minimal reproducer if possible.
+        Security issues should use the Security tab, not this form.
+  - type: input
+    id: version
+    attributes:
+      label: mmx version or commit
+      placeholder: "0.1.0 or commit hash"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and toolchain
+      placeholder: "Linux x86-64, Flutter 3.47, Dart 3.13"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Command or UI action, input file, and settings.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include topology counts if relevant (faces, boundary loops, non-manifold edges).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I can reproduce this on the latest main branch.
+          required: false

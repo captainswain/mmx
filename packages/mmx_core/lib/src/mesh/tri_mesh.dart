@@ -31,8 +31,10 @@ class TriMesh {
   TriMesh clone() => TriMesh(
         Float32List.fromList(positions),
         Uint32List.fromList(indices),
-        faceGroups: faceGroups == null ? null : Uint16List.fromList(faceGroups!),
-        vertexColors: vertexColors == null ? null : Float32List.fromList(vertexColors!),
+        faceGroups:
+            faceGroups == null ? null : Uint16List.fromList(faceGroups!),
+        vertexColors:
+            vertexColors == null ? null : Float32List.fromList(vertexColors!),
       );
 
   BBox bounds() {
@@ -82,7 +84,9 @@ class TriMesh {
       final ax = vx(ia), ay = vy(ia), az = vz(ia);
       final ux = vx(ib) - ax, uy = vy(ib) - ay, uz = vz(ib) - az;
       final wx = vx(ic) - ax, wy = vy(ic) - ay, wz = vz(ic) - az;
-      final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      final nx = uy * wz - uz * wy,
+          ny = uz * wx - ux * wz,
+          nz = ux * wy - uy * wx;
       final a = 0.5 * math.sqrt(nx * nx + ny * ny + nz * nz);
       sx += a * (ax + vx(ib) + vx(ic)) / 3.0;
       sy += a * (ay + vy(ib) + vy(ic)) / 3.0;
@@ -112,7 +116,9 @@ class TriMesh {
       final ax = vx(ia), ay = vy(ia), az = vz(ia);
       final ux = vx(ib) - ax, uy = vy(ib) - ay, uz = vz(ib) - az;
       final wx = vx(ic) - ax, wy = vy(ic) - ay, wz = vz(ic) - az;
-      final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      final nx = uy * wz - uz * wy,
+          ny = uz * wx - ux * wz,
+          nz = ux * wy - uy * wx;
       if (0.5 * math.sqrt(nx * nx + ny * ny + nz * nz) <= minArea) continue;
       keep.add(ia);
       keep.add(ib);
@@ -187,9 +193,11 @@ class TriMesh {
     return issues;
   }
 
-  static double _det(double ax, double ay, double az, double bx, double by, double bz,
-      double cx, double cy, double cz) {
-    return ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+  static double _det(double ax, double ay, double az, double bx, double by,
+      double bz, double cx, double cy, double cz) {
+    return ax * (by * cz - bz * cy) -
+        ay * (bx * cz - bz * cx) +
+        az * (bx * cy - by * cx);
   }
 }
 
@@ -233,12 +241,18 @@ TriMesh cylinderMesh(List<double> p0, List<double> p1, double r0, double r1,
   // Pick a stable perpendicular basis.
   var tx = 0.0, ty = 0.0, tz = 0.0;
   if (ux.abs() < 0.9) {
-    tx = 0; ty = -uz; tz = uy;
+    tx = 0;
+    ty = -uz;
+    tz = uy;
   } else {
-    tx = uz; ty = 0; tz = -ux;
+    tx = uz;
+    ty = 0;
+    tz = -ux;
   }
   final tl = length3(tx, ty, tz);
-  tx /= tl; ty /= tl; tz /= tl;
+  tx /= tl;
+  ty /= tl;
+  tz /= tl;
   final bx = uy * tz - uz * ty, by = uz * tx - ux * tz, bz = ux * ty - uy * tx;
 
   final ring0 = <int>[];
@@ -246,7 +260,9 @@ TriMesh cylinderMesh(List<double> p0, List<double> p1, double r0, double r1,
   for (var s = 0; s < sides; s++) {
     final a = 2 * math.pi * s / sides;
     final ca = math.cos(a), sa = math.sin(a);
-    final ox = tx * ca + bx * sa, oy = ty * ca + by * sa, oz = tz * ca + bz * sa;
+    final ox = tx * ca + bx * sa,
+        oy = ty * ca + by * sa,
+        oz = tz * ca + bz * sa;
     ring0.add(b.addVertex(p0[0] + ox * r0, p0[1] + oy * r0, p0[2] + oz * r0));
     ring1.add(b.addVertex(p1[0] + ox * r1, p1[1] + oy * r1, p1[2] + oz * r1));
   }

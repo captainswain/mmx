@@ -20,7 +20,8 @@ class Mirror {
     double weldTolerance = 0,
     bool flipNormals = true,
   }) {
-    final nl = math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+    final nl = math.sqrt(
+        normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
     if (nl < 1e-12) return mesh.clone();
     final nx = normal[0] / nl, ny = normal[1] / nl, nz = normal[2] / nl;
 
@@ -118,9 +119,15 @@ class Extruder {
     for (var f = 0; f < mesh.faceCount; f++) {
       if (faceMask[f] == 0) continue;
       selectedCount++;
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
-      final ux = mesh.vx(b) - mesh.vx(a), uy = mesh.vy(b) - mesh.vy(a), uz = mesh.vz(b) - mesh.vz(a);
-      final wx = mesh.vx(c) - mesh.vx(a), wy = mesh.vy(c) - mesh.vy(a), wz = mesh.vz(c) - mesh.vz(a);
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
+      final ux = mesh.vx(b) - mesh.vx(a),
+          uy = mesh.vy(b) - mesh.vy(a),
+          uz = mesh.vz(b) - mesh.vz(a);
+      final wx = mesh.vx(c) - mesh.vx(a),
+          wy = mesh.vy(c) - mesh.vy(a),
+          wz = mesh.vz(c) - mesh.vz(a);
       rx += uy * wz - uz * wy;
       ry += uz * wx - ux * wz;
       rz += ux * wy - uy * wx;
@@ -158,14 +165,14 @@ class Extruder {
     // Unselected faces stay.
     for (var f = 0; f < mesh.faceCount; f++) {
       if (faceMask[f] != 0) continue;
-      builder.addTriangle(vmap[mesh.indices[f * 3]], vmap[mesh.indices[f * 3 + 1]],
-          vmap[mesh.indices[f * 3 + 2]]);
+      builder.addTriangle(vmap[mesh.indices[f * 3]],
+          vmap[mesh.indices[f * 3 + 1]], vmap[mesh.indices[f * 3 + 2]]);
     }
     // Raised top.
     for (var f = 0; f < mesh.faceCount; f++) {
       if (faceMask[f] == 0) continue;
-      builder.addTriangle(raised[mesh.indices[f * 3]], raised[mesh.indices[f * 3 + 1]],
-          raised[mesh.indices[f * 3 + 2]]);
+      builder.addTriangle(raised[mesh.indices[f * 3]],
+          raised[mesh.indices[f * 3 + 1]], raised[mesh.indices[f * 3 + 2]]);
     }
     // Skirt along the selection boundary.
     var walls = 0;
@@ -238,7 +245,8 @@ class ShellSeparator {
     final (faceComp, count) = topo.components();
     if (count <= 1) return <TriMesh>[mesh];
     final builders = List<MeshBuilder>.generate(count, (_) => MeshBuilder());
-    final maps = List<Int32List>.generate(count, (_) => Int32List(mesh.vertexCount));
+    final maps =
+        List<Int32List>.generate(count, (_) => Int32List(mesh.vertexCount));
     for (var c = 0; c < count; c++) {
       for (var v = 0; v < mesh.vertexCount; v++) {
         maps[c][v] = -1;

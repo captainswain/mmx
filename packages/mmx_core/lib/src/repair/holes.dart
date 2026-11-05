@@ -46,9 +46,15 @@ class HoleFiller {
         final faces = topo.edgeFaces[k];
         if (faces == null) continue;
         for (final f in faces) {
-          final fa = mesh.indices[f * 3], fb = mesh.indices[f * 3 + 1], fc = mesh.indices[f * 3 + 2];
-          final ux = mesh.vx(fb) - mesh.vx(fa), uy = mesh.vy(fb) - mesh.vy(fa), uz = mesh.vz(fb) - mesh.vz(fa);
-          final wx = mesh.vx(fc) - mesh.vx(fa), wy = mesh.vy(fc) - mesh.vy(fa), wz = mesh.vz(fc) - mesh.vz(fa);
+          final fa = mesh.indices[f * 3],
+              fb = mesh.indices[f * 3 + 1],
+              fc = mesh.indices[f * 3 + 2];
+          final ux = mesh.vx(fb) - mesh.vx(fa),
+              uy = mesh.vy(fb) - mesh.vy(fa),
+              uz = mesh.vz(fb) - mesh.vz(fa);
+          final wx = mesh.vx(fc) - mesh.vx(fa),
+              wy = mesh.vy(fc) - mesh.vy(fa),
+              wz = mesh.vz(fc) - mesh.vz(fa);
           nx += uy * wz - uz * wy;
           ny += uz * wx - ux * wz;
           nz += ux * wy - uy * wx;
@@ -76,13 +82,21 @@ class HoleFiller {
       // Build an orthonormal basis on the fill plane.
       var refx = 0.0, refy = 0.0, refz = 0.0;
       if (nx.abs() < 0.9) {
-        refx = 0; refy = -nz; refz = ny;
+        refx = 0;
+        refy = -nz;
+        refz = ny;
       } else {
-        refx = nz; refy = 0; refz = -nx;
+        refx = nz;
+        refy = 0;
+        refz = -nx;
       }
       final rl = math.sqrt(refx * refx + refy * refy + refz * refz);
-      refx /= rl; refy /= rl; refz /= rl;
-      final bx = ny * refz - nz * refy, by = nz * refx - nx * refz, bz = nx * refy - ny * refx;
+      refx /= rl;
+      refy /= rl;
+      refz /= rl;
+      final bx = ny * refz - nz * refy,
+          by = nz * refx - nx * refz,
+          bz = nx * refy - ny * refx;
 
       // Project loop to 2D.
       final ox = mesh.vx(loop[0]), oy = mesh.vy(loop[0]), oz = mesh.vz(loop[0]);
@@ -108,7 +122,8 @@ class HoleFiller {
       }
     }
 
-    final out = TriMesh(Float32List.fromList(positions), Uint32List.fromList(indices));
+    final out =
+        TriMesh(Float32List.fromList(positions), Uint32List.fromList(indices));
     if (mode == HoleFillMode.smooth && added > 0) {
       _relax(out, smoothIterations, movable: filledVertices);
     }
@@ -185,7 +200,8 @@ class HoleFiller {
     return ax * by - ay * bx > 0;
   }
 
-  static bool _containsAny(List<List<double>> p, List<int> idx, int a, int b, int c) {
+  static bool _containsAny(
+      List<List<double>> p, List<int> idx, int a, int b, int c) {
     for (final i in idx) {
       if (i == a || i == b || i == c) continue;
       if (_pointInTriangle(p[i], p[a], p[b], p[c])) return true;
@@ -193,7 +209,8 @@ class HoleFiller {
     return false;
   }
 
-  static bool _pointInTriangle(List<double> p, List<double> a, List<double> b, List<double> c) {
+  static bool _pointInTriangle(
+      List<double> p, List<double> a, List<double> b, List<double> c) {
     double sign(List<double> p1, List<double> p2, List<double> p3) =>
         (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
     final d1 = sign(p, a, b), d2 = sign(p, b, c), d3 = sign(p, c, a);
@@ -203,7 +220,9 @@ class HoleFiller {
   }
 
   static double _triArea(List<double> a, List<double> b, List<double> c) {
-    return ((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])).abs() * 0.5;
+    return ((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]))
+            .abs() *
+        0.5;
   }
 
   /// Laplacian relaxation restricted to the fill patch. When [movable] is
@@ -220,7 +239,8 @@ class HoleFiller {
           for (var v = 0; v < mesh.vertexCount; v++)
             if (!boundary.contains(v)) v,
         };
-    final movableVertices = candidates.where((v) => !boundary.contains(v)).toList();
+    final movableVertices =
+        candidates.where((v) => !boundary.contains(v)).toList();
     for (var it = 0; it < iterations; it++) {
       final next = Float32List.fromList(mesh.positions);
       for (final v in movableVertices) {

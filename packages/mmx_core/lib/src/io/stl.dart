@@ -15,7 +15,8 @@ class StlIO {
     final builder = MeshBuilder();
     final weld = <String, int>{};
     int vkey(double x, double y, double z) {
-      final k = '${x.toStringAsPrecision(9)}|${y.toStringAsPrecision(9)}|${z.toStringAsPrecision(9)}';
+      final k =
+          '${x.toStringAsPrecision(9)}|${y.toStringAsPrecision(9)}|${z.toStringAsPrecision(9)}';
       return weld.putIfAbsent(k, () => builder.addVertex(x, y, z));
     }
 
@@ -41,7 +42,8 @@ class StlIO {
     final builder = MeshBuilder();
     final weld = <String, int>{};
     int vkey(double x, double y, double z) {
-      final k = '${x.toStringAsPrecision(9)}|${y.toStringAsPrecision(9)}|${z.toStringAsPrecision(9)}';
+      final k =
+          '${x.toStringAsPrecision(9)}|${y.toStringAsPrecision(9)}|${z.toStringAsPrecision(9)}';
       return weld.putIfAbsent(k, () => builder.addVertex(x, y, z));
     }
 
@@ -75,13 +77,17 @@ class StlIO {
     }
     bd.setUint32(80, n, Endian.little);
     for (var f = 0; f < n; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final ax = mesh.vx(a), ay = mesh.vy(a), az = mesh.vz(a);
       final bx = mesh.vx(b), by = mesh.vy(b), bz = mesh.vz(b);
       final cx = mesh.vx(c), cy = mesh.vy(c), cz = mesh.vz(c);
       final ux = bx - ax, uy = by - ay, uz = bz - az;
       final wx = cx - ax, wy = cy - ay, wz = cz - az;
-      var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      var nx = uy * wz - uz * wy,
+          ny = uz * wx - ux * wz,
+          nz = ux * wy - uy * wx;
       final len = (nx * nx + ny * ny + nz * nz);
       if (len > 1e-20) {
         final inv = 1.0 / _sqrt(len);
@@ -110,7 +116,9 @@ class StlIO {
   static String writeAscii(TriMesh mesh, {String name = 'mmx_core'}) {
     final sb = StringBuffer('solid $name\n');
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       sb.writeln('  facet normal 0 0 0');
       sb.writeln('    outer loop');
       sb.writeln('      vertex ${mesh.vx(a)} ${mesh.vy(a)} ${mesh.vz(a)}');

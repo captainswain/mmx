@@ -50,7 +50,9 @@ class VoxelGrid {
 
     // 1. Narrow band: exact unsigned distance to the nearest triangle.
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final ax = mesh.vx(a), ay = mesh.vy(a), az = mesh.vz(a);
       final bx = mesh.vx(b), by = mesh.vy(b), bz = mesh.vz(b);
       final cx = mesh.vx(c), cy = mesh.vy(c), cz = mesh.vz(c);
@@ -79,7 +81,8 @@ class VoxelGrid {
           final py = originY + j * cellSize;
           for (var k = k0; k <= k1; k++) {
             final pz = originZ + k * cellSize;
-            final d2 = closestPointTriangleSq(px, py, pz, ax, ay, az, bx, by, bz, cx, cy, cz, bary);
+            final d2 = closestPointTriangleSq(
+                px, py, pz, ax, ay, az, bx, by, bz, cx, cy, cz, bary);
             if (d2 > bandSq) continue;
             final idx = index(i, j, k);
             final d = math.sqrt(d2);
@@ -101,7 +104,8 @@ class VoxelGrid {
           final px = originX + i * cellSize;
           final py = originY + j * cellSize;
           final pz = originZ + k * cellSize;
-          final hits = bvh.raycastAll(<double>[px, py, pz], <double>[1.0, 1e-4, 1e-4]);
+          final hits =
+              bvh.raycastAll(<double>[px, py, pz], <double>[1.0, 1e-4, 1e-4]);
           final inside = hits.length.isOdd;
           values[idx] = inside ? -values[idx] : values[idx];
           state[idx] = inside ? 2 : 1;
@@ -156,7 +160,9 @@ class VoxelGrid {
       }
       for (final d in _neighbors) {
         final ni = i + d[0], nj = j + d[1], nk = k + d[2];
-        if (ni < 0 || nj < 0 || nk < 0 || ni >= nx || nj >= ny || nk >= nz) continue;
+        if (ni < 0 || nj < 0 || nk < 0 || ni >= nx || nj >= ny || nk >= nz) {
+          continue;
+        }
         final nidx = index(ni, nj, nk);
         if (state[nidx] != 0) continue;
         state[nidx] = 1;
@@ -227,7 +233,12 @@ class VoxelGrid {
     final fx = (x - originX) / cellSize;
     final fy = (y - originY) / cellSize;
     final fz = (z - originZ) / cellSize;
-    if (fx < 0 || fy < 0 || fz < 0 || fx >= nx - 1 || fy >= ny - 1 || fz >= nz - 1) {
+    if (fx < 0 ||
+        fy < 0 ||
+        fz < 0 ||
+        fx >= nx - 1 ||
+        fy >= ny - 1 ||
+        fz >= nz - 1) {
       // Outside the sampled volume: treat as fully exterior.
       return math.max(cellSize * 4, 1e-6);
     }

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -14,7 +14,8 @@ TriMesh slitSphere() {
   final mesh = loadModel('sphere.obj');
   final keep = <int>[];
   for (var f = 0; f < mesh.faceCount; f++) {
-    final i0 = mesh.indices[f * 3], i1 = mesh.indices[f * 3 + 1],
+    final i0 = mesh.indices[f * 3],
+        i1 = mesh.indices[f * 3 + 1],
         i2 = mesh.indices[f * 3 + 2];
     final cy = (mesh.vy(i0) + mesh.vy(i1) + mesh.vy(i2)) / 3;
     if (cy > 1.5 && cy < 4.0) continue;

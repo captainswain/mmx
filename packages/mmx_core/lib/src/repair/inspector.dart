@@ -13,7 +13,8 @@ class MeshDefect {
   final List<int> faces;
   final double metric;
 
-  MeshDefect(this.kind, {required this.vertices, required this.faces, required this.metric});
+  MeshDefect(this.kind,
+      {required this.vertices, required this.faces, required this.metric});
 
   Map<String, Object?> toJson() => <String, Object?>{
         'kind': kind.name,
@@ -27,7 +28,8 @@ class MeshInspector {
   /// Scans for the defect set Meshmixer reports. [smallComponentArea] is the
   /// absolute area below which a disconnected shell is flagged.
   static List<MeshDefect> scan(TriMesh mesh,
-      {double smallComponentArea = double.infinity, bool checkSelfIntersections = false}) {
+      {double smallComponentArea = double.infinity,
+      bool checkSelfIntersections = false}) {
     final topo = MeshTopology(mesh);
     final defects = <MeshDefect>[];
 
@@ -119,7 +121,8 @@ class MeshInspector {
           final b = mesh.indices[f * 3 + (k + 1) % 3];
           if (a != v && b != v) continue;
           final other = a == v ? b : a;
-          for (final g in topo.edgeFaces[topo.edgeKey(v, other)] ?? const <int>[]) {
+          for (final g
+              in topo.edgeFaces[topo.edgeKey(v, other)] ?? const <int>[]) {
             if (g != f && adj.containsKey(g)) {
               adj[f]!.add(g);
               adj[g]!.add(f);
@@ -188,7 +191,9 @@ class MeshInspector {
     final topo = MeshTopology(mesh);
     final out = <MeshDefect>[];
     for (var f = 0; f < mesh.faceCount && out.length < limit; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final bbox = _faceBox(mesh, f);
       // Cheap check against adjacent faces via vertex rings.
       for (final v in <int>[a, b, c]) {
@@ -210,7 +215,9 @@ class MeshInspector {
 
   static List<double> _faceBox(TriMesh m, int f) {
     var minx = double.infinity, miny = double.infinity, minz = double.infinity;
-    var maxx = double.negativeInfinity, maxy = double.negativeInfinity, maxz = double.negativeInfinity;
+    var maxx = double.negativeInfinity,
+        maxy = double.negativeInfinity,
+        maxz = double.negativeInfinity;
     for (var k = 0; k < 3; k++) {
       final v = m.indices[f * 3 + k];
       minx = math.min(minx, m.vx(v));
@@ -224,7 +231,12 @@ class MeshInspector {
   }
 
   static bool _boxesOverlap(List<double> a, List<double> b) =>
-      a[3] >= b[0] && a[0] <= b[3] && a[4] >= b[1] && a[1] <= b[4] && a[5] >= b[2] && a[2] <= b[5];
+      a[3] >= b[0] &&
+      a[0] <= b[3] &&
+      a[4] >= b[1] &&
+      a[1] <= b[4] &&
+      a[5] >= b[2] &&
+      a[2] <= b[5];
 
   static bool _shareVertex(TriMesh m, int f, int g) {
     for (var i = 0; i < 3; i++) {
@@ -273,9 +285,21 @@ class MeshInspector {
   }
 
   static List<List<double>> _triVerts(TriMesh m, int f) => <List<double>>[
-        <double>[m.vx(m.indices[f * 3]), m.vy(m.indices[f * 3]), m.vz(m.indices[f * 3])],
-        <double>[m.vx(m.indices[f * 3 + 1]), m.vy(m.indices[f * 3 + 1]), m.vz(m.indices[f * 3 + 1])],
-        <double>[m.vx(m.indices[f * 3 + 2]), m.vy(m.indices[f * 3 + 2]), m.vz(m.indices[f * 3 + 2])],
+        <double>[
+          m.vx(m.indices[f * 3]),
+          m.vy(m.indices[f * 3]),
+          m.vz(m.indices[f * 3])
+        ],
+        <double>[
+          m.vx(m.indices[f * 3 + 1]),
+          m.vy(m.indices[f * 3 + 1]),
+          m.vz(m.indices[f * 3 + 1])
+        ],
+        <double>[
+          m.vx(m.indices[f * 3 + 2]),
+          m.vy(m.indices[f * 3 + 2]),
+          m.vz(m.indices[f * 3 + 2])
+        ],
       ];
 
   static List<double> _sub(List<double> a, List<double> b) =>
@@ -288,15 +312,25 @@ class MeshInspector {
       ];
 
   static double _dist(TriMesh m, int a, int b) {
-    final dx = m.vx(a) - m.vx(b), dy = m.vy(a) - m.vy(b), dz = m.vz(a) - m.vz(b);
+    final dx = m.vx(a) - m.vx(b),
+        dy = m.vy(a) - m.vy(b),
+        dz = m.vz(a) - m.vz(b);
     return math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
   static double _faceArea(TriMesh m, int f) {
-    final a = m.indices[f * 3], b = m.indices[f * 3 + 1], c = m.indices[f * 3 + 2];
-    final ux = m.vx(b) - m.vx(a), uy = m.vy(b) - m.vy(a), uz = m.vz(b) - m.vz(a);
-    final wx = m.vx(c) - m.vx(a), wy = m.vy(c) - m.vy(a), wz = m.vz(c) - m.vz(a);
-    final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+    final a = m.indices[f * 3],
+        b = m.indices[f * 3 + 1],
+        c = m.indices[f * 3 + 2];
+    final ux = m.vx(b) - m.vx(a),
+        uy = m.vy(b) - m.vy(a),
+        uz = m.vz(b) - m.vz(a);
+    final wx = m.vx(c) - m.vx(a),
+        wy = m.vy(c) - m.vy(a),
+        wz = m.vz(c) - m.vz(a);
+    final nx = uy * wz - uz * wy,
+        ny = uz * wx - ux * wz,
+        nz = ux * wy - uy * wx;
     return 0.5 * math.sqrt(nx * nx + ny * ny + nz * nz);
   }
 }

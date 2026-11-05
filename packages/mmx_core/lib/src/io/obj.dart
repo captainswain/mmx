@@ -17,12 +17,14 @@ class ObjIO {
 
     int resolve(int objIndex) {
       // objIndex is 1-based and may be negative (relative).
-      final abs = objIndex > 0 ? objIndex : positions.length ~/ 3 + objIndex + 1;
+      final abs =
+          objIndex > 0 ? objIndex : positions.length ~/ 3 + objIndex + 1;
       final cached = fileToLocal[abs];
       if (cached != null) return cached;
       final base = (abs - 1) * 3;
       if (base < 0 || base + 2 >= positions.length) return 0;
-      final id = builder.addVertex(positions[base], positions[base + 1], positions[base + 2]);
+      final id = builder.addVertex(
+          positions[base], positions[base + 1], positions[base + 2]);
       fileToLocal[abs] = id;
       return id;
     }
@@ -41,7 +43,8 @@ class ObjIO {
         case 'g':
         case 'o':
           if (keepGroups && parts.length > 1) {
-            currentGroup = groupNames.putIfAbsent(parts.sublist(1).join(' '), () => groupNames.length + 1);
+            currentGroup = groupNames.putIfAbsent(
+                parts.sublist(1).join(' '), () => groupNames.length + 1);
           }
         case 'f':
           final idx = <int>[];
@@ -68,7 +71,8 @@ class ObjIO {
     return mesh;
   }
 
-  static String write(TriMesh mesh, {String name = 'mesh', bool writeGroups = true}) {
+  static String write(TriMesh mesh,
+      {String name = 'mesh', bool writeGroups = true}) {
     final sb = StringBuffer('# exported by mmx_core\n');
     for (var i = 0; i < mesh.vertexCount; i++) {
       sb.writeln('v ${mesh.vx(i)} ${mesh.vy(i)} ${mesh.vz(i)}');
@@ -81,12 +85,14 @@ class ObjIO {
           sb.writeln('g group_$g');
           last = g;
         }
-        sb.writeln('f ${mesh.indices[f * 3] + 1} ${mesh.indices[f * 3 + 1] + 1} ${mesh.indices[f * 3 + 2] + 1}');
+        sb.writeln(
+            'f ${mesh.indices[f * 3] + 1} ${mesh.indices[f * 3 + 1] + 1} ${mesh.indices[f * 3 + 2] + 1}');
       }
     } else {
       sb.writeln('o $name');
       for (var f = 0; f < mesh.faceCount; f++) {
-        sb.writeln('f ${mesh.indices[f * 3] + 1} ${mesh.indices[f * 3 + 1] + 1} ${mesh.indices[f * 3 + 2] + 1}');
+        sb.writeln(
+            'f ${mesh.indices[f * 3] + 1} ${mesh.indices[f * 3 + 1] + 1} ${mesh.indices[f * 3 + 2] + 1}');
       }
     }
     return sb.toString();

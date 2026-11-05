@@ -1,0 +1,17 @@
+mmx
+Copyright 2026 Phillip Lindsay
+
+This product includes sample geometry files from Autodesk Meshmixer 3.5.0:
+
+  bunnyr.obj, dog.obj, elephant.obj, gremlin.obj, plane.obj, sphere.obj
+
+Those files are Copyright Autodesk, Inc. and are redistributed here only as
+test fixtures and demonstration assets. The mmx source code is an independent
+clean-room implementation and is not derived from Autodesk source code.
+
+The files under docs/reference/ include public API headers and excerpts from
+Autodesk's meshmixer/mm-api repository, reproduced for reference and
+attribution. See docs/reference/README.md for the exact sources.
+
+Meshmixer is a trademark of Autodesk, Inc. mmx is not affiliated with or
+endorsed by Autodesk.

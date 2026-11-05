@@ -28,7 +28,8 @@ class _MeshViewportState extends State<MeshViewport> {
   double _lastSpread = 0;
 
   bool get _brushTool =>
-      widget.state.tool == StudioTool.sculpt || widget.state.tool == StudioTool.select;
+      widget.state.tool == StudioTool.sculpt ||
+      widget.state.tool == StudioTool.select;
 
   Offset _centroid() {
     var sx = 0.0, sy = 0.0;
@@ -60,115 +61,118 @@ class _MeshViewportState extends State<MeshViewport> {
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
-    return LayoutBuilder(builder: (context, constraints) {
-      final w = constraints.maxWidth.floor();
-      final h = constraints.maxHeight.floor();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) state.setFrameSize(w, h);
-      });
-      return Listener(
-        onPointerSignal: (event) {
-          if (event is PointerScrollEvent) {
-            state.zoom(event.scrollDelta.dy);
-          }
-        },
-        onPointerDown: (event) {
-          _pointers[event.pointer] = event.localPosition;
-          if (_pointers.length >= 2) {
-            _brushing = false;
-            _last = null;
-            _lastCentroid = _centroid();
-            _lastSpread = _spread();
-            return;
-          }
-          _last = event.localPosition;
-          _brushing = false;
-          final shift = HardwareKeyboard.instance.isShiftPressed;
-          final secondary = (event.buttons & kSecondaryMouseButton) != 0;
-          if (_brushTool && !shift && !secondary) {
-            _brushing = true;
-            _lastBrush = event.localPosition;
-            if (state.tool == StudioTool.select) {
-              state.pickAndSelect(event.localPosition.dx, event.localPosition.dy);
-            } else {
-              state.sculptAt(event.localPosition.dx, event.localPosition.dy);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth.floor();
+        final h = constraints.maxHeight.floor();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) state.setFrameSize(w, h);
+        });
+        return Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
+              state.zoom(event.scrollDelta.dy);
             }
-          }
-        },
-        onPointerMove: (event) {
-          if (_pointers.containsKey(event.pointer)) {
+          },
+          onPointerDown: (event) {
             _pointers[event.pointer] = event.localPosition;
-          }
-          if (_pointers.length >= 2) {
-            final centroid = _centroid();
-            final spread = _spread();
-            final lastCentroid = _lastCentroid;
-            if (lastCentroid != null) {
-              state.orbit(centroid.dx - lastCentroid.dx,
-                  centroid.dy - lastCentroid.dy);
-              if (_lastSpread > 0 && spread != _lastSpread) {
-                state.zoom(spread - _lastSpread);
-              }
+            if (_pointers.length >= 2) {
+              _brushing = false;
+              _last = null;
+              _lastCentroid = _centroid();
+              _lastSpread = _spread();
+              return;
             }
-            _lastCentroid = centroid;
-            _lastSpread = spread;
-            return;
-          }
-          final last = _last;
-          if (last == null) return;
-          final pos = event.localPosition;
-          final dx = pos.dx - last.dx;
-          final dy = pos.dy - last.dy;
-          final shift = HardwareKeyboard.instance.isShiftPressed;
-          final secondary = (event.buttons & kSecondaryMouseButton) != 0;
-          if (_brushing && !shift && !secondary) {
-            final lb = _lastBrush;
-            if (lb != null && (pos - lb).distance > 6) {
-              _lastBrush = pos;
-              if (state.tool == StudioTool.sculpt) {
-                state.sculptAt(pos.dx, pos.dy);
+            _last = event.localPosition;
+            _brushing = false;
+            final shift = HardwareKeyboard.instance.isShiftPressed;
+            final secondary = (event.buttons & kSecondaryMouseButton) != 0;
+            if (_brushTool && !shift && !secondary) {
+              _brushing = true;
+              _lastBrush = event.localPosition;
+              if (state.tool == StudioTool.select) {
+                state.pickAndSelect(
+                  event.localPosition.dx,
+                  event.localPosition.dy,
+                );
               } else {
-                state.pickAndSelect(pos.dx, pos.dy);
+                state.sculptAt(event.localPosition.dx, event.localPosition.dy);
               }
             }
-          } else if (shift || secondary) {
-            state.pan(dx, dy);
-          } else {
-            state.orbit(dx, dy);
-          }
-          _last = pos;
-        },
-        onPointerUp: (event) {
-          _pointers.remove(event.pointer);
-          if (_pointers.length < 2) {
-            _lastCentroid = null;
-            _lastSpread = 0;
-          }
-          if (_pointers.isEmpty) {
-            _resetGesture();
-          } else {
-            _last = _pointers.values.first;
-          }
-        },
-        onPointerCancel: (event) {
-          _pointers.remove(event.pointer);
-          if (_pointers.isEmpty) _resetGesture();
-        },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            RepaintBoundary(
-              child: CustomPaint(painter: _FramePainter(state)),
-            ),
-            Positioned(
-              left: 12,
-              top: 10,
-              child: _Hud(state: state),
-            ),
-          ],
-        ),
-      );
-    });
+          },
+          onPointerMove: (event) {
+            if (_pointers.containsKey(event.pointer)) {
+              _pointers[event.pointer] = event.localPosition;
+            }
+            if (_pointers.length >= 2) {
+              final centroid = _centroid();
+              final spread = _spread();
+              final lastCentroid = _lastCentroid;
+              if (lastCentroid != null) {
+                state.orbit(
+                  centroid.dx - lastCentroid.dx,
+                  centroid.dy - lastCentroid.dy,
+                );
+                if (_lastSpread > 0 && spread != _lastSpread) {
+                  state.zoom(spread - _lastSpread);
+                }
+              }
+              _lastCentroid = centroid;
+              _lastSpread = spread;
+              return;
+            }
+            final last = _last;
+            if (last == null) return;
+            final pos = event.localPosition;
+            final dx = pos.dx - last.dx;
+            final dy = pos.dy - last.dy;
+            final shift = HardwareKeyboard.instance.isShiftPressed;
+            final secondary = (event.buttons & kSecondaryMouseButton) != 0;
+            if (_brushing && !shift && !secondary) {
+              final lb = _lastBrush;
+              if (lb != null && (pos - lb).distance > 6) {
+                _lastBrush = pos;
+                if (state.tool == StudioTool.sculpt) {
+                  state.sculptAt(pos.dx, pos.dy);
+                } else {
+                  state.pickAndSelect(pos.dx, pos.dy);
+                }
+              }
+            } else if (shift || secondary) {
+              state.pan(dx, dy);
+            } else {
+              state.orbit(dx, dy);
+            }
+            _last = pos;
+          },
+          onPointerUp: (event) {
+            _pointers.remove(event.pointer);
+            if (_pointers.length < 2) {
+              _lastCentroid = null;
+              _lastSpread = 0;
+            }
+            if (_pointers.isEmpty) {
+              _resetGesture();
+            } else {
+              _last = _pointers.values.first;
+            }
+          },
+          onPointerCancel: (event) {
+            _pointers.remove(event.pointer);
+            if (_pointers.isEmpty) _resetGesture();
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              RepaintBoundary(
+                child: CustomPaint(painter: _FramePainter(state)),
+              ),
+              Positioned(left: 12, top: 10, child: _Hud(state: state)),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -188,12 +192,18 @@ class _Hud extends StatelessWidget {
           Text(
             '${state.tool.name.toUpperCase()}   ${obj?.name ?? "no object"}',
             style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             '$verts verts  $faces faces   render ${state.lastRenderMs}ms',
-            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.55)),
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.55),
+            ),
           ),
         ],
       ),
@@ -209,12 +219,25 @@ class _FramePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final img = state.frame;
     if (img == null) {
-      canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF16181B));
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()..color = const Color(0xFF16181B),
+      );
       return;
     }
-    final src = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+    final src = Rect.fromLTWH(
+      0,
+      0,
+      img.width.toDouble(),
+      img.height.toDouble(),
+    );
     final dst = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawImageRect(img, src, dst, Paint()..filterQuality = FilterQuality.low);
+    canvas.drawImageRect(
+      img,
+      src,
+      dst,
+      Paint()..filterQuality = FilterQuality.low,
+    );
   }
 
   @override

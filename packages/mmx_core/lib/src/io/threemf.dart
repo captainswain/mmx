@@ -21,7 +21,8 @@ class ThreeMfIO {
 </Relationships>''';
 
   /// [unit] is one of micron, millimeter, centimeter, inch, foot, meter.
-  static Uint8List write(TriMesh mesh, {String unit = 'millimeter', String name = 'mmx'}) {
+  static Uint8List write(TriMesh mesh,
+      {String unit = 'millimeter', String name = 'mmx'}) {
     final sb = StringBuffer();
     sb.write('<?xml version="1.0" encoding="UTF-8"?>\n');
     sb.write('<model unit="$unit" xml:lang="en-US" '
@@ -44,9 +45,11 @@ class ThreeMfIO {
     sb.write('  <build>\n    <item objectid="1"/>\n  </build>\n</model>\n');
 
     return ZipArchive.write(<ZipEntry>[
-      ZipEntry('[Content_Types].xml', Uint8List.fromList(utf8.encode(_contentTypes))),
+      ZipEntry('[Content_Types].xml',
+          Uint8List.fromList(utf8.encode(_contentTypes))),
       ZipEntry('_rels/.rels', Uint8List.fromList(utf8.encode(_rels))),
-      ZipEntry('3D/3dmodel.model', Uint8List.fromList(utf8.encode(sb.toString()))),
+      ZipEntry(
+          '3D/3dmodel.model', Uint8List.fromList(utf8.encode(sb.toString()))),
     ]);
   }
 
@@ -102,6 +105,8 @@ class ThreeMfIO {
   static String _f(double v) {
     // 6 decimals is plenty for millimetre-scale geometry and keeps files small.
     final s = v.toStringAsFixed(6);
-    return s.contains('.') ? s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '') : s;
+    return s.contains('.')
+        ? s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '')
+        : s;
   }
 }

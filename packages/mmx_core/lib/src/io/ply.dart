@@ -45,14 +45,27 @@ class PlyIO {
     final builder = MeshBuilder();
     if (!binary) {
       final body = String.fromCharCodes(bytes.sublist(bodyOffset));
-      final bodyLines = body.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+      final bodyLines = body
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
       for (var i = 0; i < vertexCount && i < bodyLines.length; i++) {
         final vals = bodyLines[i].split(RegExp(r'\s+'));
-        final xi = vertexProps.indexOf('float:x') >= 0 ? vertexProps.indexOf('float:x') : 0;
-        final yi = vertexProps.indexOf('float:y') >= 0 ? vertexProps.indexOf('float:y') : 1;
-        final zi = vertexProps.indexOf('float:z') >= 0 ? vertexProps.indexOf('float:z') : 2;
-        if (vals.length <= xi || vals.length <= yi || vals.length <= zi) continue;
-        builder.addVertex(double.parse(vals[xi]), double.parse(vals[yi]), double.parse(vals[zi]));
+        final xi = vertexProps.contains('float:x')
+            ? vertexProps.indexOf('float:x')
+            : 0;
+        final yi = vertexProps.contains('float:y')
+            ? vertexProps.indexOf('float:y')
+            : 1;
+        final zi = vertexProps.contains('float:z')
+            ? vertexProps.indexOf('float:z')
+            : 2;
+        if (vals.length <= xi || vals.length <= yi || vals.length <= zi) {
+          continue;
+        }
+        builder.addVertex(double.parse(vals[xi]), double.parse(vals[yi]),
+            double.parse(vals[zi]));
       }
       for (var i = 0; i < faceCount; i++) {
         final idx = vertexCount + i;
@@ -76,7 +89,7 @@ class PlyIO {
     final xIdx = vertexProps.indexOf('float:x');
     final yIdx = vertexProps.indexOf('float:y');
     final zIdx = vertexProps.indexOf('float:z');
-    final hasColor = vertexProps.indexOf('uchar:red') >= 0;
+    final hasColor = vertexProps.contains('uchar:red');
     final colors = <double>[];
     for (var i = 0; i < vertexCount; i++) {
       final vals = <double>[];
@@ -140,7 +153,8 @@ class PlyIO {
   }
 
   static String writeAscii(TriMesh mesh, {String name = 'mesh'}) {
-    final sb = StringBuffer('ply\nformat ascii 1.0\ncomment exported by mmx_core\n');
+    final sb =
+        StringBuffer('ply\nformat ascii 1.0\ncomment exported by mmx_core\n');
     sb.writeln('element vertex ${mesh.vertexCount}');
     sb.writeln('property float x\nproperty float y\nproperty float z');
     sb.writeln('element face ${mesh.faceCount}');
@@ -150,7 +164,8 @@ class PlyIO {
       sb.writeln('${mesh.vx(i)} ${mesh.vy(i)} ${mesh.vz(i)}');
     }
     for (var f = 0; f < mesh.faceCount; f++) {
-      sb.writeln('3 ${mesh.indices[f * 3]} ${mesh.indices[f * 3 + 1]} ${mesh.indices[f * 3 + 2]}');
+      sb.writeln(
+          '3 ${mesh.indices[f * 3]} ${mesh.indices[f * 3 + 1]} ${mesh.indices[f * 3 + 2]}');
     }
     return sb.toString();
   }

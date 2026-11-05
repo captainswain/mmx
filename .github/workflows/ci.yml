@@ -4,12 +4,17 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
-    # The kernel tests read models from the Meshmixer installer; run on a
-    # self-hosted runner that has them (or adapt the test model path).
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
       - name: Verify kernel and Studio
         run: ./tool/verify.sh

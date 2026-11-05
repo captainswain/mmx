@@ -18,10 +18,13 @@ class Weld {
     final builder = MeshBuilder();
     for (var i = 0; i < mesh.vertexCount; i++) {
       final x = mesh.vx(i), y = mesh.vy(i), z = mesh.vz(i);
-      final qx = (x * inv).round(), qy = (y * inv).round(), qz = (z * inv).round();
+      final qx = (x * inv).round(),
+          qy = (y * inv).round(),
+          qz = (z * inv).round();
       // Quantized key; collisions within one cell are welded, which is the
       // intended behaviour for a tolerance-based weld.
-      final key = ((qx & 0x1FFFFF) << 42) | ((qy & 0x1FFFFF) << 21) | (qz & 0x1FFFFF);
+      final key =
+          ((qx & 0x1FFFFF) << 42) | ((qy & 0x1FFFFF) << 21) | (qz & 0x1FFFFF);
       final existing = map[key];
       if (existing != null) {
         remap[i] = existing;
@@ -101,7 +104,11 @@ class Weld {
       ]..sort();
       final key = '${ids[0]}_${ids[1]}_${ids[2]}';
       if (seen.add(key)) {
-        keep.addAll(<int>[mesh.indices[f * 3], mesh.indices[f * 3 + 1], mesh.indices[f * 3 + 2]]);
+        keep.addAll(<int>[
+          mesh.indices[f * 3],
+          mesh.indices[f * 3 + 1],
+          mesh.indices[f * 3 + 2]
+        ]);
       }
     }
     final removed = mesh.faceCount - keep.length ~/ 3;

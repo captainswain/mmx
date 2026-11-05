@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -66,7 +66,8 @@ void main() {
       expect(back.faceCount, grouped.faceCount);
       expect(back.faceGroups, isNotNull);
       expect(back.faceGroups!.sublist(0, 10), groups.sublist(0, 10));
-      expect(back.faceGroups!.sublist(groups.length - 10), groups.sublist(groups.length - 10));
+      expect(back.faceGroups!.sublist(groups.length - 10),
+          groups.sublist(groups.length - 10));
     });
 
     test('rewrite preserves the scene XML and updates the mesh', () {
@@ -78,10 +79,10 @@ void main() {
       final original = file.readAsBytesSync();
       final objects = MixIO.read(original);
       final mesh = objects.first.mesh;
-      final scaledPositions = Float32List.fromList(
-          mesh.positions.map((v) => v * 2.0).toList());
-      final scaled = TriMesh(scaledPositions, mesh.indices,
-          faceGroups: mesh.faceGroups);
+      final scaledPositions =
+          Float32List.fromList(mesh.positions.map((v) => v * 2.0).toList());
+      final scaled =
+          TriMesh(scaledPositions, mesh.indices, faceGroups: mesh.faceGroups);
       final rewritten =
           MixIO.rewrite(original, [MixObject(name: 'scaled', mesh: scaled)]);
       final back = MixIO.read(rewritten).first.mesh;
@@ -95,8 +96,7 @@ void main() {
       final bdRewritten = ByteData.sublistView(rewritten);
       final xmlLen = bdOriginal.getUint32(0, Endian.little);
       expect(bdRewritten.getUint32(0, Endian.little), xmlLen);
-      expect(rewritten.sublist(4, 4 + xmlLen),
-          original.sublist(4, 4 + xmlLen));
+      expect(rewritten.sublist(4, 4 + xmlLen), original.sublist(4, 4 + xmlLen));
     });
 
     test('MeshIO dispatches .mix to the scene reader', () {
@@ -163,8 +163,7 @@ void main() {
       expect(read.length, 2);
       expect(read[0].name, 'part_a.obj');
       expect(read[1].name, 'part_b.obj');
-      expect(read[1].mesh.bounds().minX,
-          closeTo(a.bounds().minX + 30, 1e-2));
+      expect(read[1].mesh.bounds().minX, closeTo(a.bounds().minX + 30, 1e-2));
     });
   });
 }

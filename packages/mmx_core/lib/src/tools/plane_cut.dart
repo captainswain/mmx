@@ -53,7 +53,9 @@ class PlaneCut {
     }
 
     for (var f = 0; f < mesh.faceCount; f++) {
-      final v0 = mesh.indices[f * 3], v1 = mesh.indices[f * 3 + 1], v2 = mesh.indices[f * 3 + 2];
+      final v0 = mesh.indices[f * 3],
+          v1 = mesh.indices[f * 3 + 1],
+          v2 = mesh.indices[f * 3 + 2];
       final s0 = side(v0), s1 = side(v1), s2 = side(v2);
       final eps = 1e-9;
       final pos = <int>[], neg = <int>[], on = <int>[];
@@ -100,7 +102,8 @@ class PlaneCut {
       }
     }
 
-    var out = TriMesh(Float32List.fromList(builderPos), Uint32List.fromList(indices));
+    var out =
+        TriMesh(Float32List.fromList(builderPos), Uint32List.fromList(indices));
     out.removeDegenerateFaces();
     out.compact();
     if (fill) {
@@ -155,8 +158,10 @@ class PlaneCut {
   /// either side.
   static TriMesh slice(TriMesh mesh,
       {required List<double> point, required List<double> normal}) {
-    final positive = cut(mesh, point: point, normal: normal, keepPositive: true, fill: true);
-    final negative = cut(mesh, point: point, normal: normal, keepPositive: false, fill: true);
+    final positive =
+        cut(mesh, point: point, normal: normal, keepPositive: true, fill: true);
+    final negative = cut(mesh,
+        point: point, normal: normal, keepPositive: false, fill: true);
     return _merge(positive, negative);
   }
 

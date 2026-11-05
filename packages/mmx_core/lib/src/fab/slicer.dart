@@ -37,7 +37,11 @@ class Slicer {
     for (var y = y0 + layerHeight * 0.5; y < y1; y += layerHeight) {
       final segments = <List<List<double>>>[];
       for (var f = 0; f < mesh.faceCount; f++) {
-        final ids = <int>[mesh.indices[f * 3], mesh.indices[f * 3 + 1], mesh.indices[f * 3 + 2]];
+        final ids = <int>[
+          mesh.indices[f * 3],
+          mesh.indices[f * 3 + 1],
+          mesh.indices[f * 3 + 2]
+        ];
         final ys = <double>[mesh.vy(ids[0]), mesh.vy(ids[1]), mesh.vy(ids[2])];
         final xs = <double>[mesh.vx(ids[0]), mesh.vx(ids[1]), mesh.vx(ids[2])];
         final zs = <double>[mesh.vz(ids[0]), mesh.vz(ids[1]), mesh.vz(ids[2])];
@@ -47,7 +51,10 @@ class Slicer {
           final ya = ys[i], yb = ys[j];
           if ((ya < y && yb > y) || (yb < y && ya > y)) {
             final t = (y - ya) / (yb - ya);
-            pts.add(<double>[xs[i] + (xs[j] - xs[i]) * t, zs[i] + (zs[j] - zs[i]) * t]);
+            pts.add(<double>[
+              xs[i] + (xs[j] - xs[i]) * t,
+              zs[i] + (zs[j] - zs[i]) * t
+            ]);
           }
         }
         if (pts.length == 2) segments.add(pts);

@@ -13,7 +13,13 @@ import 'threemf.dart';
 /// shipped Meshmixer binary: obj, ply, stl, off (plus amf/3mf/mix upstream).
 class MeshIO {
   static const List<String> importExtensions = <String>[
-    'obj', 'ply', 'stl', 'off', '3mf', 'amf', 'mix'
+    'obj',
+    'ply',
+    'stl',
+    'off',
+    '3mf',
+    'amf',
+    'mix'
   ];
 
   static TriMesh readBytes(String filename, Uint8List bytes) {
@@ -21,8 +27,10 @@ class MeshIO {
     switch (ext) {
       case 'stl':
         // ASCII STL starts with "solid" and contains "facet".
-        final head = String.fromCharCodes(bytes.sublist(0, bytes.length < 512 ? bytes.length : 512));
-        if (head.trimLeft().toLowerCase().startsWith('solid') && head.toLowerCase().contains('facet')) {
+        final head = String.fromCharCodes(
+            bytes.sublist(0, bytes.length < 512 ? bytes.length : 512));
+        if (head.trimLeft().toLowerCase().startsWith('solid') &&
+            head.toLowerCase().contains('facet')) {
           return StlIO.readAscii(utf8.decode(bytes, allowMalformed: true));
         }
         return StlIO.readBinary(bytes);
@@ -41,7 +49,10 @@ class MeshIO {
         return Modify.combine(objects.map((o) => o.mesh).toList());
       default:
         // Fall back on content sniffing.
-        if (bytes.length > 84 && bytes[0] == 0x70 && bytes[1] == 0x6C && bytes[2] == 0x79) {
+        if (bytes.length > 84 &&
+            bytes[0] == 0x70 &&
+            bytes[1] == 0x6C &&
+            bytes[2] == 0x79) {
           return PlyIO.read(bytes);
         }
         return ObjIO.read(utf8.decode(bytes, allowMalformed: true));
@@ -49,7 +60,10 @@ class MeshIO {
   }
 
   static TriMesh readOff(String text) {
-    final tokens = text.split(RegExp(r'\s+')).where((t) => t.isNotEmpty && !t.startsWith('#')).toList();
+    final tokens = text
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty && !t.startsWith('#'))
+        .toList();
     if (tokens.isEmpty || tokens[0] != 'OFF') return TriMesh.empty();
     var i = 1;
     if (tokens[i] == 'OFF') i++;
@@ -58,7 +72,8 @@ class MeshIO {
     i += 3;
     final builder = MeshBuilder();
     for (var v = 0; v < nv; v++) {
-      builder.addVertex(double.parse(tokens[i]), double.parse(tokens[i + 1]), double.parse(tokens[i + 2]));
+      builder.addVertex(double.parse(tokens[i]), double.parse(tokens[i + 1]),
+          double.parse(tokens[i + 2]));
       i += 3;
     }
     for (var f = 0; f < nf; f++) {
@@ -75,7 +90,8 @@ class MeshIO {
     return builder.build();
   }
 
-  static Uint8List writeBytes(String filename, TriMesh mesh, {bool binaryStl = true}) {
+  static Uint8List writeBytes(String filename, TriMesh mesh,
+      {bool binaryStl = true}) {
     final ext = filename.toLowerCase().split('.').last;
     switch (ext) {
       case 'stl':

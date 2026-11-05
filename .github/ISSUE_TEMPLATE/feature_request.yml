@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest a new capability or a parity gap
+title: "[feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        mmx aims for the useful parts of Meshmixer, not bit-identical output.
+        Check `docs/TOOL-MATRIX.md` first; the tool may already exist in the
+        kernel without a Studio action.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to do, and what blocks it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Kernel / geometry
+        - Studio UI
+        - Import/export
+        - Analysis/fabrication
+        - Documentation
+        - Build/packaging
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and the tool matrix.
+          required: true

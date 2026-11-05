@@ -56,8 +56,12 @@ class Decimator {
       for (final e in topo.boundaryEdges()) {
         final a = e[0], b = e[1];
         // Constraint plane through the edge, perpendicular to the surface.
-        final ax = positions[a * 3], ay = positions[a * 3 + 1], az = positions[a * 3 + 2];
-        final bx = positions[b * 3], by = positions[b * 3 + 1], bz = positions[b * 3 + 2];
+        final ax = positions[a * 3],
+            ay = positions[a * 3 + 1],
+            az = positions[a * 3 + 2];
+        final bx = positions[b * 3],
+            by = positions[b * 3 + 1],
+            bz = positions[b * 3 + 2];
         final ex = bx - ax, ey = by - ay, ez = bz - az;
         // Approximate surface normal from an incident face.
         var nx = 0.0, ny = 0.0, nz = 0.0;
@@ -67,7 +71,9 @@ class Decimator {
           ny += nrm[1];
           nz += nrm[2];
         }
-        var px = ey * nz - ez * ny, py = ez * nx - ex * nz, pz = ex * ny - ey * nx;
+        var px = ey * nz - ez * ny,
+            py = ez * nx - ex * nz,
+            pz = ex * ny - ey * nx;
         final l = math.sqrt(px * px + py * py + pz * pz);
         if (l < 1e-20) continue;
         px /= l;
@@ -117,7 +123,10 @@ class Decimator {
       final a = e.a, b = e.b;
       if (!vAlive[a] || !vAlive[b]) continue;
       if (!_isEdge(vFaces[a], vFaces[b], faces)) continue;
-      if (!_legalCollapse(vFaces, faces, vAlive, a, b, positions, e.x, e.y, e.z)) continue;
+      if (!_legalCollapse(
+          vFaces, faces, vAlive, a, b, positions, e.x, e.y, e.z)) {
+        continue;
+      }
       // Move b to the optimal position, kill a.
       positions[b * 3] = e.x;
       positions[b * 3 + 1] = e.y;
@@ -159,7 +168,8 @@ class Decimator {
       final ids = <int>[];
       for (final v in tri) {
         if (remap[v] < 0) {
-          remap[v] = builder.addVertex(positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]);
+          remap[v] = builder.addVertex(
+              positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]);
         }
         ids.add(remap[v]);
       }
@@ -190,9 +200,16 @@ class Decimator {
   }
 
   /// Link condition plus a degenerate/zero-area rejection for the moved faces.
-  static bool _legalCollapse(List<Set<int>> vFaces, List<List<int>> faces,
-      List<bool> vAlive, int a, int b, List<double> positions,
-      double tx, double ty, double tz) {
+  static bool _legalCollapse(
+      List<Set<int>> vFaces,
+      List<List<int>> faces,
+      List<bool> vAlive,
+      int a,
+      int b,
+      List<double> positions,
+      double tx,
+      double ty,
+      double tz) {
     final na = _neighbors(vFaces[a], faces);
     final nb = _neighbors(vFaces[b], faces);
     na.remove(a);
@@ -222,19 +239,35 @@ class Decimator {
       if (v == move) {
         p.add(<double>[tx, ty, tz]);
       } else {
-        p.add(<double>[positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]]);
+        p.add(<double>[
+          positions[v * 3],
+          positions[v * 3 + 1],
+          positions[v * 3 + 2]
+        ]);
       }
     }
-    final ux = p[1][0] - p[0][0], uy = p[1][1] - p[0][1], uz = p[1][2] - p[0][2];
-    final wx = p[2][0] - p[0][0], wy = p[2][1] - p[0][1], wz = p[2][2] - p[0][2];
-    final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+    final ux = p[1][0] - p[0][0],
+        uy = p[1][1] - p[0][1],
+        uz = p[1][2] - p[0][2];
+    final wx = p[2][0] - p[0][0],
+        wy = p[2][1] - p[0][1],
+        wz = p[2][2] - p[0][2];
+    final nx = uy * wz - uz * wy,
+        ny = uz * wx - ux * wz,
+        nz = ux * wy - uy * wx;
     return nx * nx + ny * ny + nz * nz > 1e-18;
   }
 
   static List<double> _faceNormal(List<double> positions, List<int> tri) {
-    final ax = positions[tri[0] * 3], ay = positions[tri[0] * 3 + 1], az = positions[tri[0] * 3 + 2];
-    final bx = positions[tri[1] * 3], by = positions[tri[1] * 3 + 1], bz = positions[tri[1] * 3 + 2];
-    final cx = positions[tri[2] * 3], cy = positions[tri[2] * 3 + 1], cz = positions[tri[2] * 3 + 2];
+    final ax = positions[tri[0] * 3],
+        ay = positions[tri[0] * 3 + 1],
+        az = positions[tri[0] * 3 + 2];
+    final bx = positions[tri[1] * 3],
+        by = positions[tri[1] * 3 + 1],
+        bz = positions[tri[1] * 3 + 2];
+    final cx = positions[tri[2] * 3],
+        cy = positions[tri[2] * 3 + 1],
+        cz = positions[tri[2] * 3 + 2];
     final ux = bx - ax, uy = by - ay, uz = bz - az;
     final wx = cx - ax, wy = cy - ay, wz = cz - az;
     var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
@@ -243,11 +276,18 @@ class Decimator {
     return <double>[nx / l, ny / l, nz / l];
   }
 
-  static void _accumulatePlane(List<Float64List> quadrics, List<double> positions, List<int> tri) {
+  static void _accumulatePlane(
+      List<Float64List> quadrics, List<double> positions, List<int> tri) {
     final nrm = _faceNormal(positions, tri);
-    final ax = positions[tri[0] * 3], ay = positions[tri[0] * 3 + 1], az = positions[tri[0] * 3 + 2];
-    final bx = positions[tri[1] * 3], by = positions[tri[1] * 3 + 1], bz = positions[tri[1] * 3 + 2];
-    final cx = positions[tri[2] * 3], cy = positions[tri[2] * 3 + 1], cz = positions[tri[2] * 3 + 2];
+    final ax = positions[tri[0] * 3],
+        ay = positions[tri[0] * 3 + 1],
+        az = positions[tri[0] * 3 + 2];
+    final bx = positions[tri[1] * 3],
+        by = positions[tri[1] * 3 + 1],
+        bz = positions[tri[1] * 3 + 2];
+    final cx = positions[tri[2] * 3],
+        cy = positions[tri[2] * 3 + 1],
+        cz = positions[tri[2] * 3 + 2];
     final ux = bx - ax, uy = by - ay, uz = bz - az;
     final vx = cx - ax, vy = cy - ay, vz = cz - az;
     final crx = uy * vz - uz * vy;
@@ -265,7 +305,8 @@ class Decimator {
   }
 
   /// Adds w * [n,d]^T[n,d] to a symmetric 10-element quadric.
-  static void _addPlane(Float64List q, double nx, double ny, double nz, double d, double w) {
+  static void _addPlane(
+      Float64List q, double nx, double ny, double nz, double d, double w) {
     q[0] += w * nx * nx;
     q[1] += w * nx * ny;
     q[2] += w * nx * nz;
@@ -278,7 +319,8 @@ class Decimator {
     q[9] += w * d * d;
   }
 
-  static _Cost _collapseCost(Float64List qa, Float64List qb, List<double> positions, int a, int b) {
+  static _Cost _collapseCost(
+      Float64List qa, Float64List qb, List<double> positions, int a, int b) {
     final q = Float64List(10);
     for (var i = 0; i < 10; i++) {
       q[i] = qa[i] + qb[i];
@@ -292,9 +334,18 @@ class Decimator {
         m13 * (m12 * m23 - m22 * m13);
     double x, y, z;
     if (det.abs() > 1e-18) {
-      x = (r1 * (m22 * m33 - m23 * m23) - m12 * (r2 * m33 - m23 * r3) + m13 * (r2 * m23 - m22 * r3)) / det;
-      y = (m11 * (r2 * m33 - r3 * m23) - r1 * (m12 * m33 - m23 * m13) + m13 * (m12 * r3 - r2 * m13)) / det;
-      z = (m11 * (m22 * r3 - r2 * m23) - m12 * (m12 * r3 - r2 * m13) + r1 * (m12 * m23 - m22 * m13)) / det;
+      x = (r1 * (m22 * m33 - m23 * m23) -
+              m12 * (r2 * m33 - m23 * r3) +
+              m13 * (r2 * m23 - m22 * r3)) /
+          det;
+      y = (m11 * (r2 * m33 - r3 * m23) -
+              r1 * (m12 * m33 - m23 * m13) +
+              m13 * (m12 * r3 - r2 * m13)) /
+          det;
+      z = (m11 * (m22 * r3 - r2 * m23) -
+              m12 * (m12 * r3 - r2 * m13) +
+              r1 * (m12 * m23 - m22 * m13)) /
+          det;
     } else {
       x = (positions[a * 3] + positions[b * 3]) * 0.5;
       y = (positions[a * 3 + 1] + positions[b * 3 + 1]) * 0.5;
@@ -310,9 +361,16 @@ class Decimator {
   }
 
   static double _quadricError(Float64List q, double x, double y, double z) {
-    return q[0] * x * x + 2 * q[1] * x * y + 2 * q[2] * x * z + 2 * q[3] * x +
-        q[4] * y * y + 2 * q[5] * y * z + 2 * q[6] * y +
-        q[7] * z * z + 2 * q[8] * z + q[9];
+    return q[0] * x * x +
+        2 * q[1] * x * y +
+        2 * q[2] * x * z +
+        2 * q[3] * x +
+        q[4] * y * y +
+        2 * q[5] * y * z +
+        2 * q[6] * y +
+        q[7] * z * z +
+        2 * q[8] * z +
+        q[9];
   }
 }
 
@@ -358,8 +416,12 @@ class _EdgeHeap {
       while (true) {
         final l = 2 * i + 1, r = 2 * i + 2;
         var smallest = i;
-        if (l < _items.length && _items[l].cost < _items[smallest].cost) smallest = l;
-        if (r < _items.length && _items[r].cost < _items[smallest].cost) smallest = r;
+        if (l < _items.length && _items[l].cost < _items[smallest].cost) {
+          smallest = l;
+        }
+        if (r < _items.length && _items[r].cost < _items[smallest].cost) {
+          smallest = r;
+        }
         if (smallest == i) break;
         final t = _items[smallest];
         _items[smallest] = _items[i];

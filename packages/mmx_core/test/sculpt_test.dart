@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -46,10 +46,7 @@ void main() {
       final center = <double>[0, b.maxY, 0];
       final radius = b.extentX * 0.25;
       final twisted = Sculptor.apply(mesh,
-          op: BrushOp.twist,
-          center: center,
-          radius: radius,
-          strength: 0.8);
+          op: BrushOp.twist, center: center, radius: radius, strength: 0.8);
       expect(twisted.faceCount, mesh.faceCount);
       expect(twisted.validate(), isEmpty);
       for (var i = 0; i < twisted.positions.length; i++) {

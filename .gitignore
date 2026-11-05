@@ -2,9 +2,14 @@
 .dart_tool/
 .packages
 build/
+coverage/
 *.iml
 .flutter-plugins
 .flutter-plugins-dependencies
+doc/api/
+
+# Root AOT outputs (created by `dart compile exe ... -o bin/...`)
+/bin/
 
 # Logs
 *.log
@@ -12,3 +17,10 @@ build/
 # Local editor state
 .idea/
 .vscode/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Library lockfiles (apps keep theirs)
+packages/*/pubspec.lock

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -15,9 +15,12 @@ void main() {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();
       final mirrored = Mirror.mirror(mesh,
-          point: <double>[0, 0, 0], normal: <double>[1, 0, 0], keepOriginal: false);
+          point: <double>[0, 0, 0],
+          normal: <double>[1, 0, 0],
+          keepOriginal: false);
       expect(mirrored.faceCount, mesh.faceCount);
-      expect(mirrored.signedVolume(), closeTo(mesh.signedVolume(), mesh.signedVolume() * 0.01));
+      expect(mirrored.signedVolume(),
+          closeTo(mesh.signedVolume(), mesh.signedVolume() * 0.01));
       final mb = mirrored.bounds();
       expect(mb.minX, closeTo(-b.maxX, 1e-2));
       expect(mb.maxX, closeTo(-b.minX, 1e-2));
@@ -26,8 +29,11 @@ void main() {
     test('keeping the original doubles the volume', () {
       final mesh = loadModel('sphere.obj');
       final both = Mirror.mirror(mesh,
-          point: <double>[0, 0, 0], normal: <double>[1, 0, 0], keepOriginal: true);
-      expect(both.signedVolume(), closeTo(mesh.signedVolume() * 2, mesh.signedVolume() * 0.02));
+          point: <double>[0, 0, 0],
+          normal: <double>[1, 0, 0],
+          keepOriginal: true);
+      expect(both.signedVolume(),
+          closeTo(mesh.signedVolume() * 2, mesh.signedVolume() * 0.02));
     });
 
     test('seam welding closes a split sphere', () {
@@ -47,14 +53,19 @@ void main() {
     test('extruding a selection adds a skirt and stays closed', () {
       final mesh = loadModel('sphere.obj');
       final b = mesh.bounds();
-      final center = <double>[(b.minX + b.maxX) / 2, b.maxY, (b.minZ + b.maxZ) / 2];
+      final center = <double>[
+        (b.minX + b.maxX) / 2,
+        b.maxY,
+        (b.minZ + b.maxZ) / 2
+      ];
       final sel = Selection.sphereBrush(mesh, center, b.extentX * 0.25);
       final extruded = Extruder.extrude(mesh,
           faceMask: sel.faceMask, distance: b.extentX * 0.08);
       expect(extruded.faceCount, greaterThan(mesh.faceCount));
       expect(extruded.bounds().maxY, greaterThan(mesh.bounds().maxY));
       final loops = MeshTopology(extruded).boundaryLoops();
-      expect(loops, isEmpty, reason: 'extruding a patch of a closed mesh must stay closed');
+      expect(loops, isEmpty,
+          reason: 'extruding a patch of a closed mesh must stay closed');
     });
 
     test('zero distance is a no-op', () {
@@ -71,7 +82,22 @@ void main() {
       final b = a.clone();
       final dx = a.bounds().extentX * 1.5;
       b.transform(Float64List.fromList(<double>[
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, dx, 0, 0, 1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        dx,
+        0,
+        0,
+        1,
       ]));
       final merged = <TriMesh>[a, b];
       var totalV = 0;
@@ -107,7 +133,8 @@ void main() {
       final back = ThreeMfIO.read(bytes);
       expect(back.vertexCount, mesh.vertexCount);
       expect(back.faceCount, mesh.faceCount);
-      expect((back.surfaceArea() - mesh.surfaceArea()).abs() / mesh.surfaceArea(),
+      expect(
+          (back.surfaceArea() - mesh.surfaceArea()).abs() / mesh.surfaceArea(),
           lessThan(1e-3));
       // MeshIO dispatch by extension.
       final viaIo = MeshIO.readBytes('model.3mf', bytes);

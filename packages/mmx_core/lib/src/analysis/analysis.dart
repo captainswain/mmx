@@ -38,11 +38,14 @@ class ThicknessAnalysis {
 
     final step = maxSamples > 0 && maxSamples < n ? (n / maxSamples).ceil() : 1;
     for (var v = 0; v < n; v += step) {
-      final nx = normals[v * 3], ny = normals[v * 3 + 1], nz = normals[v * 3 + 2];
+      final nx = normals[v * 3],
+          ny = normals[v * 3 + 1],
+          nz = normals[v * 3 + 2];
       final px = mesh.vx(v) - nx * 1e-4;
       final py = mesh.vy(v) - ny * 1e-4;
       final pz = mesh.vz(v) - nz * 1e-4;
-      final hit = bvh.raycast(<double>[px, py, pz], <double>[-nx, -ny, -nz], tMax: limit);
+      final hit = bvh
+          .raycast(<double>[px, py, pz], <double>[-nx, -ny, -nz], tMax: limit);
       final t = hit == null ? limit : hit.t;
       out[v] = t;
       if (t < minT) minT = t;
@@ -50,8 +53,8 @@ class ThicknessAnalysis {
       count++;
       if (threshold > 0 && t < threshold) defects.add(v);
     }
-    return ThicknessAnalysis(out, count == 0 ? 0 : minT, count == 0 ? 0 : sum / count,
-        defects.length, defects);
+    return ThicknessAnalysis(out, count == 0 ? 0 : minT,
+        count == 0 ? 0 : sum / count, defects.length, defects);
   }
 
   static Float32List _vertexNormals(TriMesh m, MeshTopology topo) {
@@ -59,9 +62,15 @@ class ThicknessAnalysis {
     for (var v = 0; v < m.vertexCount; v++) {
       var nx = 0.0, ny = 0.0, nz = 0.0;
       for (final f in topo.facesOfVertex(v)) {
-        final a = m.indices[f * 3], bb = m.indices[f * 3 + 1], c = m.indices[f * 3 + 2];
-        final ux = m.vx(bb) - m.vx(a), uy = m.vy(bb) - m.vy(a), uz = m.vz(bb) - m.vz(a);
-        final wx = m.vx(c) - m.vx(a), wy = m.vy(c) - m.vy(a), wz = m.vz(c) - m.vz(a);
+        final a = m.indices[f * 3],
+            bb = m.indices[f * 3 + 1],
+            c = m.indices[f * 3 + 2];
+        final ux = m.vx(bb) - m.vx(a),
+            uy = m.vy(bb) - m.vy(a),
+            uz = m.vz(bb) - m.vz(a);
+        final wx = m.vx(c) - m.vx(a),
+            wy = m.vy(c) - m.vy(a),
+            wz = m.vz(c) - m.vz(a);
         nx += uy * wz - uz * wy;
         ny += uz * wx - ux * wz;
         nz += ux * wy - uy * wx;
@@ -93,7 +102,8 @@ class OverhangAnalysis {
       this.totalArea, this.faceCount, this.overhangFaces);
 
   static OverhangAnalysis run(TriMesh mesh,
-      {double angleDegrees = 45, List<double> buildDirection = const <double>[0, -1, 0]}) {
+      {double angleDegrees = 45,
+      List<double> buildDirection = const <double>[0, -1, 0]}) {
     final threshold = math.cos(angleDegrees * math.pi / 180);
     final perFace = Float32List(mesh.faceCount);
     final severity = Float32List(mesh.vertexCount);
@@ -105,10 +115,18 @@ class OverhangAnalysis {
     final bdx = bd[0] / bl, bdy = bd[1] / bl, bdz = bd[2] / bl;
 
     for (var f = 0; f < mesh.faceCount; f++) {
-      final a = mesh.indices[f * 3], b = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
-      final ux = mesh.vx(b) - mesh.vx(a), uy = mesh.vy(b) - mesh.vy(a), uz = mesh.vz(b) - mesh.vz(a);
-      final wx = mesh.vx(c) - mesh.vx(a), wy = mesh.vy(c) - mesh.vy(a), wz = mesh.vz(c) - mesh.vz(a);
-      var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      final a = mesh.indices[f * 3],
+          b = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
+      final ux = mesh.vx(b) - mesh.vx(a),
+          uy = mesh.vy(b) - mesh.vy(a),
+          uz = mesh.vz(b) - mesh.vz(a);
+      final wx = mesh.vx(c) - mesh.vx(a),
+          wy = mesh.vy(c) - mesh.vy(a),
+          wz = mesh.vz(c) - mesh.vz(a);
+      var nx = uy * wz - uz * wy,
+          ny = uz * wx - ux * wz,
+          nz = ux * wy - uy * wx;
       final len = math.sqrt(nx * nx + ny * ny + nz * nz);
       if (len < 1e-20) continue;
       nx /= len;
@@ -130,7 +148,8 @@ class OverhangAnalysis {
         }
       }
     }
-    return OverhangAnalysis(perFace, severity, overhangArea, total, faces.length, faces);
+    return OverhangAnalysis(
+        perFace, severity, overhangArea, total, faces.length, faces);
   }
 }
 
@@ -144,8 +163,14 @@ class StabilityAnalysis {
   final double surfaceArea;
   final double bedContactArea;
 
-  StabilityAnalysis(this.centerOfMass, this.contactPoints, this.centerInsideSupport,
-      this.minTipAngleDegrees, this.volume, this.surfaceArea, this.bedContactArea);
+  StabilityAnalysis(
+      this.centerOfMass,
+      this.contactPoints,
+      this.centerInsideSupport,
+      this.minTipAngleDegrees,
+      this.volume,
+      this.surfaceArea,
+      this.bedContactArea);
 
   /// [materialDensity] is only used for reporting mass.
   static StabilityAnalysis run(TriMesh mesh,
@@ -173,7 +198,9 @@ class StabilityAnalysis {
         }
       }
       if (!allLow) continue;
-      final a = mesh.indices[f * 3], bb = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          bb = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final ux = mesh.vx(bb) - mesh.vx(a), uz = mesh.vz(bb) - mesh.vz(a);
       final wx = mesh.vx(c) - mesh.vx(a), wz = mesh.vz(c) - mesh.vz(a);
       contactArea += 0.5 * (ux * wz - uz * wx).abs();
@@ -197,26 +224,29 @@ class StabilityAnalysis {
       }
     }
     assert(topo.vertexCount == mesh.vertexCount);
-    return StabilityAnalysis(com, hull, inside, minTip, volume, mesh.surfaceArea(),
-        contactArea);
+    return StabilityAnalysis(
+        com, hull, inside, minTip, volume, mesh.surfaceArea(), contactArea);
   }
 
   static List<List<double>> _convexHull(List<List<double>> pts) {
     if (pts.length < 3) return pts;
     final sorted = pts.toList()
-      ..sort((a, b) => a[0] == b[0] ? a[1].compareTo(b[1]) : a[0].compareTo(b[0]));
+      ..sort(
+          (a, b) => a[0] == b[0] ? a[1].compareTo(b[1]) : a[0].compareTo(b[0]));
     double cross(List<double> o, List<double> a, List<double> b) =>
         (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
     final lower = <List<double>>[];
     for (final p in sorted) {
-      while (lower.length >= 2 && cross(lower[lower.length - 2], lower.last, p) <= 0) {
+      while (lower.length >= 2 &&
+          cross(lower[lower.length - 2], lower.last, p) <= 0) {
         lower.removeLast();
       }
       lower.add(p);
     }
     final upper = <List<double>>[];
     for (final p in sorted.reversed) {
-      while (upper.length >= 2 && cross(upper[upper.length - 2], upper.last, p) <= 0) {
+      while (upper.length >= 2 &&
+          cross(upper[upper.length - 2], upper.last, p) <= 0) {
         upper.removeLast();
       }
       upper.add(p);
@@ -246,15 +276,19 @@ class DeviationAnalysis {
   final double maxDistance;
   final double meanDistance;
 
-  DeviationAnalysis(this.perVertexDistance, this.maxDistance, this.meanDistance);
+  DeviationAnalysis(
+      this.perVertexDistance, this.maxDistance, this.meanDistance);
 
-  static DeviationAnalysis run(TriMesh target, TriMesh reference, {int maxSamples = 20000}) {
+  static DeviationAnalysis run(TriMesh target, TriMesh reference,
+      {int maxSamples = 20000}) {
     final bvh = TriangleBVH.build(reference);
     final out = Float32List(target.vertexCount);
     var maxD = 0.0;
     var sum = 0.0;
     var count = 0;
-    final step = target.vertexCount > maxSamples ? (target.vertexCount / maxSamples).ceil() : 1;
+    final step = target.vertexCount > maxSamples
+        ? (target.vertexCount / maxSamples).ceil()
+        : 1;
     for (var v = 0; v < target.vertexCount; v += step) {
       final cp = bvh.closestPoint(target.vx(v), target.vy(v), target.vz(v));
       final d = cp?.distance ?? double.infinity;

@@ -19,7 +19,8 @@ class SceneObject {
         visible = true,
         isTarget = false;
 
-  SceneObject clone() => SceneObject(id, name, mesh.clone(), transform: Float64List.fromList(transform))
+  SceneObject clone() => SceneObject(id, name, mesh.clone(),
+      transform: Float64List.fromList(transform))
     ..visible = visible
     ..isTarget = isTarget
     ..pivot = pivot;
@@ -49,7 +50,8 @@ class Document {
   Document({this.maxUndoBytes = 512 * 1024 * 1024});
 
   SceneObject add(TriMesh mesh, {String? name}) {
-    final obj = SceneObject(_nextId++, name ?? 'Object ${objects.length + 1}', mesh);
+    final obj =
+        SceneObject(_nextId++, name ?? 'Object ${objects.length + 1}', mesh);
     objects.add(obj);
     return obj;
   }
@@ -132,25 +134,62 @@ class _Snapshot {
 }
 
 Float64List identity4() => Float64List.fromList(<double>[
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
     ]);
 
 /// Column-major translation.
-Float64List translation4(double x, double y, double z) => Float64List.fromList(<double>[
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      x, y, z, 1,
+Float64List translation4(double x, double y, double z) =>
+    Float64List.fromList(<double>[
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      x,
+      y,
+      z,
+      1,
     ]);
 
 Float64List scale4(double s) => Float64List.fromList(<double>[
-      s, 0, 0, 0,
-      0, s, 0, 0,
-      0, 0, s, 0,
-      0, 0, 0, 1,
+      s,
+      0,
+      0,
+      0,
+      0,
+      s,
+      0,
+      0,
+      0,
+      0,
+      s,
+      0,
+      0,
+      0,
+      0,
+      1,
     ]);
 
 /// Rotation about an arbitrary axis (column-major).
@@ -161,10 +200,22 @@ Float64List rotation4(double ax, double ay, double az, double radians) {
   final x = ax * n, y = ay * n, z = az * n;
   final c = _cos(radians), s = _sin(radians), t = 1 - c;
   return Float64List.fromList(<double>[
-    t * x * x + c, t * x * y - s * z, t * x * z + s * y, 0,
-    t * x * y + s * z, t * y * y + c, t * y * z - s * x, 0,
-    t * x * z - s * y, t * y * z + s * x, t * z * z + c, 0,
-    0, 0, 0, 1,
+    t * x * x + c,
+    t * x * y - s * z,
+    t * x * z + s * y,
+    0,
+    t * x * y + s * z,
+    t * y * y + c,
+    t * y * z - s * x,
+    0,
+    t * x * z - s * y,
+    t * y * z + s * x,
+    t * z * z + c,
+    0,
+    0,
+    0,
+    0,
+    1,
   ]);
 }
 

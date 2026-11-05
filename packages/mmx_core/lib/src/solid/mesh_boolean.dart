@@ -11,7 +11,8 @@ class BooleanResult {
   final bool usedFallback;
   final String? fallbackReason;
 
-  const BooleanResult(this.mesh, {this.usedFallback = false, this.fallbackReason});
+  const BooleanResult(this.mesh,
+      {this.usedFallback = false, this.fallbackReason});
 }
 
 /// Mesh-level boolean composition: classify triangles by containment, keep the
@@ -29,7 +30,9 @@ class PreciseBoolean {
     double? edgeLength,
     int resolution = 160,
   }) {
-    return computeDetailed(a, b, op, edgeLength: edgeLength, resolution: resolution).mesh;
+    return computeDetailed(a, b, op,
+            edgeLength: edgeLength, resolution: resolution)
+        .mesh;
   }
 
   static BooleanResult computeDetailed(
@@ -89,10 +92,8 @@ class PreciseBoolean {
       );
     }
     out = Weld.weldVertices(out, tolerance: 1e-5);
-    out = Bridge.stitchNearest(
-        out,
-        maxGap: out.bounds().diagonal * 0.25,
-        maxPairs: 64);
+    out = Bridge.stitchNearest(out,
+        maxGap: out.bounds().diagonal * 0.25, maxPairs: 64);
     out = Weld.weldCracks(out, tolerance: 1e-5);
     out.removeDegenerateFaces();
     out.compact();

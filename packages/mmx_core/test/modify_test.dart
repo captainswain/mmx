@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -21,11 +21,14 @@ void main() {
 
     test('face mask restricts the flip', () {
       final mesh = loadModel('sphere.obj');
-      final mask = Uint8List(mesh.faceCount)..fillRange(0, mesh.faceCount ~/ 2, 1);
+      final mask = Uint8List(mesh.faceCount)
+        ..fillRange(0, mesh.faceCount ~/ 2, 1);
       final flipped = Modify.flipNormals(mesh, faceMask: mask);
       final changed = <int>[];
       for (var f = 0; f < mesh.faceCount; f++) {
-        if (flipped.indices[f * 3 + 1] != mesh.indices[f * 3 + 1]) changed.add(f);
+        if (flipped.indices[f * 3 + 1] != mesh.indices[f * 3 + 1]) {
+          changed.add(f);
+        }
       }
       expect(changed.length, mesh.faceCount ~/ 2);
     });
@@ -71,7 +74,8 @@ void main() {
       final mesh = loadModel('sphere.obj');
       final joined = Modify.combine(<TriMesh>[
         mesh,
-        Modify.duplicate(mesh, offset: <double>[mesh.bounds().extentX * 2, 0, 0]),
+        Modify.duplicate(mesh,
+            offset: <double>[mesh.bounds().extentX * 2, 0, 0]),
       ]);
       expect(joined.faceCount, mesh.faceCount * 2);
       expect(MeshTopology(joined).components().$2, 2);
@@ -129,8 +133,7 @@ void main() {
     test('reports the gap between two separated spheres', () {
       final mesh = loadModel('sphere.obj');
       final r = mesh.bounds().extentX / 2;
-      final other = Modify.duplicate(mesh,
-          offset: <double>[2 * r + 5, 0, 0]);
+      final other = Modify.duplicate(mesh, offset: <double>[2 * r + 5, 0, 0]);
       final gap = Modify.clearance(mesh, other);
       expect(gap, closeTo(5, 0.25));
     });

@@ -53,7 +53,8 @@ class RenderOptions {
 /// selection highlight, cut-plane overlay, print bed) into a plain RGBA buffer
 /// so the same code path works on every platform, including inside an isolate.
 class Rasterizer {
-  static Uint8List render(List<RenderObject> objects, Camera camera, RenderOptions opts) {
+  static Uint8List render(
+      List<RenderObject> objects, Camera camera, RenderOptions opts) {
     final w = opts.width, h = opts.height;
     final color = Uint8List(w * h * 4);
     final depth = Float32List(w * h);
@@ -88,13 +89,23 @@ class Rasterizer {
       }
 
       for (var f = 0; f < mesh.faceCount; f++) {
-        final i0 = mesh.indices[f * 3], i1 = mesh.indices[f * 3 + 1], i2 = mesh.indices[f * 3 + 2];
-        final ax = world[i0 * 3], ay = world[i0 * 3 + 1], az = world[i0 * 3 + 2];
-        final bx = world[i1 * 3], by = world[i1 * 3 + 1], bz = world[i1 * 3 + 2];
-        final cx = world[i2 * 3], cy = world[i2 * 3 + 1], cz = world[i2 * 3 + 2];
+        final i0 = mesh.indices[f * 3],
+            i1 = mesh.indices[f * 3 + 1],
+            i2 = mesh.indices[f * 3 + 2];
+        final ax = world[i0 * 3],
+            ay = world[i0 * 3 + 1],
+            az = world[i0 * 3 + 2];
+        final bx = world[i1 * 3],
+            by = world[i1 * 3 + 1],
+            bz = world[i1 * 3 + 2];
+        final cx = world[i2 * 3],
+            cy = world[i2 * 3 + 1],
+            cz = world[i2 * 3 + 2];
         final ux = bx - ax, uy = by - ay, uz = bz - az;
         final wx = cx - ax, wy = cy - ay, wz = cz - az;
-        var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+        var nx = uy * wz - uz * wy,
+            ny = uz * wx - ux * wz,
+            nz = ux * wy - uy * wx;
         final nl = math.sqrt(nx * nx + ny * ny + nz * nz);
         if (nl < 1e-20) continue;
         nx /= nl;
@@ -111,7 +122,9 @@ class Rasterizer {
           g = obj.faceColors![f * 3 + 1];
           b = obj.faceColors![f * 3 + 2];
         }
-        if (obj.faceMask != null && f < obj.faceMask!.length && obj.faceMask![f] != 0) {
+        if (obj.faceMask != null &&
+            f < obj.faceMask!.length &&
+            obj.faceMask![f] != 0) {
           r = (r * 0.35 + 0.65);
           g = (g * 0.35 + 0.45);
           b = (b * 0.35 + 0.10);
@@ -127,17 +140,31 @@ class Rasterizer {
         final cg = (g * shade).clamp(0.0, 1.0);
         final cb = (b * shade).clamp(0.0, 1.0);
 
-        _drawTriangle(color, depth, w, h, vp, ax, ay, az, bx, by, bz, cx, cy, cz,
-            cr, cg, cb, opts.wireframe);
+        _drawTriangle(color, depth, w, h, vp, ax, ay, az, bx, by, bz, cx, cy,
+            cz, cr, cg, cb, opts.wireframe);
       }
     }
     return color;
   }
 
   static void _drawTriangle(
-      Uint8List color, Float32List depth, int w, int h, List<double> vp,
-      double ax, double ay, double az, double bx, double by, double bz,
-      double cx, double cy, double cz, double r, double g, double b,
+      Uint8List color,
+      Float32List depth,
+      int w,
+      int h,
+      List<double> vp,
+      double ax,
+      double ay,
+      double az,
+      double bx,
+      double by,
+      double bz,
+      double cx,
+      double cy,
+      double cz,
+      double r,
+      double g,
+      double b,
       bool wireframe) {
     // Clip-space vertices.
     final p0 = _project(vp, ax, ay, az);
@@ -147,11 +174,13 @@ class Rasterizer {
     final poly = _clipNear(<List<double>>[p0, p1, p2]);
     if (poly.length < 3) return;
     for (var i = 2; i < poly.length; i++) {
-      _rasterizeClipped(color, depth, w, h, poly[0], poly[i - 1], poly[i], r, g, b);
+      _rasterizeClipped(
+          color, depth, w, h, poly[0], poly[i - 1], poly[i], r, g, b);
     }
     if (wireframe) {
       for (var i = 0; i < poly.length; i++) {
-        _line(color, depth, w, h, poly[i], poly[(i + 1) % poly.length], r * 0.4, g * 0.4, b * 0.4);
+        _line(color, depth, w, h, poly[i], poly[(i + 1) % poly.length], r * 0.4,
+            g * 0.4, b * 0.4);
       }
     }
   }
@@ -188,8 +217,17 @@ class Rasterizer {
     return out;
   }
 
-  static void _rasterizeClipped(Uint8List color, Float32List depth, int w, int h,
-      List<double> p0, List<double> p1, List<double> p2, double r, double g, double b) {
+  static void _rasterizeClipped(
+      Uint8List color,
+      Float32List depth,
+      int w,
+      int h,
+      List<double> p0,
+      List<double> p1,
+      List<double> p2,
+      double r,
+      double g,
+      double b) {
     // Perspective divide to screen space.
     final w0 = p0[3] == 0 ? 1e-9 : p0[3];
     final w1 = p1[3] == 0 ? 1e-9 : p1[3];
@@ -276,23 +314,41 @@ class Rasterizer {
     final half = opts.bedSize / 2;
     final step = opts.bedSize <= 120 ? 10.0 : 20.0;
     for (var x = -half; x <= half + 1e-6; x += step) {
-      _worldLine(color, depth, w, h, vp, x, 0, -half, x, 0, half, 0.32, 0.34, 0.38);
+      _worldLine(
+          color, depth, w, h, vp, x, 0, -half, x, 0, half, 0.32, 0.34, 0.38);
     }
     for (var z = -half; z <= half + 1e-6; z += step) {
-      _worldLine(color, depth, w, h, vp, -half, 0, z, half, 0, z, 0.32, 0.34, 0.38);
+      _worldLine(
+          color, depth, w, h, vp, -half, 0, z, half, 0, z, 0.32, 0.34, 0.38);
     }
     // Bed outline.
     final edge = <double>[0.55, 0.58, 0.62];
-    _worldLine(color, depth, w, h, vp, -half, 0, -half, half, 0, -half, edge[0], edge[1], edge[2]);
-    _worldLine(color, depth, w, h, vp, half, 0, -half, half, 0, half, edge[0], edge[1], edge[2]);
-    _worldLine(color, depth, w, h, vp, half, 0, half, -half, 0, half, edge[0], edge[1], edge[2]);
-    _worldLine(color, depth, w, h, vp, -half, 0, half, -half, 0, -half, edge[0], edge[1], edge[2]);
+    _worldLine(color, depth, w, h, vp, -half, 0, -half, half, 0, -half, edge[0],
+        edge[1], edge[2]);
+    _worldLine(color, depth, w, h, vp, half, 0, -half, half, 0, half, edge[0],
+        edge[1], edge[2]);
+    _worldLine(color, depth, w, h, vp, half, 0, half, -half, 0, half, edge[0],
+        edge[1], edge[2]);
+    _worldLine(color, depth, w, h, vp, -half, 0, half, -half, 0, -half, edge[0],
+        edge[1], edge[2]);
     assert(camera.near > 0);
   }
 
-  static void _worldLine(Uint8List color, Float32List depth, int w, int h,
-      List<double> vp, double x0, double y0, double z0, double x1, double y1,
-      double z1, double r, double g, double b) {
+  static void _worldLine(
+      Uint8List color,
+      Float32List depth,
+      int w,
+      int h,
+      List<double> vp,
+      double x0,
+      double y0,
+      double z0,
+      double x1,
+      double y1,
+      double z1,
+      double r,
+      double g,
+      double b) {
     final p0 = _project(vp, x0, y0, z0);
     final p1 = _project(vp, x1, y1, z1);
     if (p0[3] <= 1e-6 || p1[3] <= 1e-6) return;

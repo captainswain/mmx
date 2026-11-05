@@ -32,8 +32,12 @@ class TriangleBVH {
     final centroids = Float32List(n * 3);
     final bounds = Float64List(n * 6);
     for (var f = 0; f < n; f++) {
-      var minx = double.infinity, miny = double.infinity, minz = double.infinity;
-      var maxx = double.negativeInfinity, maxy = double.negativeInfinity, maxz = double.negativeInfinity;
+      var minx = double.infinity,
+          miny = double.infinity,
+          minz = double.infinity;
+      var maxx = double.negativeInfinity,
+          maxy = double.negativeInfinity,
+          maxz = double.negativeInfinity;
       var cx = 0.0, cy = 0.0, cz = 0.0;
       for (var k = 0; k < 3; k++) {
         final v = mesh.indices[f * 3 + k];
@@ -81,10 +85,18 @@ class TriangleBVH {
       for (var k = 0; k < 6; k++) {
         nb.add(0);
       }
-      var minx = double.infinity, miny = double.infinity, minz = double.infinity;
-      var maxx = double.negativeInfinity, maxy = double.negativeInfinity, maxz = double.negativeInfinity;
-      var cminx = double.infinity, cminy = double.infinity, cminz = double.infinity;
-      var cmaxx = double.negativeInfinity, cmaxy = double.negativeInfinity, cmaxz = double.negativeInfinity;
+      var minx = double.infinity,
+          miny = double.infinity,
+          minz = double.infinity;
+      var maxx = double.negativeInfinity,
+          maxy = double.negativeInfinity,
+          maxz = double.negativeInfinity;
+      var cminx = double.infinity,
+          cminy = double.infinity,
+          cminz = double.infinity;
+      var cmaxx = double.negativeInfinity,
+          cmaxy = double.negativeInfinity,
+          cmaxz = double.negativeInfinity;
       for (var i = start; i < start + count; i++) {
         final f = order[i];
         minx = math.min(minx, bounds[f * 6]);
@@ -125,7 +137,8 @@ class TriangleBVH {
       }
       // Median split on the chosen centroid axis.
       final sub = order.sublist(start, start + count);
-      sub.sort((a, b) => centroids[a * 3 + axis].compareTo(centroids[b * 3 + axis]));
+      sub.sort(
+          (a, b) => centroids[a * 3 + axis].compareTo(centroids[b * 3 + axis]));
       for (var i = 0; i < count; i++) {
         order[start + i] = sub[i];
       }
@@ -155,8 +168,8 @@ class TriangleBVH {
   }
 
   /// Slab test. Returns entry distance (may be negative when inside).
-  double _boxHit(int node, double ox, double oy, double oz, double dx, double dy,
-      double dz, double tMax) {
+  double _boxHit(int node, double ox, double oy, double oz, double dx,
+      double dy, double dz, double tMax) {
     final o = node * 6;
     var t0 = 0.0, t1 = tMax;
     // X
@@ -176,7 +189,9 @@ class TriangleBVH {
     }
     // Y
     if (dy.abs() < 1e-12) {
-      if (oy < nodeBounds[o + 1] || oy > nodeBounds[o + 4]) return double.infinity;
+      if (oy < nodeBounds[o + 1] || oy > nodeBounds[o + 4]) {
+        return double.infinity;
+      }
     } else {
       var a = (nodeBounds[o + 1] - oy) / dy;
       var b = (nodeBounds[o + 4] - oy) / dy;
@@ -191,7 +206,9 @@ class TriangleBVH {
     }
     // Z
     if (dz.abs() < 1e-12) {
-      if (oz < nodeBounds[o + 2] || oz > nodeBounds[o + 5]) return double.infinity;
+      if (oz < nodeBounds[o + 2] || oz > nodeBounds[o + 5]) {
+        return double.infinity;
+      }
     } else {
       var a = (nodeBounds[o + 2] - oz) / dz;
       var b = (nodeBounds[o + 5] - oz) / dz;
@@ -213,9 +230,15 @@ class TriangleBVH {
     final i0 = mesh.indices[f * 3] * 3;
     final i1 = mesh.indices[f * 3 + 1] * 3;
     final i2 = mesh.indices[f * 3 + 2] * 3;
-    final ax = mesh.positions[i0], ay = mesh.positions[i0 + 1], az = mesh.positions[i0 + 2];
-    final bx = mesh.positions[i1], by = mesh.positions[i1 + 1], bz = mesh.positions[i1 + 2];
-    final cx = mesh.positions[i2], cy = mesh.positions[i2 + 1], cz = mesh.positions[i2 + 2];
+    final ax = mesh.positions[i0],
+        ay = mesh.positions[i0 + 1],
+        az = mesh.positions[i0 + 2];
+    final bx = mesh.positions[i1],
+        by = mesh.positions[i1 + 1],
+        bz = mesh.positions[i1 + 2];
+    final cx = mesh.positions[i2],
+        cy = mesh.positions[i2 + 1],
+        cz = mesh.positions[i2 + 2];
     final e1x = bx - ax, e1y = by - ay, e1z = bz - az;
     final e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
     final px = dy * e2z - dz * e2y;
@@ -248,7 +271,9 @@ class TriangleBVH {
     final stack = <int>[0];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      if (_boxHit(node, ox, oy, oz, dx, dy, dz, bestT) == double.infinity) continue;
+      if (_boxHit(node, ox, oy, oz, dx, dy, dz, bestT) == double.infinity) {
+        continue;
+      }
       final l = nodeLeft[node];
       if (l < 0) {
         final s = leafStart[node], n = leafCount[node];
@@ -280,7 +305,9 @@ class TriangleBVH {
     final stack = <int>[0];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      if (_boxHit(node, ox, oy, oz, dx, dy, dz, tMax) == double.infinity) continue;
+      if (_boxHit(node, ox, oy, oz, dx, dy, dz, tMax) == double.infinity) {
+        continue;
+      }
       final l = nodeLeft[node];
       if (l < 0) {
         final s = leafStart[node], n = leafCount[node];
@@ -330,10 +357,18 @@ class TriangleBVH {
           final i1 = mesh.indices[f * 3 + 1] * 3;
           final i2 = mesh.indices[f * 3 + 2] * 3;
           final d2 = closestPointTriangleSq(
-            px, py, pz,
-            mesh.positions[i0], mesh.positions[i0 + 1], mesh.positions[i0 + 2],
-            mesh.positions[i1], mesh.positions[i1 + 1], mesh.positions[i1 + 2],
-            mesh.positions[i2], mesh.positions[i2 + 1], mesh.positions[i2 + 2],
+            px,
+            py,
+            pz,
+            mesh.positions[i0],
+            mesh.positions[i0 + 1],
+            mesh.positions[i0 + 2],
+            mesh.positions[i1],
+            mesh.positions[i1 + 1],
+            mesh.positions[i1 + 2],
+            mesh.positions[i2],
+            mesh.positions[i2 + 1],
+            mesh.positions[i2 + 2],
             bary,
           );
           if (d2 < best) {
@@ -353,9 +388,15 @@ class TriangleBVH {
     final i0 = mesh.indices[bestF * 3] * 3;
     final i1 = mesh.indices[bestF * 3 + 1] * 3;
     final i2 = mesh.indices[bestF * 3 + 2] * 3;
-    final x = bestBary[0] * mesh.positions[i0] + bestBary[1] * mesh.positions[i1] + bestBary[2] * mesh.positions[i2];
-    final y = bestBary[0] * mesh.positions[i0 + 1] + bestBary[1] * mesh.positions[i1 + 1] + bestBary[2] * mesh.positions[i2 + 1];
-    final z = bestBary[0] * mesh.positions[i0 + 2] + bestBary[1] * mesh.positions[i1 + 2] + bestBary[2] * mesh.positions[i2 + 2];
+    final x = bestBary[0] * mesh.positions[i0] +
+        bestBary[1] * mesh.positions[i1] +
+        bestBary[2] * mesh.positions[i2];
+    final y = bestBary[0] * mesh.positions[i0 + 1] +
+        bestBary[1] * mesh.positions[i1 + 1] +
+        bestBary[2] * mesh.positions[i2 + 1];
+    final z = bestBary[0] * mesh.positions[i0 + 2] +
+        bestBary[1] * mesh.positions[i1 + 2] +
+        bestBary[2] * mesh.positions[i2 + 2];
     return ClosestPoint(math.sqrt(best), bestF, <double>[x, y, z]);
   }
 
@@ -384,8 +425,12 @@ class TriangleBVH {
             out.add(f);
             continue;
           }
-          var tminx = double.infinity, tminy = double.infinity, tminz = double.infinity;
-          var tmaxx = double.negativeInfinity, tmaxy = double.negativeInfinity, tmaxz = double.negativeInfinity;
+          var tminx = double.infinity,
+              tminy = double.infinity,
+              tminz = double.infinity;
+          var tmaxx = double.negativeInfinity,
+              tmaxy = double.negativeInfinity,
+              tmaxz = double.negativeInfinity;
           for (var k = 0; k < 3; k++) {
             final v = mesh.indices[f * 3 + k];
             final x = mesh.vx(v), y = mesh.vy(v), z = mesh.vz(v);

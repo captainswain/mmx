@@ -33,31 +33,200 @@ class MixIO {
 
   /// Constant trailer written by Meshmixer for a single-group triangle mesh.
   static const List<int> _polygonTrailer = <int>[
-    0x11, 0x00, 0x00, 0x00, 0x4d, 0x65, 0x73, 0x68, 0x50, 0x6f, 0x6c, 0x79,
-    0x67, 0x6f, 0x6e, 0x73,
-    0x20, 0x31, 0x2e, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0xde,
-    0x73, 0xbf, 0x00, 0x00, 0x00, 0xc0, 0x03, 0xf8, 0x38, 0x40, 0x00, 0x00,
-    0x00, 0x00, 0x80, 0xf1,
-    0x82, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f, 0x30, 0xd6,
-    0x5e, 0xbd, 0x75, 0xbe,
-    0xa3, 0x3f, 0x30, 0xd6, 0x5e, 0xbd, 0x75, 0xbe, 0xa3, 0x3f, 0x30, 0xd6,
-    0x5e, 0xbd, 0x75, 0xbe,
-    0xa3, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0xde, 0x73, 0x3f, 0x00, 0x00,
-    0x00, 0xc0, 0x03, 0xf8,
-    0x38, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x80, 0xf1, 0x82, 0xbf, 0x00, 0xff,
-    0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff,
+    0x11,
+    0x00,
+    0x00,
+    0x00,
+    0x4d,
+    0x65,
+    0x73,
+    0x68,
+    0x50,
+    0x6f,
+    0x6c,
+    0x79,
+    0x67,
+    0x6f,
+    0x6e,
+    0x73,
+    0x20,
+    0x31,
+    0x2e,
+    0x30,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0xde,
+    0x73,
+    0xbf,
+    0x00,
+    0x00,
+    0x00,
+    0xc0,
+    0x03,
+    0xf8,
+    0x38,
+    0x40,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x80,
+    0xf1,
+    0x82,
+    0x3f,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0xf0,
+    0x3f,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0xf0,
+    0x3f,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0xf0,
+    0x3f,
+    0x30,
+    0xd6,
+    0x5e,
+    0xbd,
+    0x75,
+    0xbe,
+    0xa3,
+    0x3f,
+    0x30,
+    0xd6,
+    0x5e,
+    0xbd,
+    0x75,
+    0xbe,
+    0xa3,
+    0x3f,
+    0x30,
+    0xd6,
+    0x5e,
+    0xbd,
+    0x75,
+    0xbe,
+    0xa3,
+    0x3f,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0xde,
+    0x73,
+    0x3f,
+    0x00,
+    0x00,
+    0x00,
+    0xc0,
+    0x03,
+    0xf8,
+    0x38,
+    0xc0,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x80,
+    0xf1,
+    0x82,
+    0xbf,
+    0x00,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
   ];
 
   static const List<int> _semanticBlock = <int>[
@@ -165,8 +334,8 @@ class MixIO {
     }
     return MixObject(
         name: 'Mesh',
-        mesh: TriMesh(positions, indices,
-            faceGroups: hasGroups ? groups : null));
+        mesh:
+            TriMesh(positions, indices, faceGroups: hasGroups ? groups : null));
   }
 
   /// Rewrites mesh blocks in an existing scene while preserving every other
@@ -185,7 +354,8 @@ class MixIO {
       final body = m.group(1) ?? '';
       final vis = RegExp(r'<Visibility>(\d+)</Visibility>').firstMatch(body);
       if (vis != null && vis.group(1) == '0') continue;
-      final block = RegExp(r'<MeshBlockID>(\d+)</MeshBlockID>').firstMatch(body);
+      final block =
+          RegExp(r'<MeshBlockID>(\d+)</MeshBlockID>').firstMatch(body);
       if (block != null) ids.add(int.parse(block.group(1)!));
     }
     if (ids.length != usable.length) return write(objects);
@@ -269,7 +439,8 @@ class MixIO {
           final file = RegExp(r'<Filename>(.*?)</Filename>').firstMatch(body);
           final block =
               RegExp(r'<MeshBlockID>(\d+)</MeshBlockID>').firstMatch(body);
-          final vis = RegExp(r'<Visibility>(\d+)</Visibility>').firstMatch(body);
+          final vis =
+              RegExp(r'<Visibility>(\d+)</Visibility>').firstMatch(body);
           if (block == null) continue;
           final id = int.parse(block.group(1)!);
           if (vis != null && vis.group(1) == '0') continue;
@@ -279,7 +450,8 @@ class MixIO {
         final obj = _readMeshBlock(payload);
         if (obj != null) {
           final id = nextBlock++;
-          meshes.add(MixObject(name: names[id] ?? 'Object $id', mesh: obj.mesh));
+          meshes
+              .add(MixObject(name: names[id] ?? 'Object $id', mesh: obj.mesh));
         }
       }
       off += 4 + len;
@@ -301,7 +473,8 @@ class MixIO {
     xml.write('\t<Values>\n');
     xml.write('\t\t<WorldUnits>millimeters</WorldUnits>\n');
     xml.write('\t\t<WorldUnitsScale>1</WorldUnitsScale>\n');
-    xml.write('\t\t<SceneTransform>1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 0 0 0 0 0 0</SceneTransform>\n');
+    xml.write(
+        '\t\t<SceneTransform>1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 0 0 0 0 0 0</SceneTransform>\n');
     xml.write('\t\t<WorldUnitIncrement>10</WorldUnitIncrement>\n');
     xml.write('\t\t<MeshSO9>MeshSO</MeshSO9>\n');
     xml.write('\t</Values>\n');
@@ -321,8 +494,10 @@ class MixIO {
       xml.write('\t\t<Visibility>1</Visibility>\n');
       xml.write('\t\t<Filename>$name</Filename>\n');
       xml.write('\t\t<MeshBlockID>${i + 1}</MeshBlockID>\n');
-      xml.write('\t\t<FileTransform>1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 0 0 0 0 0 0</FileTransform>\n');
-      xml.write('\t\t<LocalFrame>1 0 0 0 1 0 0 0 1 1 0 0 0 1 0 0 0 1 0 0 0 </LocalFrame>\n');
+      xml.write(
+          '\t\t<FileTransform>1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 0 0 0 0 0 0</FileTransform>\n');
+      xml.write(
+          '\t\t<LocalFrame>1 0 0 0 1 0 0 0 1 1 0 0 0 1 0 0 0 1 0 0 0 </LocalFrame>\n');
       xml.write('\t</Values>\n');
       xml.write('\t<SubRecords />\n');
       xml.write('</MeshSO9>\n');
@@ -375,12 +550,15 @@ class MixIO {
     final nf = mesh.faceCount;
     final normals = Float32List(nv * 3);
     for (var f = 0; f < nf; f++) {
-      final ia = mesh.indices[f * 3], ib = mesh.indices[f * 3 + 1],
+      final ia = mesh.indices[f * 3],
+          ib = mesh.indices[f * 3 + 1],
           ic = mesh.indices[f * 3 + 2];
       final ax = mesh.vx(ia), ay = mesh.vy(ia), az = mesh.vz(ia);
       final ux = mesh.vx(ib) - ax, uy = mesh.vy(ib) - ay, uz = mesh.vz(ib) - az;
       final wx = mesh.vx(ic) - ax, wy = mesh.vy(ic) - ay, wz = mesh.vz(ic) - az;
-      final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      final nx = uy * wz - uz * wy,
+          ny = uz * wx - ux * wz,
+          nz = ux * wy - uy * wx;
       for (final v in <int>[ia, ib, ic]) {
         normals[v * 3] += nx;
         normals[v * 3 + 1] += ny;
@@ -442,9 +620,7 @@ class MixIO {
       fb.setUint32(12, mesh.indices[f * 3 + 1], Endian.little);
       fb.setUint32(16, mesh.indices[f * 3 + 2], Endian.little);
       fb.setUint32(
-          20,
-          mesh.faceGroups == null ? 0 : mesh.faceGroups![f],
-          Endian.little);
+          20, mesh.faceGroups == null ? 0 : mesh.faceGroups![f], Endian.little);
       fb.setUint32(24, 0xFFFFFFFF, Endian.little);
       out.add(fb.buffer.asUint8List());
     }

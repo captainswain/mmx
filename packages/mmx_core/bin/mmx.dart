@@ -67,7 +67,8 @@ Future<void> main(List<String> args) async {
 
   void save(String path, TriMesh mesh) {
     File(path).writeAsBytesSync(MeshIO.writeBytes(path, mesh));
-    stdout.writeln('wrote $path (${mesh.vertexCount} verts, ${mesh.faceCount} faces)');
+    stdout.writeln(
+        'wrote $path (${mesh.vertexCount} verts, ${mesh.faceCount} faces)');
   }
 
   double flag(String name, double fallback) =>
@@ -81,7 +82,8 @@ Future<void> main(List<String> args) async {
         final b = mesh.bounds();
         stdout.writeln('file: ${positional[0]}');
         stdout.writeln('verts: ${mesh.vertexCount}  faces: ${mesh.faceCount}');
-        stdout.writeln('bounds: ${b.minX.toStringAsFixed(2)},${b.minY.toStringAsFixed(2)},'
+        stdout.writeln(
+            'bounds: ${b.minX.toStringAsFixed(2)},${b.minY.toStringAsFixed(2)},'
             '${b.minZ.toStringAsFixed(2)} .. ${b.maxX.toStringAsFixed(2)},'
             '${b.maxY.toStringAsFixed(2)},${b.maxZ.toStringAsFixed(2)}');
         stdout.writeln('area: ${mesh.surfaceArea().toStringAsFixed(3)}  '
@@ -90,7 +92,8 @@ Future<void> main(List<String> args) async {
         stdout.writeln('components: $comps  '
             'boundaryLoops: ${topo.boundaryLoops().length}  '
             'nonManifoldEdges: ${topo.nonManifoldEdges().length}');
-        stdout.writeln('avgValence: ${topo.averageValence().toStringAsFixed(2)}');
+        stdout
+            .writeln('avgValence: ${topo.averageValence().toStringAsFixed(2)}');
         final defects = MeshInspector.scan(mesh);
         final counts = <String, int>{};
         for (final d in defects) {
@@ -122,9 +125,11 @@ Future<void> main(List<String> args) async {
     case 'reduce':
       {
         final mesh = load(positional[0]);
-        final faces = flags.containsKey('faces') ? int.parse(flags['faces']!) : null;
+        final faces =
+            flags.containsKey('faces') ? int.parse(flags['faces']!) : null;
         final pct = flags.containsKey('percent') ? flag('percent', 0.5) : null;
-        final maxDev = flags.containsKey('max-dev') ? flag('max-dev', 0.0) : null;
+        final maxDev =
+            flags.containsKey('max-dev') ? flag('max-dev', 0.0) : null;
         final out = Decimator.reduce(mesh,
             targetFaceCount: faces,
             percentage: pct,
@@ -145,7 +150,8 @@ Future<void> main(List<String> args) async {
             resolution: flag('res', 128).toInt(),
             offset: flag('offset', 0),
             smoothing: flag('smooth', 0).toInt());
-        stdout.writeln('grid ${r.gridResolution} cell ${r.cellSize.toStringAsFixed(4)} '
+        stdout.writeln(
+            'grid ${r.gridResolution} cell ${r.cellSize.toStringAsFixed(4)} '
             '${r.elapsedMs}ms');
         save(positional[1], r.mesh);
       }
@@ -160,9 +166,8 @@ Future<void> main(List<String> args) async {
         };
         final r = flags.containsKey('precise')
             ? PreciseBoolean.compute(a, b, op,
-                edgeLength: flags['edge'] == null
-                    ? null
-                    : double.parse(flags['edge']!),
+                edgeLength:
+                    flags['edge'] == null ? null : double.parse(flags['edge']!),
                 resolution: flag('res', 160).toInt())
             : Solidifier.boolean(a, b, op, resolution: flag('res', 160).toInt())
                 .mesh;
@@ -194,7 +199,8 @@ Future<void> main(List<String> args) async {
           postDiameter: flag('post', 2),
           baseDiameter: flag('base', 6),
         );
-        final r = SupportGenerator.generate(mesh, settings: settings, bedY: flag('bed', 0));
+        final r = SupportGenerator.generate(mesh,
+            settings: settings, bedY: flag('bed', 0));
         stdout.writeln('posts ${r.postCount} struts ${r.strutCount}');
         save(positional[1], r.supports);
       }
@@ -203,7 +209,8 @@ Future<void> main(List<String> args) async {
         final out = positional[0];
         final meshes = positional.sublist(1).map(load).toList();
         final r = Packer.pack(meshes,
-            bedWidth: flag('bed', 200), bedDepth: flag('bed', 200),
+            bedWidth: flag('bed', 200),
+            bedDepth: flag('bed', 200),
             quality: flag('quality', 1).toInt());
         stdout.writeln('placed ${r.placed.length}/${meshes.length} '
             'utilisation ${(r.bedUtilization * 100).toStringAsFixed(1)}%');
@@ -237,15 +244,18 @@ Future<void> main(List<String> args) async {
         final r = Slicer.slice(mesh, layerHeight: flag('layer', 0.2));
         stdout.writeln('layers ${r.layers.length}');
         for (final l in r.layers.take(3)) {
-          stdout.writeln('  y=${l.y.toStringAsFixed(2)} loops=${l.loops.length} '
-              'closed=${l.loops.where((x) => x.closed).length}');
+          stdout
+              .writeln('  y=${l.y.toStringAsFixed(2)} loops=${l.loops.length} '
+                  'closed=${l.loops.where((x) => x.closed).length}');
         }
       }
     case 'analyze':
       {
         final mesh = load(positional[0]);
-        final t = ThicknessAnalysis.run(mesh, threshold: flag('thickness', 1.0));
-        final o = OverhangAnalysis.run(mesh, angleDegrees: flag('overhang', 45));
+        final t =
+            ThicknessAnalysis.run(mesh, threshold: flag('thickness', 1.0));
+        final o =
+            OverhangAnalysis.run(mesh, angleDegrees: flag('overhang', 45));
         final s = StabilityAnalysis.run(mesh);
         final mp = MassProperties.compute(mesh);
         stdout.writeln('mass: volume=${mp.volume.toStringAsFixed(2)} '
@@ -278,8 +288,11 @@ Future<void> main(List<String> args) async {
         final shells = ShellSeparator.separate(mesh);
         stdout.writeln('${shells.length} shells');
         final base = positional[1];
-        final stem = base.contains('.') ? base.substring(0, base.lastIndexOf('.')) : base;
-        final ext = base.contains('.') ? base.substring(base.lastIndexOf('.')) : '.obj';
+        final stem = base.contains('.')
+            ? base.substring(0, base.lastIndexOf('.'))
+            : base;
+        final ext =
+            base.contains('.') ? base.substring(base.lastIndexOf('.')) : '.obj';
         for (var i = 0; i < shells.length; i++) {
           save('${stem}_${i + 1}$ext', shells[i]);
         }
@@ -351,11 +364,14 @@ Future<void> main(List<String> args) async {
     case 'measure':
       {
         final r = Modify.measure(load(positional[0]));
-        stdout.writeln('dimensions: ${r.dimensions.map((v) => v.toStringAsFixed(3)).join(' x ')}');
+        stdout.writeln(
+            'dimensions: ${r.dimensions.map((v) => v.toStringAsFixed(3)).join(' x ')}');
         stdout.writeln('area: ${r.surfaceArea.toStringAsFixed(3)}  '
             'volume: ${r.volume.toStringAsFixed(3)}');
-        stdout.writeln('centroid: ${r.centroid.map((v) => v.toStringAsFixed(3)).join(', ')}');
-        stdout.writeln('shells: ${r.shellCount}  boundaryEdges: ${r.boundaryEdgeCount}  '
+        stdout.writeln(
+            'centroid: ${r.centroid.map((v) => v.toStringAsFixed(3)).join(', ')}');
+        stdout.writeln(
+            'shells: ${r.shellCount}  boundaryEdges: ${r.boundaryEdgeCount}  '
             'watertight: ${r.watertight}');
       }
     case 'clearance':
@@ -383,12 +399,14 @@ Future<void> main(List<String> args) async {
         );
         final sw = Stopwatch()..start();
         final rgba = Rasterizer.render(<RenderObject>[
-          RenderObject(mesh, transform: identity4(), color: <double>[0.78, 0.72, 0.62]),
+          RenderObject(mesh,
+              transform: identity4(), color: <double>[0.78, 0.72, 0.62]),
         ], cam, opts);
         sw.stop();
         final png = PngEncoder.encodeRGBA(rgba, opts.width, opts.height);
         File(positional[1]).writeAsBytesSync(png);
-        stdout.writeln('rendered ${opts.width}x${opts.height} in ${sw.elapsedMilliseconds}ms '
+        stdout.writeln(
+            'rendered ${opts.width}x${opts.height} in ${sw.elapsedMilliseconds}ms '
             '-> ${positional[1]}');
       }
     default:

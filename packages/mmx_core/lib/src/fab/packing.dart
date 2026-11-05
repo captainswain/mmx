@@ -158,17 +158,30 @@ class Packer {
       used += o.width * o.depth;
     }
     sw.stop();
-    return PackResult(placed, unplaced, used / (bedWidth * bedDepth), sw.elapsedMilliseconds);
+    return PackResult(
+        placed, unplaced, used / (bedWidth * bedDepth), sw.elapsedMilliseconds);
   }
 
   static List<double> _yawMatrix(double degrees) {
     final a = degrees * math.pi / 180;
     final c = math.cos(a), s = math.sin(a);
     return <double>[
-      c, 0, -s, 0,
-      0, 1, 0, 0,
-      s, 0, c, 0,
-      0, 0, 0, 1,
+      c,
+      0,
+      -s,
+      0,
+      0,
+      1,
+      0,
+      0,
+      s,
+      0,
+      c,
+      0,
+      0,
+      0,
+      0,
+      1,
     ];
   }
 }
@@ -177,5 +190,6 @@ class _Candidate {
   final double angle;
   final int x0, z0, w, h;
   final double minX, minZ;
-  _Candidate(this.angle, this.x0, this.z0, this.w, this.h, this.minX, this.minZ);
+  _Candidate(
+      this.angle, this.x0, this.z0, this.w, this.h, this.minX, this.minZ);
 }

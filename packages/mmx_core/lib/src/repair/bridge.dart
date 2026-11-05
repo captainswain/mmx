@@ -91,7 +91,8 @@ class Bridge {
 
   /// Pairs boundary loops by centroid proximity and bridges them, largest gap
   /// first limited by [maxGap]. Use this to stitch a slit or join two halves.
-  static TriMesh stitchNearest(TriMesh mesh, {double? maxGap, int maxPairs = 8}) {
+  static TriMesh stitchNearest(TriMesh mesh,
+      {double? maxGap, int maxPairs = 8}) {
     var work = mesh.clone();
     final gap = maxGap ?? work.bounds().diagonal * 0.2;
     var pairs = 0;
@@ -138,9 +139,8 @@ class Bridge {
     bx /= b.length;
     by /= b.length;
     bz /= b.length;
-    return math.sqrt(math.pow(ax - bx, 2) +
-        math.pow(ay - by, 2) +
-        math.pow(az - bz, 2));
+    return math.sqrt(
+        math.pow(ax - bx, 2) + math.pow(ay - by, 2) + math.pow(az - bz, 2));
   }
 
   static double _dist(TriMesh mesh, int a, int b) {

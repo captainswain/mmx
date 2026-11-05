@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) {
   final f = File('$modelsDir/$name');
@@ -34,7 +34,8 @@ void main() {
       final stl = StlIO.writeBinary(mesh);
       final back = StlIO.readBinary(stl);
       expect(back.faceCount, mesh.faceCount);
-      expect((back.surfaceArea() - mesh.surfaceArea()).abs() / mesh.surfaceArea(),
+      expect(
+          (back.surfaceArea() - mesh.surfaceArea()).abs() / mesh.surfaceArea(),
           lessThan(1e-4));
     });
 
@@ -42,7 +43,8 @@ void main() {
       final mesh = loadModel('sphere.obj');
       final obj = ObjIO.read(ObjIO.write(mesh));
       expect(obj.faceCount, mesh.faceCount);
-      final ply = PlyIO.read(Uint8List.fromList(PlyIO.writeAscii(mesh).codeUnits));
+      final ply =
+          PlyIO.read(Uint8List.fromList(PlyIO.writeAscii(mesh).codeUnits));
       expect(ply.faceCount, mesh.faceCount);
     });
   });
@@ -74,7 +76,11 @@ void main() {
       final keep = <int>[];
       for (var f = 0; f < mesh.faceCount; f++) {
         if (f < 12) continue;
-        keep.addAll(<int>[mesh.indices[f * 3], mesh.indices[f * 3 + 1], mesh.indices[f * 3 + 2]]);
+        keep.addAll(<int>[
+          mesh.indices[f * 3],
+          mesh.indices[f * 3 + 1],
+          mesh.indices[f * 3 + 2]
+        ]);
       }
       final holed = TriMesh(mesh.positions, Uint32List.fromList(keep));
       final before = MeshTopology(holed).boundaryLoops();
@@ -91,11 +97,16 @@ void main() {
       final keep = <int>[];
       for (var f = 0; f < mesh.faceCount; f++) {
         if (f < 6) continue;
-        keep.addAll(<int>[mesh.indices[f * 3], mesh.indices[f * 3 + 1], mesh.indices[f * 3 + 2]]);
+        keep.addAll(<int>[
+          mesh.indices[f * 3],
+          mesh.indices[f * 3 + 1],
+          mesh.indices[f * 3 + 2]
+        ]);
       }
       final holed = TriMesh(mesh.positions, Uint32List.fromList(keep));
       final defects = MeshInspector.scan(holed);
-      expect(defects.where((d) => d.kind == DefectKind.hole).isNotEmpty, isTrue);
+      expect(
+          defects.where((d) => d.kind == DefectKind.hole).isNotEmpty, isTrue);
     });
   });
 
@@ -104,11 +115,13 @@ void main() {
       final mesh = loadModel('sphere.obj');
       final bvh = TriangleBVH.build(mesh);
       final b = mesh.bounds();
-      final hit = bvh.raycast(<double>[b.minX - 1, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2],
+      final hit = bvh.raycast(
+          <double>[b.minX - 1, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2],
           <double>[1, 0, 0]);
       expect(hit, isNotNull);
       expect(hit!.t, greaterThan(0));
-      final hits = bvh.raycastAll(<double>[b.minX - 1, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2],
+      final hits = bvh.raycastAll(
+          <double>[b.minX - 1, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2],
           <double>[1, 0, 0]);
       expect(hits.length, greaterThanOrEqualTo(2));
     });
@@ -117,7 +130,8 @@ void main() {
       final mesh = loadModel('sphere.obj');
       final bvh = TriangleBVH.build(mesh);
       final b = mesh.bounds();
-      final cp = bvh.closestPoint(b.maxX + 5, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2);
+      final cp = bvh.closestPoint(
+          b.maxX + 5, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2);
       expect(cp, isNotNull);
       expect(cp!.distance, greaterThan(0));
     });

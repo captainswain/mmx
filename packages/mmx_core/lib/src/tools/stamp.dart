@@ -69,9 +69,9 @@ class StampTool {
         return (0.5 + 0.5 * math.cos(cell)) * (1 - t);
       case StampPattern.noise:
         // Deterministic hash of the direction, so repeated stamps match.
-        final h = (math.sin(dx * 12.9898 + dy * 78.233 + dz * 37.719) *
-                43758.5453) %
-            1.0;
+        final h =
+            (math.sin(dx * 12.9898 + dy * 78.233 + dz * 37.719) * 43758.5453) %
+                1.0;
         return (h.abs() * 2 - 1) * (1 - t);
     }
   }
@@ -79,12 +79,15 @@ class StampTool {
   static Float32List _vertexNormals(TriMesh mesh, MeshTopology topo) {
     final n = Float32List(mesh.vertexCount * 3);
     for (var f = 0; f < mesh.faceCount; f++) {
-      final ia = mesh.indices[f * 3], ib = mesh.indices[f * 3 + 1],
+      final ia = mesh.indices[f * 3],
+          ib = mesh.indices[f * 3 + 1],
           ic = mesh.indices[f * 3 + 2];
       final ax = mesh.vx(ia), ay = mesh.vy(ia), az = mesh.vz(ia);
       final ux = mesh.vx(ib) - ax, uy = mesh.vy(ib) - ay, uz = mesh.vz(ib) - az;
       final wx = mesh.vx(ic) - ax, wy = mesh.vy(ic) - ay, wz = mesh.vz(ic) - az;
-      final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      final nx = uy * wz - uz * wy,
+          ny = uz * wx - ux * wz,
+          nz = ux * wy - uy * wx;
       for (final v in <int>[ia, ib, ic]) {
         n[v * 3] += nx;
         n[v * 3 + 1] += ny;

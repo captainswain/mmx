@@ -34,7 +34,9 @@ class AlignTool {
       final to = <List<double>>[];
       final dists = <double>[];
       for (final v in sampleIdx) {
-        final x = scratch[v * 3], y = scratch[v * 3 + 1], z = scratch[v * 3 + 2];
+        final x = scratch[v * 3],
+            y = scratch[v * 3 + 1],
+            z = scratch[v * 3 + 2];
         final hit = bvh.closestPoint(x, y, z);
         if (hit == null) continue;
         from.add(<double>[x, y, z]);
@@ -44,7 +46,9 @@ class AlignTool {
       if (from.length < 3) break;
       // Reject the worst matches so a partial overlap does not drag the solve.
       dists.sort();
-      final cutoff = dists[(dists.length * (1 - outlierFraction)).floor().clamp(0, dists.length - 1)];
+      final cutoff = dists[(dists.length * (1 - outlierFraction))
+          .floor()
+          .clamp(0, dists.length - 1)];
       final keep = <int>[];
       for (var i = 0; i < dists.length; i++) {
         if (dists[i] <= cutoff) keep.add(i);
@@ -158,26 +162,56 @@ class AlignTool {
     }
     final w = q[0], x = q[1], y = q[2], z = q[3];
     final rot = <double>[
-      1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w),
-      2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w),
-      2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y),
+      1 - 2 * (y * y + z * z),
+      2 * (x * y - z * w),
+      2 * (x * z + y * w),
+      2 * (x * y + z * w),
+      1 - 2 * (x * x + z * z),
+      2 * (y * z - x * w),
+      2 * (x * z - y * w),
+      2 * (y * z + x * w),
+      1 - 2 * (x * x + y * y),
     ];
     final tx = cqx - (rot[0] * cpx + rot[1] * cpy + rot[2] * cpz);
     final ty = cqy - (rot[3] * cpx + rot[4] * cpy + rot[5] * cpz);
     final tz = cqz - (rot[6] * cpx + rot[7] * cpy + rot[8] * cpz);
     return Float64List.fromList(<double>[
-      rot[0], rot[3], rot[6], 0,
-      rot[1], rot[4], rot[7], 0,
-      rot[2], rot[5], rot[8], 0,
-      tx, ty, tz, 1,
+      rot[0],
+      rot[3],
+      rot[6],
+      0,
+      rot[1],
+      rot[4],
+      rot[7],
+      0,
+      rot[2],
+      rot[5],
+      rot[8],
+      0,
+      tx,
+      ty,
+      tz,
+      1,
     ]);
   }
 
   static Float64List _identity() => Float64List.fromList(<double>[
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
       ]);
 
   static Float64List _multiply(Float64List a, Float64List b) {

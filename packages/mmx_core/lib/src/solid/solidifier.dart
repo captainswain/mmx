@@ -28,16 +28,19 @@ class SolidResult {
 /// Mesh Resolution / Reduce Percentage controls exposed in the UI.
 class Solidifier {
   static VoxelGrid _gridFor(BBox bounds, int resolution, double padCells) {
-    final extent = math.max(bounds.extentX, math.max(bounds.extentY, bounds.extentZ));
+    final extent =
+        math.max(bounds.extentX, math.max(bounds.extentY, bounds.extentZ));
     if (extent <= 0) {
-      return VoxelGrid(8, 8, 8, 1.0, bounds.minX - 4, bounds.minY - 4, bounds.minZ - 4);
+      return VoxelGrid(
+          8, 8, 8, 1.0, bounds.minX - 4, bounds.minY - 4, bounds.minZ - 4);
     }
     final cell = extent / resolution;
     final pad = padCells * cell;
     final nx = ((bounds.extentX + 2 * pad) / cell).ceil() + 1;
     final ny = ((bounds.extentY + 2 * pad) / cell).ceil() + 1;
     final nz = ((bounds.extentZ + 2 * pad) / cell).ceil() + 1;
-    return VoxelGrid(nx, ny, nz, cell, bounds.minX - pad, bounds.minY - pad, bounds.minZ - pad);
+    return VoxelGrid(nx, ny, nz, cell, bounds.minX - pad, bounds.minY - pad,
+        bounds.minZ - pad);
   }
 
   static SolidResult makeSolid(
@@ -65,7 +68,8 @@ class Solidifier {
       SolidMode.accurate => smoothing,
     };
     final bounds = work.bounds();
-    final extent = math.max(bounds.extentX, math.max(bounds.extentY, bounds.extentZ));
+    final extent =
+        math.max(bounds.extentX, math.max(bounds.extentY, bounds.extentZ));
     final cell = extent <= 0 ? 1.0 : extent / effectiveResolution;
     // Pad has to cover the offset, otherwise the grown surface is clipped by
     // the grid boundary and the result silently shrinks.
@@ -99,7 +103,8 @@ class Solidifier {
     solid.removeDegenerateFaces(minArea: -1);
     solid.compact();
     sw.stop();
-    return SolidResult(solid, effectiveResolution, grid.cellSize, sw.elapsedMilliseconds);
+    return SolidResult(
+        solid, effectiveResolution, grid.cellSize, sw.elapsedMilliseconds);
   }
 
   static SolidResult boolean(TriMesh a, TriMesh b, BooleanOp op,
@@ -131,8 +136,10 @@ class Solidifier {
   }
 
   /// Offset surface. Positive grows, negative shrinks.
-  static SolidResult offsetSolid(TriMesh mesh, double distance, {int resolution = 128}) {
-    return makeSolid(mesh, resolution: resolution, offset: distance, smoothing: 1);
+  static SolidResult offsetSolid(TriMesh mesh, double distance,
+      {int resolution = 128}) {
+    return makeSolid(mesh,
+        resolution: resolution, offset: distance, smoothing: 1);
   }
 
   /// Hollow shell with escape holes.
@@ -235,9 +242,12 @@ class Solidifier {
             if (grid.values[idx] >= 0) continue;
             var best = double.infinity;
             for (final d in <List<int>>[
-              <int>[1, 0, 0], <int>[-1, 0, 0],
-              <int>[0, 1, 0], <int>[0, -1, 0],
-              <int>[0, 0, 1], <int>[0, 0, -1],
+              <int>[1, 0, 0],
+              <int>[-1, 0, 0],
+              <int>[0, 1, 0],
+              <int>[0, -1, 0],
+              <int>[0, 0, 1],
+              <int>[0, 0, -1],
             ]) {
               final v = grid.values[grid.index(i + d[0], j + d[1], k + d[2])];
               if (v > 0 && v < best) best = v;
@@ -261,6 +271,7 @@ class Solidifier {
       idx[f * 3 + 1] = m.indices[f * 3 + 2];
       idx[f * 3 + 2] = m.indices[f * 3 + 1];
     }
-    return TriMesh(m.positions, idx, faceGroups: m.faceGroups, vertexColors: m.vertexColors);
+    return TriMesh(m.positions, idx,
+        faceGroups: m.faceGroups, vertexColors: m.vertexColors);
   }
 }

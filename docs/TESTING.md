@@ -13,11 +13,12 @@ dart pub global run coverage:format_coverage \
   --packages=.dart_tool/package_config.json --report-on=lib
 ```
 
-The kernel suite uses models shipped inside the Meshmixer installer at
-`/data/re/meshmixer/extract/meshmixer/models`. The Studio app tests are run
+The kernel suite uses the vendored sample models under
+`packages/mmx_core/test/fixtures/models` (originally from the Meshmixer
+installer). No Meshmixer installation is required. The Studio app tests are run
 separately with `flutter test` under `apps/mmx_studio`.
 
-## Current status (2026-11-04)
+## Current status (2026-11-05)
 
 - Kernel: 106 tests, all passing; `dart analyze` clean.
 - Studio: 11 widget/state tests passing; `flutter analyze` clean.

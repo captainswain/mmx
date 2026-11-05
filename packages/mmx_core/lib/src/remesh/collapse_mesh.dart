@@ -23,8 +23,7 @@ class CollapseMesh {
         positions = Float32List.fromList(mesh.positions),
         faces = <List<int>>[],
         faceAlive = <bool>[],
-        vertexFaces = List<Set<int>>.generate(
-            mesh.vertexCount, (_) => <int>{}),
+        vertexFaces = List<Set<int>>.generate(mesh.vertexCount, (_) => <int>{}),
         edgeCount = <int, int>{},
         faceKeyCount = <int, int>{},
         boundaryDegree = <int, int>{} {
@@ -224,11 +223,19 @@ class CollapseMesh {
         if (v == a) {
           p.add(<double>[mx, my, mz]);
         } else {
-          p.add(<double>[positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]]);
+          p.add(<double>[
+            positions[v * 3],
+            positions[v * 3 + 1],
+            positions[v * 3 + 2]
+          ]);
         }
       }
-      final ux = p[1][0] - p[0][0], uy = p[1][1] - p[0][1], uz = p[1][2] - p[0][2];
-      final wx = p[2][0] - p[0][0], wy = p[2][1] - p[0][1], wz = p[2][2] - p[0][2];
+      final ux = p[1][0] - p[0][0],
+          uy = p[1][1] - p[0][1],
+          uz = p[1][2] - p[0][2];
+      final wx = p[2][0] - p[0][0],
+          wy = p[2][1] - p[0][1],
+          wz = p[2][2] - p[0][2];
       final after = <double>[
         uy * wz - uz * wy,
         uz * wx - ux * wz,

@@ -46,7 +46,8 @@ class SupportResult {
   final int postCount;
   final int strutCount;
   final double contactArea;
-  SupportResult(this.supports, this.postCount, this.strutCount, this.contactArea);
+  SupportResult(
+      this.supports, this.postCount, this.strutCount, this.contactArea);
 }
 
 /// Generates a printable support forest for overhanging geometry.
@@ -61,26 +62,31 @@ class SupportGenerator {
     SupportSettings settings = const SupportSettings(),
     double bedY = 0,
   }) {
-    final overhang = OverhangAnalysis.run(mesh,
-        angleDegrees: settings.overhangAngleDegrees);
+    final overhang =
+        OverhangAnalysis.run(mesh, angleDegrees: settings.overhangAngleDegrees);
     if (overhang.overhangFaces.isEmpty) {
       return SupportResult(TriMesh.empty(), 0, 0, 0);
     }
     final bvh = TriangleBVH.build(mesh);
     final b = mesh.bounds();
     // Sample spacing derived from density (density 1 = dense posts).
-    final spacing = math.max(settings.postDiameter * 2.0, (1.0 - settings.density) * b.diagonal * 0.08 + settings.postDiameter);
+    final spacing = math.max(settings.postDiameter * 2.0,
+        (1.0 - settings.density) * b.diagonal * 0.08 + settings.postDiameter);
     final cell = <int, List<double>>{};
     var contactArea = 0.0;
 
     for (final f in overhang.overhangFaces) {
-      final a = mesh.indices[f * 3], bb = mesh.indices[f * 3 + 1], c = mesh.indices[f * 3 + 2];
+      final a = mesh.indices[f * 3],
+          bb = mesh.indices[f * 3 + 1],
+          c = mesh.indices[f * 3 + 2];
       final ax = mesh.vx(a), ay = mesh.vy(a), az = mesh.vz(a);
       final bx = mesh.vx(bb), by = mesh.vy(bb), bz = mesh.vz(bb);
       final cx = mesh.vx(c), cy = mesh.vy(c), cz = mesh.vz(c);
       // Sample points on a grid over the triangle.
-      final edgeMax = math.max(_dist3(ax, ay, az, bx, by, bz),
-          math.max(_dist3(bx, by, bz, cx, cy, cz), _dist3(cx, cy, cz, ax, ay, az)));
+      final edgeMax = math.max(
+          _dist3(ax, ay, az, bx, by, bz),
+          math.max(
+              _dist3(bx, by, bz, cx, cy, cz), _dist3(cx, cy, cz, ax, ay, az)));
       final n = math.max(1, (edgeMax / spacing).ceil());
       for (var i = 0; i <= n; i++) {
         for (var j = 0; j <= n - i; j++) {
@@ -100,8 +106,15 @@ class SupportGenerator {
     final posts = <List<double>>[];
     for (final p in cell.values) {
       // Cast down to find the first surface below (or the bed).
-      final hit = bvh.raycast(<double>[p[0], p[1] - settings.contactTolerance, p[2]],
-          <double>[0, -1, 0], tMax: p[1] - bedY + 1e-6);
+      final hit = bvh.raycast(<double>[
+        p[0],
+        p[1] - settings.contactTolerance,
+        p[2]
+      ], <double>[
+        0,
+        -1,
+        0
+      ], tMax: p[1] - bedY + 1e-6);
       final endY = hit != null ? hit.point[1] : bedY;
       if (endY >= p[1] - settings.contactTolerance) continue;
       posts.add(<double>[p[0], p[1] - settings.verticalOffset, p[2], endY]);
@@ -114,11 +127,13 @@ class SupportGenerator {
       final top = <double>[p[0], p[1], p[2]];
       final bottom = <double>[p[0], p[3], p[2]];
       final tipBase = <double>[p[0], p[1] - settings.tipHeight, p[2]];
-      final post = cylinderMesh(top, tipBase, settings.tipDiameter / 2,
-          settings.postDiameter / 2, sides: settings.postSides);
+      final post = cylinderMesh(
+          top, tipBase, settings.tipDiameter / 2, settings.postDiameter / 2,
+          sides: settings.postSides);
       _append(b2, post);
-      final shaft = cylinderMesh(tipBase, bottom, settings.postDiameter / 2,
-          settings.postDiameter / 2, sides: settings.postSides);
+      final shaft = cylinderMesh(
+          tipBase, bottom, settings.postDiameter / 2, settings.postDiameter / 2,
+          sides: settings.postSides);
       _append(b2, shaft);
       if (bottom[1] <= bedY + 1e-6) {
         final base = cylinderMesh(
@@ -144,10 +159,19 @@ class SupportGenerator {
         if (angle > settings.maxStrutAngleDegrees) continue;
         // Only connect the nearest few neighbours to keep the forest sparse.
         if (horiz > maxStrutRun * 0.5 && (i + j) % 3 != 0) continue;
-        final from = <double>[posts[i][0], posts[i][1] - settings.tipHeight, posts[i][2]];
-        final to = <double>[posts[j][0], posts[j][1] - settings.tipHeight, posts[j][2]];
+        final from = <double>[
+          posts[i][0],
+          posts[i][1] - settings.tipHeight,
+          posts[i][2]
+        ];
+        final to = <double>[
+          posts[j][0],
+          posts[j][1] - settings.tipHeight,
+          posts[j][2]
+        ];
         final strut = cylinderMesh(from, to, settings.postDiameter * 0.35,
-            settings.postDiameter * 0.35, sides: math.max(6, settings.postSides ~/ 2));
+            settings.postDiameter * 0.35,
+            sides: math.max(6, settings.postSides ~/ 2));
         _append(b2, strut);
         struts++;
       }
@@ -168,16 +192,19 @@ class SupportGenerator {
     }
   }
 
-  static double _dist3(double ax, double ay, double az, double bx, double by, double bz) {
+  static double _dist3(
+      double ax, double ay, double az, double bx, double by, double bz) {
     final dx = ax - bx, dy = ay - by, dz = az - bz;
     return math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
-  static double _triArea(double ax, double ay, double az, double bx, double by, double bz,
-      double cx, double cy, double cz) {
+  static double _triArea(double ax, double ay, double az, double bx, double by,
+      double bz, double cx, double cy, double cz) {
     final ux = bx - ax, uy = by - ay, uz = bz - az;
     final wx = cx - ax, wy = cy - ay, wz = cz - az;
-    final nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+    final nx = uy * wz - uz * wy,
+        ny = uz * wx - ux * wz,
+        nz = ux * wy - uy * wx;
     return math.sqrt(nx * nx + ny * ny + nz * nz);
   }
 }
@@ -218,9 +245,10 @@ class OrientationOptimizer {
       final stability = StabilityAnalysis.run(rotated);
       // Estimate support material as overhang area times an average height.
       final supportEstimate = overhang.overhangArea * diag * 0.15;
-      final score = -supportEstimate - (stability.centerInsideSupport ? 0 : diag)
-          + stability.minTipAngleDegrees * diag * 0.01
-          + stability.bedContactArea * 0.5;
+      final score = -supportEstimate -
+          (stability.centerInsideSupport ? 0 : diag) +
+          stability.minTipAngleDegrees * diag * 0.01 +
+          stability.bedContactArea * 0.5;
       if (score > bestScore) {
         bestScore = score;
         best = <double>[ax, y, az, angle];
@@ -229,21 +257,35 @@ class OrientationOptimizer {
         bestStable = stability.centerInsideSupport;
       }
     }
-    return OrientationOptimizer(best, bestScore, bestSupport, bestContact, bestStable);
+    return OrientationOptimizer(
+        best, bestScore, bestSupport, bestContact, bestStable);
   }
 
   static Float64List _axisAngle(double ax, double ay, double az, double angle) {
     final l = math.sqrt(ax * ax + ay * ay + az * az);
     if (l < 1e-12) {
-      return Float64List.fromList(<double>[1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+      return Float64List.fromList(
+          <double>[1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
     }
     final x = ax / l, y = ay / l, z = az / l;
     final c = math.cos(angle), s = math.sin(angle), t = 1 - c;
     return Float64List.fromList(<double>[
-      t * x * x + c, t * x * y - s * z, t * x * z + s * y, 0,
-      t * x * y + s * z, t * y * y + c, t * y * z - s * x, 0,
-      t * x * z - s * y, t * y * z + s * x, t * z * z + c, 0,
-      0, 0, 0, 1,
+      t * x * x + c,
+      t * x * y - s * z,
+      t * x * z + s * y,
+      0,
+      t * x * y + s * z,
+      t * y * y + c,
+      t * y * z - s * x,
+      0,
+      t * x * z - s * y,
+      t * y * z + s * x,
+      t * z * z + c,
+      0,
+      0,
+      0,
+      0,
+      1,
     ]);
   }
 }

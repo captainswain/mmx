@@ -4,7 +4,7 @@
 /// (libgeometry + libmeshtools) as portable Dart: topology, spatial indices,
 /// repair, remeshing, decimation, implicit solid conversion, fabrication
 /// analysis, support generation, packing, slicing and brush sculpting.
-library mmx_core;
+library;
 
 export 'src/analysis/analysis.dart';
 export 'src/fab/packing.dart';

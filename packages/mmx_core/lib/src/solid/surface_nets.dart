@@ -23,13 +23,28 @@ class SurfaceNets {
     final ox = grid.originX, oy = grid.originY, oz = grid.originZ;
 
     const cornerOff = <List<int>>[
-      <int>[0, 0, 0], <int>[1, 0, 0], <int>[1, 1, 0], <int>[0, 1, 0],
-      <int>[0, 0, 1], <int>[1, 0, 1], <int>[1, 1, 1], <int>[0, 1, 1],
+      <int>[0, 0, 0],
+      <int>[1, 0, 0],
+      <int>[1, 1, 0],
+      <int>[0, 1, 0],
+      <int>[0, 0, 1],
+      <int>[1, 0, 1],
+      <int>[1, 1, 1],
+      <int>[0, 1, 1],
     ];
     const edges = <List<int>>[
-      <int>[0, 1], <int>[1, 2], <int>[2, 3], <int>[3, 0],
-      <int>[4, 5], <int>[5, 6], <int>[6, 7], <int>[7, 4],
-      <int>[0, 4], <int>[1, 5], <int>[2, 6], <int>[3, 7],
+      <int>[0, 1],
+      <int>[1, 2],
+      <int>[2, 3],
+      <int>[3, 0],
+      <int>[4, 5],
+      <int>[5, 6],
+      <int>[6, 7],
+      <int>[7, 4],
+      <int>[0, 4],
+      <int>[1, 5],
+      <int>[2, 6],
+      <int>[3, 7],
     ];
 
     for (var i = 0; i < nx - 1; i++) {
@@ -67,7 +82,14 @@ class SurfaceNets {
     }
 
     int vid(int i, int j, int k) {
-      if (i < 0 || j < 0 || k < 0 || i >= nx - 1 || j >= ny - 1 || k >= nz - 1) return -1;
+      if (i < 0 ||
+          j < 0 ||
+          k < 0 ||
+          i >= nx - 1 ||
+          j >= ny - 1 ||
+          k >= nz - 1) {
+        return -1;
+      }
       return cellVertex[(i * ny + j) * nz + k];
     }
 
@@ -83,7 +105,12 @@ class SurfaceNets {
       final nyq = uz * wx - ux * wz;
       final nzq = ux * wy - uy * wx;
       final want = insideToOutside ? 1.0 : -1.0;
-      final dot = (axis == 0 ? nxq : axis == 1 ? nyq : nzq) * want;
+      final dot = (axis == 0
+              ? nxq
+              : axis == 1
+                  ? nyq
+                  : nzq) *
+          want;
       if (dot >= 0) {
         tris.addAll(<int>[a, b, c]);
         tris.addAll(<int>[a, c, d]);

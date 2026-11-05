@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
-const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
+const String modelsDir = 'test/fixtures/models';
 
 TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
@@ -87,10 +87,12 @@ void main() {
       ]);
       expect(polygon.faceCount, 2);
       expect(polygon.surfaceArea(), closeTo(1.0, 1e-6));
-      expect(MakePolygon.fromPoints(<List<double>>[
-        <double>[0, 0, 0],
-        <double>[1, 0, 0],
-      ]).faceCount, 0);
+      expect(
+          MakePolygon.fromPoints(<List<double>>[
+            <double>[0, 0, 0],
+            <double>[1, 0, 0],
+          ]).faceCount,
+          0);
     });
 
     test('triangulates a concave polygon without overlapping', () {
@@ -134,7 +136,8 @@ void main() {
       final point = Pivot.atPoint(<double>[1, 2, 3]);
       expect(point.position, <double>[1, 2, 3]);
       expect(point.normal, <double>[0, 1, 0]);
-      final degenerate = Pivot.atPoint(<double>[1, 2, 3], normal: <double>[0, 0, 0]);
+      final degenerate =
+          Pivot.atPoint(<double>[1, 2, 3], normal: <double>[0, 0, 0]);
       expect(degenerate.normal, <double>[0, 1, 0]);
     });
   });

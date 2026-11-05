@@ -1,122 +1,167 @@
-# mmx — a cross-platform mesh studio
+# mmx
 
-A clean-room, from-scratch reimplementation of the useful parts of **Autodesk
-Meshmixer 3.5.0**, based on reverse engineering the shipped Windows binary, plus
-the reverse-engineering report itself.
+A clean-room, cross-platform mesh studio and geometry kernel built from a
+reverse engineering study of **Autodesk Meshmixer 3.5.0**.
 
-* Reverse engineering: [`docs/REVERSE-ENGINEERING.md`](docs/REVERSE-ENGINEERING.md)
-* RTTI class and vtable attribution: [`docs/RTTI.md`](docs/RTTI.md)
-* Method-name recovery and open-source relatives: [`docs/METHODS.md`](docs/METHODS.md)
-* Architecture and technology rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-* Testing and coverage: [`docs/TESTING.md`](docs/TESTING.md)
-* Remaining-work plan: [`docs/REMEDIATION-PLAN.md`](docs/REMEDIATION-PLAN.md)
-* Finish plan (RE closure, parity, validation): [`docs/FINISH-PLAN.md`](docs/FINISH-PLAN.md)
-* Kernel: [`packages/mmx_core`](packages/mmx_core) (pure Dart, no Flutter dependency)
-* App: [`apps/mmx_studio`](apps/mmx_studio) (Flutter: Windows, macOS, Linux;
-  Android/iOS scaffolds included)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Dart](https://img.shields.io/badge/Dart-3.13%2B-blue)](https://dart.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47%2B-02569B)](https://flutter.dev)
+[![CI](https://github.com/plindsay/mmx/actions/workflows/ci.yml/badge.svg)](https://github.com/plindsay/mmx/actions/workflows/ci.yml)
 
-![studio](docs/img/studio.png)
-![mirror panel](docs/img/mirror-panel.png)
+> **Status: pre-1.0.** The core geometry workflows are usable and tested; the
+> remaining work is tracked in [`docs/FINISH-PLAN.md`](docs/FINISH-PLAN.md).
+> The source is Apache-2.0. Sample models are Autodesk assets; see
+> [`NOTICE`](NOTICE).
 
-## What it does
+## What this is
 
-Geometry kernel (Dart, AOT):
+mmx has two parts:
 
-* import/export OBJ, PLY, STL (binary + ASCII), OFF, 3MF (OPC zip, no deps),
-  and `.mix` (native Meshmixer scenes; reads VFMesh 1.2 and 1.3, writes files
-  the 3.5.0 build opens)
-* topology: CSR adjacency, edge incidence, boundary loops, components,
-  manifold checks
-* repair: weld, crack closing, hole filling (flat/smooth), non-manifold
-  splitting, defect inspector (holes / non-manifold / small shells)
-* remesh: isotropic split/collapse/flip/relax/reproject with boundary and sharp
-  constraints
-* reduce: quadric-error decimation with boundary quadrics, face budget or
-  percentage
-* solid: narrow-band SDF voxelization, surface-nets polygonization,
-  Make Solid (blocky/fast/accurate), offset, hollow with escape holes,
-  boolean union/intersection/difference
-* analysis: wall thickness, overhang, stability (COM/support polygon/tip angle),
-  deviation, mass properties
-* fabrication: support forest (tapered posts, bases, struts), orientation
-  search, 2D bed packing, layer slicing
-* tools: plane cut with capping, mirror with seam welding, selection extrude
-  with a generated skirt, shell separation, normal flipping (selection or
-  whole mesh), Taubin surface smoothing, bed placement, duplication, joining,
-  grid pattern arrays, primitive fitting (box/cylinder/sphere), measurement
-  (dimensions/area/volume/shells/watertightness), inter-object clearance,
-  boundary-loop bridging/stitching, rigid ICP alignment onto a reference,
-  procedural stamps (circle/ring/star/grid/noise),
-  sculpt brushes (draw/inflate/flatten/pinch/crease/twist/smooth/move) with
-  dynamic refinement, selection sets, face groups, soft transform
-* remesh: isotropic split/collapse/flip/relax/reproject with boundary and sharp
-  constraints, plus group-aware variational mode that pins internal face-group
-  seams and carries groups onto the output
-* rendering: orbit camera, z-buffer rasterizer, PNG output
+- **`mmx_core`** - a pure-Dart geometry kernel: import/export, topology,
+  repair, remeshing, decimation, SDF solidification, booleans, analysis,
+  supports, packing and slicing.
+- **`mmx_studio`** - a Flutter desktop app for selection, sculpting, repair,
+  remesh/reduce, solid/hollow, plane cuts, mirroring, supports, analysis and
+  print preparation.
 
-App: object browser, tool rail, per-tool parameter panels, sculpt/select with
-the mouse, analysis heat maps, supports, packing, undo/redo, export. The layout
-collapses the properties panel into a drawer below 900 px so the same build is
-usable on a narrow desktop window or a tablet; two-finger orbit and pinch zoom
-work on touch screens. Android and iOS targets are scaffolded (`android/`,
-`ios/`), with the Linux build verified end to end.
+The reverse-engineering report is part of the repository:
+[`docs/REVERSE-ENGINEERING.md`](docs/REVERSE-ENGINEERING.md). It separates
+**[observed]** evidence from **[inferred]** conclusions and **[unknown]**
+constants, and documents the `.mix` binary format, RTTI, recovered method names
+and tool semantics.
 
-## Build and run
+## Documentation
 
-Requires Flutter 3.47+ and Dart 3.13+.
+- [Documentation index](docs/README.md)
+- [Reverse-engineering report](docs/REVERSE-ENGINEERING.md)
+- [Tool and action coverage](docs/TOOL-MATRIX.md)
+- [CLI reference](docs/CLI.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Testing and coverage](docs/TESTING.md)
+- [Finish plan](docs/FINISH-PLAN.md)
+- [Remediation plan](docs/REMEDIATION-PLAN.md)
 
-```bash
-# kernel tests (106 tests, uses models shipped inside the Meshmixer installer)
+## Features
+
+**Formats:** OBJ, PLY, STL (binary/ASCII), OFF, 3MF (OPC zip) and native
+Meshmixer `.mix` scenes. The `.mix` reader supports VFMesh 1.2 and 1.3, face
+groups and lossless rewrite of unknown records.
+
+**Geometry:** CSR topology, BVH raycast/closest-point, weld, crack closing,
+hole filling, non-manifold splitting, defect inspection, isotropic and
+adaptive remeshing, QEM and uniform decimation, SDF voxelization, surface-nets
+polygonization, Make Solid, offset, hollow, booleans with an explicit fallback,
+plane cutting with capping, mirroring, extrusion, shell separation, ICP
+alignment, primitive fitting and procedural stamps.
+
+**Analysis and fabrication:** wall thickness, overhang, stability, deviation,
+mass properties, clearance, support forests, orientation search, 2D bed packing
+and layer slicing.
+
+**Studio:** object browser, tool panels, sculpt/select brushes, analysis heat
+maps, undo/redo, import/export, narrow-window drawer layout and touch orbit/pinch
+gestures. Linux is verified end to end; Windows and macOS targets are present.
+
+## Build and test
+
+Requirements: Flutter 3.47+ and Dart 3.13+. No Meshmixer installation is needed
+for tests; the sample models are vendored under
+`packages/mmx_core/test/fixtures/models`.
+
+```sh
+# Full verification (kernel + Studio)
+./tool/verify.sh
+
+# Kernel only
 cd packages/mmx_core
 dart pub get
+dart analyze
 dart test
 
-# CLI
+# Studio
+cd apps/mmx_studio
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Current baseline: **106 kernel tests** and **11 Studio tests**, both analyzers
+clean. Coverage and known gaps are in [`docs/TESTING.md`](docs/TESTING.md).
+
+## CLI
+
+```sh
+cd packages/mmx_core
 dart run bin/mmx.dart info model.obj
 dart run bin/mmx.dart reduce model.obj out.stl --percent 0.3
+dart run bin/mmx.dart remesh model.obj out.stl --edge 1.2 --iters 4
 dart run bin/mmx.dart solid model.obj solid.stl --mode accurate --res 160
 dart run bin/mmx.dart hollow model.obj shell.stl --thickness 2 --holes 4
 dart run bin/mmx.dart supports model.obj supports.stl --angle 45
 dart run bin/mmx.dart analyze model.obj
 dart run bin/mmx.dart measure model.obj
-dart run bin/mmx.dart flip model.obj flipped.obj
-dart run bin/mmx.dart smooth model.obj smoothed.obj --iters 8
-dart run bin/mmx.dart pattern model.obj array.obj --nx 3 --nz 2
-dart run bin/mmx.dart primitive model.obj box.obj --kind box
 dart run bin/mmx.dart convert model.obj scene.mix
 dart run bin/mmx.dart render model.obj view.png --width 1200 --height 800
 
 # AOT build
 dart compile exe bin/mmx.dart -o mmx
+```
 
-# desktop app
+## Desktop app
+
+```sh
 cd apps/mmx_studio
 flutter pub get
 flutter run -d linux        # or windows / macos
 flutter build linux --release
 ```
 
-The app bundles the three models that ship with Meshmixer
-(`assets/models/bunnyr.obj`, `sphere.obj`, `dog.obj`) and will also read the
-installer's models directory if it is present.
+The app bundles `bunnyr.obj`, `sphere.obj` and `dog.obj` as starter assets and
+can also read a Meshmixer installer models directory.
 
-## Measured performance (AOT, 8-core x86-64, bunny 5,550 v / 10,996 f)
+## Performance
+
+Measured on an 8-core x86-64 Linux host with AOT compilation against the
+shipped `bunnyr.obj` (5,550 vertices / 10,996 faces):
 
 | Operation | Time |
-|---|---|
-| import + topology + BVH | 38 ms |
-| decimate 50 % | 108 ms |
-| isotropic remesh | 394 ms |
-| make solid 128³ | 1.20 s |
-| hollow + escape holes | 1.62 s |
-| thickness scan | 56 ms |
-| support forest | 46 ms |
-| pack 6 objects | 1 ms |
-| slice 250 layers | 254 ms |
-| render 960×640 | 12 ms |
+|---|---:|
+| Import + topology + BVH | 38 ms |
+| QEM decimate 50% | 108 ms |
+| Isotropic remesh | 394 ms |
+| Make Solid 128³ | 1.20 s |
+| Hollow + escape holes | 1.62 s |
+| Thickness scan | 56 ms |
+| Support forest | 46 ms |
+| Pack 6 objects | 1 ms |
+| Slice 250 layers | 254 ms |
+| Render 960×640 | 12 ms |
 
-## License note
+## Contributing
 
-The code here is original; the only Autodesk-derived material is the sample
-geometry (`bunnyr.obj`, `sphere.obj`, `dog.obj`) that ships in the Meshmixer
-installer, used as test fixtures.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md),
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) and [`SUPPORT.md`](SUPPORT.md).
+Security issues follow [`SECURITY.md`](SECURITY.md). The project uses a clean-room rule: no Autodesk
+source code is copied; the binary, its RTTI/strings and public API headers are
+the evidence.
+
+## License and attribution
+
+The mmx source code is licensed under the **Apache License 2.0**. See
+[`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+The sample geometry (`bunnyr.obj`, `dog.obj`, `elephant.obj`, `gremlin.obj`,
+`plane.obj`, `sphere.obj`) comes from the Meshmixer installer and remains
+Copyright Autodesk, Inc. It is included as test fixtures and demonstration
+assets. The public API headers under `docs/reference/` are reproduced from
+Autodesk's `meshmixer/mm-api` repository for reference.
+
+Meshmixer is a trademark of Autodesk, Inc. mmx is an independent project and is
+not affiliated with or endorsed by Autodesk.
+
+## Acknowledgments
+
+The geometry approach follows published work by Botsch, Kobbelt, Sorkine and
+Schmidt, and the open-source lineage around Meshmixer (geometry3Sharp,
+Cotangent2 and libgeometry). Those projects informed the algorithms; mmx does
+not link against them.

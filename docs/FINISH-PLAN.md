@@ -168,8 +168,8 @@ the final report is self-contained.
 
 ## Immediate next actions
 
-1. Generate `docs/TOOL-MATRIX.md` from the recovered tool list and the current
-   code; this is the only way to stop guessing at "remaining work".
+1. Use `docs/TOOL-MATRIX.md` as the scope checklist; close the kernel-only and
+   partial entries in priority order.
 2. Create Wine samples for pivot, decal, stamp, texture and shader scenes;
    inspect the XML and block records before writing parsers.
 3. Run the reducer/boolean/remesh named functions through Ghidra one more time
