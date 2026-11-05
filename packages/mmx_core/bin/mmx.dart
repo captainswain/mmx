@@ -11,7 +11,7 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
   mmx remesh <in> <out> --edge <len> [--iters 6]
   mmx reduce <in> <out> --percent <0-1> | --faces <n>
   mmx solid <in> <out> [--mode fast|accurate|blocky] [--res 128] [--offset 0] [--smooth 0]
-  mmx boolean <a> <b> <out> --op union|intersection|difference
+  mmx boolean <a> <b> <out> --op union|intersection|difference [--precise] [--edge <len>]
   mmx hollow <in> <out> --thickness <t> [--holes 3] [--hole-radius <r>]
   mmx offset <in> <out> --distance <d>
   mmx supports <in> <out> [--angle 45] [--density 0.5] [--bed 0]
@@ -150,8 +150,15 @@ Future<void> main(List<String> args) async {
           'intersection' => BooleanOp.intersection,
           _ => BooleanOp.union,
         };
-        final r = Solidifier.boolean(a, b, op, resolution: flag('res', 160).toInt());
-        save(positional[2], r.mesh);
+        final r = flags.containsKey('precise')
+            ? PreciseBoolean.compute(a, b, op,
+                edgeLength: flags['edge'] == null
+                    ? null
+                    : double.parse(flags['edge']!),
+                resolution: flag('res', 160).toInt())
+            : Solidifier.boolean(a, b, op, resolution: flag('res', 160).toInt())
+                .mesh;
+        save(positional[2], r);
       }
     case 'hollow':
       {

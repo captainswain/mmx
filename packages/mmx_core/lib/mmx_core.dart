@@ -31,6 +31,7 @@ export 'src/remesh/decimate.dart';
 export 'src/remesh/isotropic.dart';
 export 'src/scene/document.dart';
 export 'src/solid/solidifier.dart';
+export 'src/solid/mesh_boolean.dart';
 export 'src/solid/surface_nets.dart';
 export 'src/solid/voxel.dart';
 export 'src/spatial/bvh.dart';

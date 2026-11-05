@@ -10,6 +10,26 @@ TriMesh loadModel(String name) =>
     MeshIO.readBytes(name, File('$modelsDir/$name').readAsBytesSync());
 
 void main() {
+  group('precise boolean', () {
+    test('mesh-level union/difference/intersection are watertight', () {
+      final a = loadModel('sphere.obj');
+      final b = a.clone();
+      for (var i = 0; i < b.vertexCount; i++) {
+        b.positions[i * 3] += 1.0;
+      }
+      for (final op in BooleanOp.values) {
+        final out = PreciseBoolean.compute(a, b, op);
+        final loops = MeshTopology(out).boundaryLoops();
+        print('precise $op: faces=${out.faceCount} '
+            'volume=${out.signedVolume().toStringAsFixed(3)} '
+            'loops=${loops.length}');
+        expect(out.faceCount, greaterThan(0));
+        expect(loops, isEmpty, reason: '$op must be watertight');
+        expect(out.signedVolume(), greaterThan(0));
+      }
+    });
+  });
+
   group('make solid', () {
     test('turns a sphere into a watertight solid', () {
       final mesh = loadModel('sphere.obj');

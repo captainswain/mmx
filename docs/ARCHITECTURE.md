@@ -36,7 +36,8 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
                        with a uniform shortest-edge mode
   lib/src/solid/       narrow-band SDF voxelizer (ray-parity sign, flood fill),
                        surface-nets polygonizer, make-solid (Fast reprojects onto
-                       the input), offset, hollow with escape holes, boolean CSG
+                       the input), offset, hollow with escape holes, grid CSG,
+                       mesh-level precise boolean (classify + stitch, grid fallback)
   lib/src/analysis/    thickness, overhang, stability, deviation, mass properties
   lib/src/fab/         support forest (posts + struts + bases), orientation
                        search, 2D raster packing, layer slicing
@@ -140,7 +141,7 @@ the interface takes plain arrays and a camera rather than Flutter objects.
 
 ## 5. Correctness and verification
 
-`dart test` runs 70 tests against the models that ship inside the Meshmixer
+`dart test` runs 71 tests against the models that ship inside the Meshmixer
 installer, asserting invariants rather than snapshots:
 
 * import/export round trips for STL/OBJ/PLY preserve area within 1e-4;

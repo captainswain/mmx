@@ -358,7 +358,7 @@ Accurate with a negative offset. Detailed notes are in
 |---|---|---|
 | Voxelization | `MeshRasterizer::RasterizeVolume_RayCast`, log `find surface voxels took %f`, `MeshToSolid::GenerateVoxelSolid: m_nTargetGridResolution is %d`; decompiled grid loop indexes `x + nx*(y + ny*z)` and tests sign changes against six neighbours; Autodesk Make Solid help describes voxelizing at Solid Accuracy then a second voxelization at Mesh Density | Ray-cast voxelization into a signed field with target grid resolution, followed by a second grid meshing pass |
 | Solid conversion | `ImplicitPolygonizer.cpp`; API `solidType=Blocky|Fast|Accurate|FastSharp`; Autodesk help: Fast meshes voxels then reprojects onto the input, Accurate computes and meshes a signed distance field, Block meshes cubes, Sharp Edge Preserve recovers sharp edges like Attract to Target; Cull Edges drops edges below a fraction of the voxel edge length, Min Thickness adds spheres, open boundaries are filled with Minimal Erase & Fill | Implicit polygonization plus optional reprojection or SDF meshing, with a cell-size-based edge cull |
-| Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`; API `solutionType=FastApproximate|Precise|ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `maxRefineDepth`, `postReduce`; Autodesk help: no cutting, instead remesh around the intersection, delete triangle strips to make boundary loops, then grow the loops together while sliding on the input surfaces (Join-like); Search Depth retries at higher density; Fast Approximate is unconstrained Join-like, Precise solves the intersection curve, Max Quality raises thresholds | Remesh-and-stitch boundary growing, not voxel CSG. The voxel boolean path is Make Pattern, which performs the boolean on a grid and extracts a surface |
+| Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`; API `solutionType=FastApproximate|Precise|ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `maxRefineDepth`, `postReduce`; Autodesk help: no cutting, instead remesh around the intersection, delete triangle strips to make boundary loops, then grow the loops together while sliding on the input surfaces (Join-like); Search Depth retries at higher density; Fast Approximate is unconstrained Join-like, Precise solves the intersection curve, Max Quality raises thresholds | Remesh-and-stitch boundary growing, not voxel CSG. mmx implements a mesh-level classify-and-stitch boolean with a grid-CSG fallback; the voxel boolean path in Meshmixer is Make Pattern |
 | Remeshing | `SurfaceRemesher.cpp`, `VariationalRemesher.cpp`, `MeshRefinement.cpp`, `RefinementConstraint.cpp`; Autodesk Remesh help: rounds of split/collapse/flip interleaved with Laplacian smoothing and reprojection, Regularity controls smoothing, Transition widens the density band, boundary modes Fixed/Free/Refined, Linear Subdivision splits only; geometry3Sharp Remesher cites Botsch & Kobbelt SGP 2004 | Iterative isotropic/adaptive remeshing with edge split/collapse/flip, Laplacian smoothing, projection and constraints |
 | Decimation | `MeshReducer.cpp`, `Reduce Type` Percentage/Triangle Budget/Max Deviation, `Shape Preserving`; Autodesk Reduce help: Uniform is shortest-edges-first, Shape Preserving is quadric-error collapse, Max Deviation is checked at vertices only; geometry3Sharp weights vertex quadrics by incident triangle area | QEM edge collapse for Shape Preserving with area-weighted quadrics; shortest-edge-first collapse for Uniform |
 | Hole filling | `SimpleHoleFiller.cpp`, `LoopStitcher.cpp`, `BoundaryJoiner/Stitcher/Bridge`; Autodesk Plane Cut help fill types: No Fill, Minimal (constrained Delaunay), Remeshed (remesh the minimal fill), Fixed (clip a fixed triangle pattern); Erase & Fill Minimal/Flat Refined/Smooth MVC | Boundary-loop triangulation with Delaunay, remeshed and fixed-pattern variants |
@@ -406,12 +406,13 @@ Accurate with a negative offset. Detailed notes are in
   inside the reducer's edge queue, quadric weighting, the support optimization
   objective, and the adaptive-density transition widths. The reimplementation
   uses standard published formulations and documents each one.
-* The boolean pipeline is now resolved by Autodesk's own help text: it is a
+* The boolean pipeline is resolved by Autodesk's own help text: it is a
   remesh-and-stitch algorithm (remesh around the intersection, delete strips,
   grow boundary loops while sliding on the input surfaces), with Search Depth
-  retries and Precise/Max Quality/Fast Approximate modes. It is not voxel CSG;
-  the voxel boolean path is Make Pattern. The exact density multipliers, merge
-  iteration counts and robustness thresholds are still **[unknown]**.
+  retries and Precise/Max Quality/Fast Approximate modes. mmx implements a
+  mesh-level classify-and-stitch version with a grid-CSG fallback. The exact
+  density multipliers, merge iteration counts and robustness thresholds are
+  still **[unknown]**.
 * The `.mix` container is parsed and written for triangle meshes (see section
   5), including per-face group ids. `PivotSO`, `DecalSO`, stamps and shaders are
   not decoded, but `MixIO.rewrite` rebuilds only the mesh blocks and keeps every
