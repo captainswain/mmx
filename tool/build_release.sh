@@ -10,6 +10,7 @@
 #   --version=<version>                    Release version string (default: from pubspec.yaml)
 #   --out-dir=<path>                       Directory to store artifacts (default: dist)
 #   --no-archive                           Skip packaging into archives (.tar.gz / .zip)
+#   --no-checksums                         Skip writing SHA256SUMS.txt
 #   -h, --help                             Show this help message
 
 set -euo pipefail
@@ -37,7 +38,7 @@ detect_arch() {
   case "$(uname -m)" in
     x86_64|amd64)         echo "x64" ;;
     arm64|aarch64)        echo "arm64" ;;
-    *)                    echo "$(uname -m)" ;;
+    *)                    uname -m ;;
   esac
 }
 
@@ -64,6 +65,7 @@ TARGET="all"
 VERSION=""
 OUT_DIR="$ROOT_DIR/dist"
 ARCHIVE="true"
+CHECKSUMS="true"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -92,8 +94,12 @@ while [[ $# -gt 0 ]]; do
       ARCHIVE="false"
       shift
       ;;
+    --no-checksums)
+      CHECKSUMS="false"
+      shift
+      ;;
     -h|--help)
-      sed -n '2,13p' "$0" | sed 's/^# *//'
+      sed -n '2,14p' "$0" | sed 's/^# *//'
       exit 0
       ;;
     *)
@@ -110,6 +116,17 @@ fi
 
 if [[ -z "$ARCH" || "$ARCH" == "auto" ]]; then
   ARCH="$(detect_arch)"
+fi
+
+# The script builds natively and does not cross-compile, so a mismatched
+# platform or arch would only mislabel the archives.
+if [[ "$PLATFORM" != "$(detect_platform)" ]]; then
+  echo "Error: --platform=$PLATFORM does not match this host ($(detect_platform)); cross-compiling is not supported." >&2
+  exit 1
+fi
+if [[ "$ARCH" != "$(detect_arch)" ]]; then
+  echo "Error: --arch=$ARCH does not match this host ($(detect_arch)); cross-compiling is not supported." >&2
+  exit 1
 fi
 
 if [[ -z "$VERSION" ]]; then
@@ -290,7 +307,7 @@ build_studio() {
 }
 
 generate_checksums() {
-  if [[ "$ARCHIVE" != "true" ]]; then
+  if [[ "$ARCHIVE" != "true" || "$CHECKSUMS" != "true" ]]; then
     return
   fi
 
