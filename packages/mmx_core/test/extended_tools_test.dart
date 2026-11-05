@@ -92,6 +92,23 @@ void main() {
         <double>[1, 0, 0],
       ]).faceCount, 0);
     });
+
+    test('triangulates a concave polygon without overlapping', () {
+      final lShape = <List<double>>[
+        <double>[0, 0, 0],
+        <double>[2, 0, 0],
+        <double>[2, 0, 1],
+        <double>[1, 0, 1],
+        <double>[1, 0, 2],
+        <double>[0, 0, 2],
+      ];
+      final polygon = MakePolygon.fromPoints(lShape);
+      expect(polygon.faceCount, 4);
+      expect(polygon.surfaceArea(), closeTo(3.0, 1e-6));
+      final reversed = MakePolygon.fromPoints(lShape.reversed.toList());
+      expect(reversed.faceCount, 4);
+      expect(reversed.surfaceArea(), closeTo(3.0, 1e-6));
+    });
   });
 
   group('make part', () {

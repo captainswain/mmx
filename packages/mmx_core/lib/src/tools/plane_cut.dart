@@ -125,6 +125,7 @@ class PlaneCut {
     required List<double> point,
     required List<double> normal,
     int groupId = 1,
+    int? negativeGroupId,
   }) {
     final nx = normal[0], ny = normal[1], nz = normal[2];
     final nl = math.sqrt(nx * nx + ny * ny + nz * nz);
@@ -141,7 +142,11 @@ class PlaneCut {
       final cy = (mesh.vy(a) + mesh.vy(b) + mesh.vy(c)) / 3.0;
       final cz = (mesh.vz(a) + mesh.vz(b) + mesh.vz(c)) / 3.0;
       final side = (cx - px) * ux + (cy - py) * uy + (cz - pz) * uz;
-      if (side > 0) groups[f] = groupId;
+      if (side > 0) {
+        groups[f] = groupId;
+      } else if (negativeGroupId != null) {
+        groups[f] = negativeGroupId;
+      }
     }
     return TriMesh(mesh.positions, mesh.indices, faceGroups: groups);
   }

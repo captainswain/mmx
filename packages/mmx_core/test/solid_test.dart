@@ -40,6 +40,14 @@ void main() {
       expect(out.faceCount, greaterThan(0));
       expect(MeshTopology(out).boundaryLoops(), isEmpty);
     });
+
+    test('empty mesh-level result falls back to grid CSG', () {
+      final a = loadModel('sphere.obj');
+      final out = PreciseBoolean.compute(a, a.clone(), BooleanOp.union);
+      expect(out.faceCount, greaterThan(0));
+      expect(out.signedVolume(), closeTo(a.signedVolume(), a.signedVolume() * 0.05));
+      expect(MeshTopology(out).boundaryLoops(), isEmpty);
+    });
   });
 
   group('make solid', () {

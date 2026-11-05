@@ -9,6 +9,7 @@ the reverse-engineering report itself.
 * Method-name recovery and open-source relatives: [`docs/METHODS.md`](docs/METHODS.md)
 * Architecture and technology rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 * Testing and coverage: [`docs/TESTING.md`](docs/TESTING.md)
+* Remaining-work plan: [`docs/REMEDIATION-PLAN.md`](docs/REMEDIATION-PLAN.md)
 * Kernel: [`packages/mmx_core`](packages/mmx_core) (pure Dart, no Flutter dependency)
 * App: [`apps/mmx_studio`](apps/mmx_studio) (Flutter: Windows, macOS, Linux;
   Android/iOS scaffolds included)
@@ -64,7 +65,7 @@ work on touch screens. Android and iOS targets are scaffolded (`android/`,
 Requires Flutter 3.47+ and Dart 3.13+.
 
 ```bash
-# kernel tests (94 tests, uses models shipped inside the Meshmixer installer)
+# kernel tests (98 tests, uses models shipped inside the Meshmixer installer)
 cd packages/mmx_core
 dart pub get
 dart test

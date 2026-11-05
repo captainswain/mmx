@@ -162,12 +162,14 @@ void main() {
       final grouped = PlaneCut.sliceGroups(mesh,
           point: <double>[0, b.minY + b.extentY * 0.5, 0],
           normal: <double>[0, 1, 0],
-          groupId: 7);
+          groupId: 7,
+          negativeGroupId: 9);
       expect(grouped.faceCount, mesh.faceCount);
       expect(grouped.signedVolume(), closeTo(mesh.signedVolume(), 1e-6));
       expect(grouped.faceGroups, isNotNull);
       expect(grouped.faceGroups!.contains(7), isTrue);
-      expect(grouped.faceGroups!.contains(0), isTrue);
+      expect(grouped.faceGroups!.contains(9), isTrue);
+      expect(grouped.faceGroups!.contains(0), isFalse);
     });
 
     test('sculpt draw displaces the surface', () {

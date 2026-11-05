@@ -1,0 +1,106 @@
+# Remediation plan
+
+Baseline: 98 kernel tests passing, `dart analyze` clean, 10 Studio widget tests
+passing. This plan prioritises correctness and user-visible gaps over cosmetic
+coverage numbers.
+
+## P0 - correctness and safety
+
+1. **Mesh-level boolean fallback coverage**
+   - The empty-result fallback is tested. The second fallback (stitching leaves
+     a boundary loop) still lacks a forced test.
+   - Action: add a pathological input (non-closed or highly non-manifold operand)
+     and assert the grid CSG path is used; expose a `usedFallback` flag on the
+     result for testability.
+   - Acceptance: both fallback branches execute under test; output watertight.
+
+2. **Plane Cut degenerate cases**
+   - Add cuts through existing vertices and fully on-plane triangles, with
+     `keepPositive` both true and false.
+   - Acceptance: no duplicate/degenerate triangles; watertight caps; volumes
+     complement the input.
+
+3. **CollapseMesh duplicate-face rejection**
+   - Add a direct test with a duplicate triangle input and assert
+     `tryCollapse` rejects the invalid merge rather than silently dropping it.
+   - Acceptance: rejected merge leaves the mesh unchanged; accepted merge stays
+     manifold.
+
+4. **Adaptive-density fallback transparency**
+   - The adaptive heuristic can fall back to uniform remeshing. Return a result
+     flag (`usedUniformFallback`) so callers/tests know which path ran.
+   - Acceptance: tests cover adaptive success and fallback; no silent downgrade.
+
+## P1 - Studio integration
+
+5. **Wire kernel tools into the app**
+   - `Pivot` creation, `MakePolygon`, `AddTube`, `Unwrap`, `SoftMove`, and
+     `ComplexTools.makePart` currently exist only in the kernel.
+   - Replace the duplicated `_extractSelection` implementation in
+     `panels.dart` with `ComplexTools.extract`.
+   - Add widget tests for each new action.
+   - Acceptance: every new kernel tool has a reachable UI action or an explicit
+     "kernel-only" label.
+
+6. **Pivot persistence**
+   - Observed `.mix` samples do not contain `PivotSO`; pivots appear to be
+     runtime-only. Add a scene-level pivot model and a round-trip test for the
+     app document format before claiming `.mix` pivot support.
+   - Acceptance: save/reload preserves pivot position/orientation.
+
+## P2 - data model and file fidelity
+
+7. **UV storage**
+   - `Unwrap` returns a separate `UvMesh`; `TriMesh` and `.mix` have no UV
+     channel. Add an optional per-vertex UV field only if texture export is in
+     scope; otherwise document planar unwrap as a preview operation.
+   - Acceptance: OBJ/PLY export preserves UVs if the field is added; `.mix`
+     round-trip preserves existing UV blocks byte-for-byte.
+
+8. **`.mix` extras**
+   - `MixIO.rewrite` preserves unknown records. Decode `PivotSO`/`DecalSO`/
+     stamps only when a real sample contains them; current samples do not.
+   - Acceptance: rewrite remains lossless; decoded records survive round-trip.
+
+## P3 - fidelity and algorithms
+
+9. **Adaptive-density calibration**
+   - Compare our angle-defect heuristic against Wine Meshmixer outputs at
+     several density/transition settings; tune the falloff and document the
+     residual error. Exact constants remain unknowable without source.
+   - Acceptance: face-count and edge-length distributions track Meshmixer within
+     a documented tolerance on the sample models.
+
+10. **Solidifier minimum thickness**
+    - `_enforceMinThickness` is a simple erosion. Replace with a distance-field
+      constrained solve if wall-thickness accuracy matters.
+    - Acceptance: measured minimum wall thickness meets the requested value on
+      a hollowed test model.
+
+11. **Slice Groups semantics**
+    - Negative-side grouping is implemented. Confirm Meshmixer's group numbering
+      and whether both sides are always tagged; adjust defaults accordingly.
+
+## P4 - hardening and CI
+
+12. **Property/fuzz tests**
+    - Random small meshes: split/collapse/flip invariants, no non-manifold output,
+      volume/area sanity, deterministic seeds.
+13. **Coverage gate**
+    - CI: `dart analyze`, full tests, lcov; fail below 90% line coverage on new
+      kernel modules (with an explicit allowlist for `plane_cut.dart` while its
+      nested-branch attribution is fixed).
+14. **Performance budget**
+    - Track remesh/decimate/solidify timings on 12k and 100k face meshes; reject
+      regressions above 20%.
+
+## Suggested order
+
+1. P0.1-P0.4 (testability and safety)
+2. P1.5-P1.6 (user-visible integration)
+3. P3.9-P3.11 (fidelity)
+4. P2.7-P2.8 (only if texture/UV export is required)
+5. P4.12-P4.14 (continuous hardening)
+
+Items 7 and 8 are deliberately deferred until there is a concrete consumer
+(UV export or a `.mix` sample containing those records).

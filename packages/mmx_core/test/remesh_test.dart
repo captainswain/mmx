@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:mmx_core/mmx_core.dart';
+import 'package:mmx_core/src/remesh/collapse_mesh.dart';
 import 'package:test/test.dart';
 
 const String modelsDir = '/data/re/meshmixer/extract/meshmixer/models';
@@ -165,6 +166,60 @@ void main() {
           preserveBoundary: true);
       expect(out.validate(), isEmpty);
       expect(MeshTopology(out).boundaryLoops().length, before);
+    });
+  });
+
+  group('collapse mesh', () {
+    test('rejects sharp constraints and accepts an interior collapse', () {
+      final mesh = loadModel('sphere.obj');
+      final cm = CollapseMesh(mesh);
+      final key = cm.edgeCount.keys.first;
+      final n = mesh.vertexCount;
+      final a = key ~/ n, b = key % n;
+      final mx = (mesh.vx(a) + mesh.vx(b)) * 0.5;
+      final my = (mesh.vy(a) + mesh.vy(b)) * 0.5;
+      final mz = (mesh.vz(a) + mesh.vz(b)) * 0.5;
+      expect(cm.tryCollapse(a, b, mx, my, mz, sharp: <int>{a, b}), isFalse);
+      expect(cm.tryCollapse(a, b, mx, my, mz), isTrue);
+      final out = cm.build();
+      expect(out.validate(), isEmpty);
+      expect(MeshTopology(out).nonManifoldEdges(), isEmpty);
+    });
+
+    test('rejects a boundary-to-interior collapse', () {
+      final mesh = loadModel('sphere.obj');
+      final bounds = mesh.bounds();
+      final open = PlaneCut.cut(mesh,
+          point: <double>[0, bounds.minY + bounds.extentY * 0.5, 0],
+          normal: <double>[0, 1, 0],
+          fill: false);
+      final topo = MeshTopology(open);
+      final boundary = <int>{
+        for (final e in topo.boundaryEdges()) ...[e[0], e[1]],
+      };
+      final cm = CollapseMesh(open);
+      int? foundA, foundB;
+      for (final key in cm.edgeCount.keys) {
+        final n = open.vertexCount;
+        final a = key ~/ n, b = key % n;
+        if (boundary.contains(a) != boundary.contains(b)) {
+          foundA = a;
+          foundB = b;
+          break;
+        }
+      }
+      expect(foundA, isNotNull);
+      final a = foundA!, b = foundB!;
+      expect(
+          cm.tryCollapse(
+            a,
+            b,
+            (open.vx(a) + open.vx(b)) * 0.5,
+            (open.vy(a) + open.vy(b)) * 0.5,
+            (open.vz(a) + open.vz(b)) * 0.5,
+            preserveBoundary: true,
+          ),
+          isFalse);
     });
   });
 }
