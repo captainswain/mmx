@@ -315,6 +315,15 @@ reference for the algorithms Meshmixer used. His successor application,
 Cotangent2, states it implements "better versions of Meshmixer Tools" and uses
 geometry3Sharp for the geometry work.
 
+The executable's RTTI also yields 3,612 class names. They confirm the kernel
+namespace and class inventory: `rms::MeshBoolean`, `rms::MeshReducer`,
+`rms::SurfaceReducer`, `rms::SurfaceRemesher`, `rms::VariationalRemesher`,
+`rms::ARAPDeformer`, `rms::COILSDeformer`, `rms::RotInvCoordDeformer`,
+`rms::MeshPlaneCut`, `rms::MeshBoundaryJoin`, `rms::MeshFileReader/Writer`,
+`rms::M2SGridImplicit` (mesh-to-solid grid implicit) and
+`rms::SupportMesherGridImplicit`. That inventory is consistent with the
+module-name evidence and with the geometry3Sharp class list.
+
 ## 6. Algorithms (inferred from module names, parameter names and log strings)
 
 | Capability | Evidence | Inference |
