@@ -385,11 +385,18 @@ Accurate with a negative offset. Detailed notes are in
   headless passes on the saved project: 127 functions touching kernel strings
   (`/data/re/meshmixer/ghidra_decomp2.txt`), 13 callers of 6 key addresses
   (`ghidra_key_callers.txt`), and a broad caller corpus of 15,968 functions for
-  383 target addresses (`ghidra_callers.txt`). There is no PDB, so the functions
-  are still named `FUN_<address>`; RTTI vtable recovery attributes 913 classes
-  to functions in that corpus (see `docs/RTTI.md`), but individual method names
-  remain unknown. The source-path and log strings are what tie functions to
-  `libgeometry`/`libmeshtools` modules.
+  383 target addresses (`ghidra_callers.txt`).
+  There is no PDB, so the functions are still named `FUN_<address>` unless a
+  `Class::Method` string can be tied to them. RTTI vtable recovery attributes
+  913 classes to functions in that corpus (see `docs/RTTI.md`), and string
+  xref analysis recovered 198 unique `Class::Method` names and renamed 173
+  functions in the Ghidra project, including `MeshBoolean::Validate`,
+  `MeshPlaneCut::ComputeResult`, `MeshReducer::ReduceToMinEdgeLength`,
+  `MeshToSolid::GenerateVoxelSolid`, `MeshRasterizer::RasterizeVolume_RayCast`,
+  `SupportForestGenerator::Generate`, `HoleFiller::ParamAndOpt` and
+  `SurfaceRemesher::ApplyEdit` (see `docs/METHODS.md`). Individual method names
+  for functions without such a string remain unknown. The source-path and log
+  strings tie functions to `libgeometry`/`libmeshtools` modules.
 * From that decompilation, these behaviours are now **[observed]** rather than
   inferred:
   * `MeshToSolid::GenerateVoxelSolid` rejects a target grid resolution below 1
@@ -449,9 +456,16 @@ Accurate with a negative offset. Detailed notes are in
   <https://github.com/gradientspace/geometry3Sharp>
   (`MeshBoolean`, `MeshMeshCut`, `MeshStitchLoops`, `MeshICP`, `MeshPlaneCut`,
   `MeshIterativeSmooth`, `Reducer`, `Remesher`, `SimpleHoleFiller`).
-* Cotangent2, the Meshmixer successor by the same author:
-  <https://www.cotangent.io/> and
-  <https://github.com/gradientspace/Cotangent2>.
+* libgeometry, the older open-source C++ mesh library by the same author:
+  <https://www.dgp.toronto.edu/~rms/software/libgeometry/index.html>
+  (source: <http://graphicscode.s3.amazonaws.com/libgeometry.zip>;
+  `IMesh`, `VFTriangleMesh`, `MeshIO`, `MeshPolygons`).
+* geometry3cpp, the open-source C++ port of geometry3Sharp:
+  <https://github.com/gradientspace/geometry3cpp> (`DMesh3`, `Remesher`,
+  `OBJReader`, `OBJWriter`).
+* Cotangent2, the Meshmixer successor:
+  <https://github.com/gradientspace/Cotangent2> (UE5 tool layer;
+  `GSMeshBooleanTool`, `GSRemeshMeshTool`, `GSMakeSolidTool`).
 * Ryan Schmidt's project page for Meshmixer:
   <https://www.rms80.com/projects/meshmixer>.
 * Just Solve the File Format Problem, MeshMixer entry:
