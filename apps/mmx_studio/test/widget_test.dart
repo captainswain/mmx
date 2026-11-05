@@ -147,7 +147,7 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
       expect(state.selected, isNotNull);
-      await state.importPath('/data/re/meshmixer/sample.mix');
+      await state.importPath('test/fixtures/sample.mix');
       expect(state.status, contains('Imported'));
       final imported = state.doc.objects
           .where((o) => o.mesh.faceCount == 10996)
