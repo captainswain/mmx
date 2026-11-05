@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import '../mesh/topology.dart';
 import '../mesh/tri_mesh.dart';
+import '../repair/holes.dart';
 import '../repair/inspector.dart';
 import '../repair/weld.dart';
 import '../spatial/bvh.dart';
@@ -126,9 +127,17 @@ class IsotropicRemesher {
     mesh.compact();
     if (adaptiveDensity > 0) {
       Weld.removeDuplicateFaces(mesh);
-      for (var pass = 0; pass < 2; pass++) {
-        if (MeshTopology(mesh).nonManifoldEdges().isEmpty) break;
-        mesh = MeshInspector.splitNonManifold(mesh);
+      for (var pass = 0; pass < 3; pass++) {
+        var changed = false;
+        if (MeshTopology(mesh).boundaryLoops().isNotEmpty) {
+          mesh = HoleFiller.fill(mesh, mode: HoleFillMode.flatMinimal);
+          changed = true;
+        }
+        if (MeshTopology(mesh).nonManifoldEdges().isNotEmpty) {
+          mesh = MeshInspector.splitNonManifold(mesh);
+          changed = true;
+        }
+        if (!changed) break;
       }
     }
     if (groupSegments.isNotEmpty) {
