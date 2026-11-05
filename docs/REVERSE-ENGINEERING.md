@@ -253,11 +253,11 @@ directly. The file is a sequence of length-prefixed records:
    * `VFMesh 1.3`: six u32 counts/strides (vertices, vertices, faces, faces,
      56, 24), 60-byte vertex records (`u32 56`, vertex id, 3f position, 3f
      normal, u32 vertexCount, u32 0, 4f RGBA, u32 0) and 28-byte face records
-     (`u32 24`, face id, three indices, u32 0, u32 0xFFFFFFFF).
+     (`u32 24`, face id, three indices, **group id**, `u32 0xFFFFFFFF`).
    * `VFMesh 1.2` (older): four u32 counts (vertices, vertices, faces, faces),
      56-byte vertex records (`u32 vertexId`, 3f position, 3f normal, u32
      vertexCount, u32 0, 4f RGBA, u32 0) and 20-byte face records (face id,
-     three indices, u32 0).
+     three indices, **group id**).
    Both end with the constant 194-byte `MeshPolygons 1.0` trailer.
 4. `[length][MMSDB block]`: `u32 6` + `MMSDB\0`, `u32 17` +
    `SemanticDB 01.20\0` and a fixed 55-byte body.
@@ -267,10 +267,13 @@ unmodified Meshmixer 3.5.0 under Wine with the correct vertex and triangle
 counts, so the writer is byte-compatible with the shipped reader. The reader
 also parses the official API sample
 (`mm-api/python/examples/sphere.mix`, VFMesh 1.2, 6302 vertices, 12600 faces,
-volume 4.18879) and the 3.5.0 scene saved under Wine (VFMesh 1.3). Multi-object
-scenes are written as one `MeshSO9`/`MMGS` pair per object and round-trip through
-mmx_core's reader; the shipped 3.5.0 build was verified on single-object files
-(its Import dialog merges appended meshes into one object).
+volume 4.18879) and the 3.5.0 scene saved under Wine (VFMesh 1.3). Face groups
+are stored as the group id in each face record: a 3.5.0 scene with all faces
+tagged group 4 reads back as group 4, and a two-group sphere written by
+`mmx_core` displays as two face-group colors in the unmodified 3.5.0 build.
+Multi-object scenes are written as one `MeshSO9`/`MMGS` pair per object and
+round-trip through mmx_core's reader; the shipped 3.5.0 build was verified on
+single-object files (its Import dialog merges appended meshes into one object).
 
 ### Official API headers (mm-api)
 
@@ -357,7 +360,7 @@ Accurate with a negative offset. Detailed notes are in
 | Solid conversion | `ImplicitPolygonizer.cpp`; API `solidType=Blocky|Fast|Accurate|FastSharp`; Autodesk help: Fast meshes voxels then reprojects onto the input, Accurate computes and meshes a signed distance field, Block meshes cubes, Sharp Edge Preserve recovers sharp edges like Attract to Target; Cull Edges drops edges below a fraction of the voxel edge length, Min Thickness adds spheres, open boundaries are filled with Minimal Erase & Fill | Implicit polygonization plus optional reprojection or SDF meshing, with a cell-size-based edge cull |
 | Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`; API `solutionType=FastApproximate|Precise|ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `maxRefineDepth`, `postReduce`; Autodesk help: no cutting, instead remesh around the intersection, delete triangle strips to make boundary loops, then grow the loops together while sliding on the input surfaces (Join-like); Search Depth retries at higher density; Fast Approximate is unconstrained Join-like, Precise solves the intersection curve, Max Quality raises thresholds | Remesh-and-stitch boundary growing, not voxel CSG. The voxel boolean path is Make Pattern, which performs the boolean on a grid and extracts a surface |
 | Remeshing | `SurfaceRemesher.cpp`, `VariationalRemesher.cpp`, `MeshRefinement.cpp`, `RefinementConstraint.cpp`; Autodesk Remesh help: rounds of split/collapse/flip interleaved with Laplacian smoothing and reprojection, Regularity controls smoothing, Transition widens the density band, boundary modes Fixed/Free/Refined, Linear Subdivision splits only; geometry3Sharp Remesher cites Botsch & Kobbelt SGP 2004 | Iterative isotropic/adaptive remeshing with edge split/collapse/flip, Laplacian smoothing, projection and constraints |
-| Decimation | `MeshReducer.cpp`, `Reduce Type` Percentage/Triangle Budget/Max Deviation, `Shape Preserving`; Autodesk Reduce help: Uniform is shortest-edges-first, Shape Preserving is quadric-error collapse, Max Deviation is checked at vertices only | QEM edge collapse for Shape Preserving; shortest-edge-first collapse for Uniform |
+| Decimation | `MeshReducer.cpp`, `Reduce Type` Percentage/Triangle Budget/Max Deviation, `Shape Preserving`; Autodesk Reduce help: Uniform is shortest-edges-first, Shape Preserving is quadric-error collapse, Max Deviation is checked at vertices only; geometry3Sharp weights vertex quadrics by incident triangle area | QEM edge collapse for Shape Preserving with area-weighted quadrics; shortest-edge-first collapse for Uniform |
 | Hole filling | `SimpleHoleFiller.cpp`, `LoopStitcher.cpp`, `BoundaryJoiner/Stitcher/Bridge`; Autodesk Plane Cut help fill types: No Fill, Minimal (constrained Delaunay), Remeshed (remesh the minimal fill), Fixed (clip a fixed triangle pattern); Erase & Fill Minimal/Flat Refined/Smooth MVC | Boundary-loop triangulation with Delaunay, remeshed and fixed-pattern variants |
 | Plane cut | `MeshPlaneCut` RTTI, `MeshPlaneSlicer`; API `cutType=PreciseGeometricCut|PreciseGeometricSlice|NearestPointAttach|RefinedICPAttach`, fill types as above; Autodesk help: Cut/Slice/Slice Groups | Exact plane/edge intersection, with optional constrained-Delaunay or remeshed caps |
 | Hollow | API `hollowType`, `holesPerComponent`, `holeRadiusWorld`, `holeTaperWorld`; Autodesk help: Make Solid Accurate with a negative offset equal to wall thickness, escape holes added by boolean subtraction | SDF offset shell plus boolean escape holes |
@@ -410,9 +413,10 @@ Accurate with a negative offset. Detailed notes are in
   the voxel boolean path is Make Pattern. The exact density multipliers, merge
   iteration counts and robustness thresholds are still **[unknown]**.
 * The `.mix` container is parsed and written for triangle meshes (see section
-  5). What remains unparsed inside it: `PivotSO`, `DecalSO`, stamps, shaders,
-  and the per-face polygon-group table in the `MeshPolygons 1.0` trailer
-  (mmx writes the constant single-group trailer Meshmixer itself emits).
+  5), including per-face group ids. What remains unparsed inside it: `PivotSO`,
+  `DecalSO`, stamps and shaders; unknown XML records and binary blocks are lost
+  when mmx rewrites a scene. The `MeshPolygons 1.0` trailer is constant in all
+  observed scenes, so it carries no group table.
 
 ## 8. References
 

@@ -84,5 +84,8 @@ Notable method addresses (VAs in the loaded image):
 From the decompiled `SurfaceRemesher` methods (`0x1409df4b0`, `0x1409e09a0`),
 **[observed]** numeric literals include `1.3333334` (4/3), `0.8`, `10.0`, a
 cubic `(x * 3.0 * x - 6.5 * x + 4.0)`, and float constants `5.0886`/`5.0888`
-loaded as defaults. Their exact roles (edge-length bounds, smoothing speed,
-angle threshold) are **[inferred]** from their position in the remesh loop.
+loaded as defaults. The `0.8` and `4/3` values match geometry3Sharp's older
+`Remesher.SetTargetEdgeLength` bounds (`MinEdgeLength = 4/5 * L`,
+`MaxEdgeLength = 4/3 * L`), which is strong evidence that the remesher uses the
+same edge-length window. The cubic is likely the mapping from the Regularity
+slider to smoothing speed; that role is **[inferred]**.

@@ -226,9 +226,21 @@ class Decimator {
   static void _accumulatePlane(List<Float64List> quadrics, List<double> positions, List<int> tri) {
     final nrm = _faceNormal(positions, tri);
     final ax = positions[tri[0] * 3], ay = positions[tri[0] * 3 + 1], az = positions[tri[0] * 3 + 2];
+    final bx = positions[tri[1] * 3], by = positions[tri[1] * 3 + 1], bz = positions[tri[1] * 3 + 2];
+    final cx = positions[tri[2] * 3], cy = positions[tri[2] * 3 + 1], cz = positions[tri[2] * 3 + 2];
+    final ux = bx - ax, uy = by - ay, uz = bz - az;
+    final vx = cx - ax, vy = cy - ay, vz = cz - az;
+    final crx = uy * vz - uz * vy;
+    final cry = uz * vx - ux * vz;
+    final crz = ux * vy - uy * vx;
+    final area = 0.5 * math.sqrt(crx * crx + cry * cry + crz * crz);
     final d = -(nrm[0] * ax + nrm[1] * ay + nrm[2] * az);
+    // geometry3Sharp weights vertex quadrics by incident triangle area; doing
+    // the same makes collapse order scale with surface area rather than with
+    // triangle count.
+    final w = area > 1e-12 ? area : 1e-12;
     for (final v in tri) {
-      _addPlane(quadrics[v], nrm[0], nrm[1], nrm[2], d, 1.0);
+      _addPlane(quadrics[v], nrm[0], nrm[1], nrm[2], d, w);
     }
   }
 

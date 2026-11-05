@@ -91,10 +91,11 @@ class MixIO {
     var vPosOffset = 8;
     var fStride = _faceRecordSize;
     var fIndexOffset = 8;
+    var fGroupOffset = 20;
     if (meshTag.startsWith('VFMesh 1.2')) {
       // Older layout: four counts, then 56-byte vertex records with the id
       // first and the position at +4, and 20-byte face records
-      // (id, a, b, c, 0).
+      // (id, a, b, c, group).
       if (off + 16 > payload.length) return null;
       final nv12 = _u32(payload, off);
       final nf12 = _u32(payload, off + 8);
@@ -103,8 +104,9 @@ class MixIO {
       vPosOffset = 4;
       fStride = 20;
       fIndexOffset = 4;
+      fGroupOffset = 16;
       return _readRecords(payload, off, nv12, nf12, vStride, vPosOffset,
-          fStride, fIndexOffset);
+          fStride, fIndexOffset, fGroupOffset);
     }
     if (off + 24 > payload.length) return null;
 
@@ -115,8 +117,8 @@ class MixIO {
     off += 24;
     vStride = vPayload + 4;
     fStride = fPayload + 4;
-    return _readRecords(
-        payload, off, nv, nf, vStride, vPosOffset, fStride, fIndexOffset);
+    return _readRecords(payload, off, nv, nf, vStride, vPosOffset, fStride,
+        fIndexOffset, fGroupOffset);
   }
 
   static MixObject? _readRecords(
@@ -128,6 +130,7 @@ class MixIO {
     int vPosOffset,
     int fStride,
     int fIndexOffset,
+    int fGroupOffset,
   ) {
     if (nv <= 0 || nf <= 0) return null;
     if (off + nv * vStride + nf * fStride > payload.length) return null;
@@ -141,18 +144,29 @@ class MixIO {
     }
     final faceOff = off + nv * vStride;
     final indices = Uint32List(nf * 3);
+    final groups = Uint16List(nf);
+    var hasGroups = false;
     for (var i = 0; i < nf; i++) {
-      final base = faceOff + i * fStride + fIndexOffset;
+      final rec = faceOff + i * fStride;
+      final base = rec + fIndexOffset;
       indices[i * 3] = _u32(payload, base);
       indices[i * 3 + 1] = _u32(payload, base + 4);
       indices[i * 3 + 2] = _u32(payload, base + 8);
+      final group = _u32(payload, rec + fGroupOffset);
+      if (group != 0 && group != 0xFFFFFFFF) {
+        groups[i] = group > 0xFFFF ? 0xFFFF : group;
+        hasGroups = true;
+      }
       if (indices[i * 3] >= nv ||
           indices[i * 3 + 1] >= nv ||
           indices[i * 3 + 2] >= nv) {
         return null;
       }
     }
-    return MixObject(name: 'Mesh', mesh: TriMesh(positions, indices));
+    return MixObject(
+        name: 'Mesh',
+        mesh: TriMesh(positions, indices,
+            faceGroups: hasGroups ? groups : null));
   }
 
   /// Reads every mesh object in the scene. Returns an empty list when the
@@ -347,7 +361,10 @@ class MixIO {
       fb.setUint32(8, mesh.indices[f * 3], Endian.little);
       fb.setUint32(12, mesh.indices[f * 3 + 1], Endian.little);
       fb.setUint32(16, mesh.indices[f * 3 + 2], Endian.little);
-      fb.setUint32(20, 0, Endian.little);
+      fb.setUint32(
+          20,
+          mesh.faceGroups == null ? 0 : mesh.faceGroups![f],
+          Endian.little);
       fb.setUint32(24, 0xFFFFFFFF, Endian.little);
       out.add(fb.buffer.asUint8List());
     }

@@ -40,6 +40,35 @@ void main() {
       expect(MeshTopology(objects.first.mesh).boundaryLoops(), isEmpty);
     });
 
+    test('reads face groups from a Meshmixer scene', () {
+      final file = File('test/fixtures/grouped.mix');
+      if (!file.existsSync()) {
+        markTestSkipped('grouped.mix fixture not present');
+        return;
+      }
+      final objects = MixIO.read(file.readAsBytesSync());
+      expect(objects.length, 1);
+      final groups = objects.first.mesh.faceGroups;
+      expect(groups, isNotNull);
+      expect(groups!.length, objects.first.mesh.faceCount);
+      expect(groups.every((g) => g == 4), isTrue);
+    });
+
+    test('writes face groups back into .mix', () {
+      final mesh = loadModel('sphere.obj');
+      final groups = Uint16List(mesh.faceCount);
+      for (var i = 0; i < groups.length; i++) {
+        groups[i] = i < groups.length ~/ 2 ? 1 : 2;
+      }
+      final grouped = TriMesh(mesh.positions, mesh.indices, faceGroups: groups);
+      final bytes = MixIO.write([MixObject(name: 'grouped', mesh: grouped)]);
+      final back = MixIO.read(bytes).first.mesh;
+      expect(back.faceCount, grouped.faceCount);
+      expect(back.faceGroups, isNotNull);
+      expect(back.faceGroups!.sublist(0, 10), groups.sublist(0, 10));
+      expect(back.faceGroups!.sublist(groups.length - 10), groups.sublist(groups.length - 10));
+    });
+
     test('MeshIO dispatches .mix to the scene reader', () {
       final file = File('/data/re/meshmixer/sample.mix');
       if (!file.existsSync()) {
