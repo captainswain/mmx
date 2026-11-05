@@ -324,16 +324,33 @@ namespace and class inventory: `rms::MeshBoolean`, `rms::MeshReducer`,
 `rms::SupportMesherGridImplicit`. That inventory is consistent with the
 module-name evidence and with the geometry3Sharp class list.
 
+Autodesk's 2019 help pages go further than the strings: they describe the
+internal steps. Make Solid voxelizes at Solid Accuracy and again at Mesh
+Density, with Fast reprojecting onto the input, Accurate meshing a signed
+distance field, and Sharp Edge Preserve recovering edges like Attract to
+Target. Boolean does not cut: it remeshes around the intersection, deletes
+triangle strips to create boundary loops, then grows the loops together while
+sliding them on the input surfaces, with Search Depth retries at higher density
+and Precise/Max Quality/Fast Approximate solution modes. Remesh uses rounds of
+split/collapse/flip plus Laplacian smoothing and reprojection, with Regularity,
+Transition and boundary modes. Reduce's Uniform mode is shortest-edge-first and
+Shape Preserving is quadric-error collapse. Plane Cut fill modes are No Fill,
+Minimal (constrained Delaunay), Remeshed and Fixed. Hollow is Make Solid
+Accurate with a negative offset. Detailed notes are in
+`docs/reference/AUTODESK-HELP-NOTES.md`.
+
 ## 6. Algorithms (inferred from module names, parameter names and log strings)
 
 | Capability | Evidence | Inference |
 |---|---|---|
-| Voxelization | `MeshRasterizer::RasterizeVolume_RayCast`, log `find surface voxels took %f`, `MeshToSolid::GenerateVoxelSolid: m_nTargetGridResolution is %d`; decompiled grid loop indexes `x + nx*(y + ny*z)` and tests sign changes against six neighbours | Ray-cast voxelization into a signed field with target grid resolution |
-| Solid conversion | `ImplicitPolygonizer.cpp`, `Make Solid` modes Blocky/Fast/Accurate, offset, min thickness, auto-repair | Implicit surface polygonization of the voxel field |
-| Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`, union/intersection/difference actions; API exposes `solutionType=FastApproximate|Precise|ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `maxRefineDepth`, `postReduce` | FastApproximate is voxel/implicit CSG; Precise/ExtraPrecise are mesh-intersection algorithms with boundary resampling and refinement |
-| Remeshing | `SurfaceRemesher.cpp`, `VariationalRemesher.cpp`, `MeshRefinement.cpp`, `RefinementConstraint.cpp`, params Target Edge Length/Regularity/Adaptive Density/Transition | Isotropic + adaptive remeshing with edge split/collapse/flip and density transition |
-| Decimation | `MeshReducer.cpp`, `Reduce Type` Percentage/Triangle Budget/Max Deviation, `Shape Preserving` | Quadric-error edge collapse with boundary constraints |
-| Hole filling | `SimpleHoleFiller.cpp`, `LoopStitcher.cpp`, `BoundaryJoiner/Stitcher/Bridge`, fill types Flat Minimal/Flat Remeshed/Smooth MVC | Boundary-loop triangulation with relaxation variants |
+| Voxelization | `MeshRasterizer::RasterizeVolume_RayCast`, log `find surface voxels took %f`, `MeshToSolid::GenerateVoxelSolid: m_nTargetGridResolution is %d`; decompiled grid loop indexes `x + nx*(y + ny*z)` and tests sign changes against six neighbours; Autodesk Make Solid help describes voxelizing at Solid Accuracy then a second voxelization at Mesh Density | Ray-cast voxelization into a signed field with target grid resolution, followed by a second grid meshing pass |
+| Solid conversion | `ImplicitPolygonizer.cpp`; API `solidType=Blocky|Fast|Accurate|FastSharp`; Autodesk help: Fast meshes voxels then reprojects onto the input, Accurate computes and meshes a signed distance field, Block meshes cubes, Sharp Edge Preserve recovers sharp edges like Attract to Target; Cull Edges drops edges below a fraction of the voxel edge length, Min Thickness adds spheres, open boundaries are filled with Minimal Erase & Fill | Implicit polygonization plus optional reprojection or SDF meshing, with a cell-size-based edge cull |
+| Booleans | `MeshBoolean.cpp`, `SimpleBooleanParamAlias`; API `solutionType=FastApproximate|Precise|ExtraPrecise`, `useIntersectionCurves`, `robustMode`, `maxRefineDepth`, `postReduce`; Autodesk help: no cutting, instead remesh around the intersection, delete triangle strips to make boundary loops, then grow the loops together while sliding on the input surfaces (Join-like); Search Depth retries at higher density; Fast Approximate is unconstrained Join-like, Precise solves the intersection curve, Max Quality raises thresholds | Remesh-and-stitch boundary growing, not voxel CSG. The voxel boolean path is Make Pattern, which performs the boolean on a grid and extracts a surface |
+| Remeshing | `SurfaceRemesher.cpp`, `VariationalRemesher.cpp`, `MeshRefinement.cpp`, `RefinementConstraint.cpp`; Autodesk Remesh help: rounds of split/collapse/flip interleaved with Laplacian smoothing and reprojection, Regularity controls smoothing, Transition widens the density band, boundary modes Fixed/Free/Refined, Linear Subdivision splits only; geometry3Sharp Remesher cites Botsch & Kobbelt SGP 2004 | Iterative isotropic/adaptive remeshing with edge split/collapse/flip, Laplacian smoothing, projection and constraints |
+| Decimation | `MeshReducer.cpp`, `Reduce Type` Percentage/Triangle Budget/Max Deviation, `Shape Preserving`; Autodesk Reduce help: Uniform is shortest-edges-first, Shape Preserving is quadric-error collapse, Max Deviation is checked at vertices only | QEM edge collapse for Shape Preserving; shortest-edge-first collapse for Uniform |
+| Hole filling | `SimpleHoleFiller.cpp`, `LoopStitcher.cpp`, `BoundaryJoiner/Stitcher/Bridge`; Autodesk Plane Cut help fill types: No Fill, Minimal (constrained Delaunay), Remeshed (remesh the minimal fill), Fixed (clip a fixed triangle pattern); Erase & Fill Minimal/Flat Refined/Smooth MVC | Boundary-loop triangulation with Delaunay, remeshed and fixed-pattern variants |
+| Plane cut | `MeshPlaneCut` RTTI, `MeshPlaneSlicer`; API `cutType=PreciseGeometricCut|PreciseGeometricSlice|NearestPointAttach|RefinedICPAttach`, fill types as above; Autodesk help: Cut/Slice/Slice Groups | Exact plane/edge intersection, with optional constrained-Delaunay or remeshed caps |
+| Hollow | API `hollowType`, `holesPerComponent`, `holeRadiusWorld`, `holeTaperWorld`; Autodesk help: Make Solid Accurate with a negative offset equal to wall thickness, escape holes added by boolean subtraction | SDF offset shell plus boolean escape holes |
 | Deformation | `ARAPDeformer.cpp`, `LaplacianDeformer.cpp`, part attachment help text naming COILS/RotInvCoord deformation; the SIGGRAPH 2010 sketch states composition uses dynamic mesh parameterization (Schmidt et al. 2006) and linear variational deformation (Botsch & Sorkine 2008), plus a topology-independent geometric differential deformation | As-rigid-as-possible and Laplacian solvers, dense linear algebra via ACML |
 | Curves | `DiscreteRod.cpp`, `DiscreteRodSimulator.cpp` | Discrete elastic rods for curve handles / hair |
 | Spatial index | `IMeshOctree.cpp`, `OctreeFaceDecomposition.cpp`, `VoxelGrid`, `ParticleGrid`, `MeshVertexAOJob` | Octree/grid acceleration for queries, AO and nearest-point work |
@@ -374,12 +391,12 @@ module-name evidence and with the geometry3Sharp class list.
   inside the reducer's edge queue, quadric weighting, the support optimization
   objective, and the adaptive-density transition widths. The reimplementation
   uses standard published formulations and documents each one.
-* The boolean pipeline is now partly resolved: the API header documents
-  `FastApproximate`, `Precise` and `ExtraPrecise` solution types with
-  `useIntersectionCurves`, `robustMode`, `maxRefineDepth` and `postReduce`.
-  That makes the precise path a mesh-intersection algorithm rather than pure
-  voxel CSG; the exact refinement thresholds and robustness constants are still
-  **[unknown]**.
+* The boolean pipeline is now resolved by Autodesk's own help text: it is a
+  remesh-and-stitch algorithm (remesh around the intersection, delete strips,
+  grow boundary loops while sliding on the input surfaces), with Search Depth
+  retries and Precise/Max Quality/Fast Approximate modes. It is not voxel CSG;
+  the voxel boolean path is Make Pattern. The exact density multipliers, merge
+  iteration counts and robustness thresholds are still **[unknown]**.
 * The `.mix` container is parsed and written for triangle meshes (see section
   5). What remains unparsed inside it: `PivotSO`, `DecalSO`, stamps, shaders,
   and the per-face polygon-group table in the `MeshPolygons 1.0` trailer
@@ -387,6 +404,19 @@ module-name evidence and with the geometry3Sharp class list.
 
 ## 8. References
 
+* Autodesk Meshmixer 2019 help: Make Solid
+  <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-F8C64203-AFB7-449C-A395-2C029A80BB6C.htm>,
+  Boolean <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-355503DE-889B-4168-8398-084F9BBD508B.htm>,
+  Remesh <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-6EF8ABD4-AB4A-426F-A0C4-DE96FAABF520.htm>,
+  Reduce <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-54087649-E962-409E-8565-F646BDA80B33.htm>,
+  Hollow <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-4092B330-FF8D-4523-BB43-9453F60BCF4E.htm>,
+  Plane Cut <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-C36CDABA-05F7-44B0-9529-C33D9E435220.htm>,
+  Make Pattern <https://help.autodesk.com/cloudhelp/2019/ENU/MSHMXR/files/GUID-DFDE32B6-40A7-4237-AE07-45334A464663.htm>;
+  summarized in `docs/reference/AUTODESK-HELP-NOTES.md`.
+* Autodesk Research Meshmixer project page:
+  <https://www.research.autodesk.com/projects/meshmixer/>.
+* Meshmixer manual (older, UI-level):
+  <https://forums.autodesk.com/autodesk/attachments/autodesk/3ds-max-maya-forum-tr/10043/1/MeshmixerManual.pdf>.
 * Autodesk Meshmixer API headers: <https://github.com/meshmixer/mm-api>
   (`build/StoredCommands.h`, `build/LiveMesh.h`, `build/BinarySerializer.h`;
   local copies in `docs/reference/`).

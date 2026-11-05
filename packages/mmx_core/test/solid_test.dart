@@ -27,6 +27,10 @@ void main() {
       expect(loops, isEmpty, reason: 'Make Solid must produce a closed surface');
       expect(solidVolume, greaterThan(0));
       expect((solidVolume - originalVolume).abs() / originalVolume, lessThan(0.15));
+      // Fast mode reprojects the meshed surface onto the input, so its
+      // vertices should sit on the original surface.
+      final rms = AlignTool.rmsDistance(result.mesh, mesh);
+      expect(rms, lessThan(result.cellSize));
     });
 
     test('fills holes before solidifying', () {

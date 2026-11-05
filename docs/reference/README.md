@@ -18,6 +18,9 @@ they are included unmodified.
   `VFTriangleMesh` kernel class used by `LiveMeshUtil`.
 - `API-PARAMETERS.md` - generated from `StoredCommands.h`: a readable index of
   the tool names and parameters.
+- `AUTODESK-HELP-NOTES.md` - summaries of the official 2019 help pages that
+  describe the internal algorithm steps for Make Solid, Hollow, Boolean,
+  Plane Cut, Make Pattern, Remesh and Reduce, with source URLs.
 
 What this adds over the binary analysis:
 
@@ -26,8 +29,9 @@ What this adds over the binary analysis:
   tube, pivot and the analysis tools.
 * Confirmation that the boolean tool has `FastApproximate`, `Precise` and
   `ExtraPrecise` solution types with `useIntersectionCurves`, `robustMode`,
-  `maxRefineDepth` and `postReduce` controls. That makes the precise path a
-  mesh-intersection algorithm, not only voxel CSG.
+  `maxRefineDepth` and `postReduce` controls. The help pages then explain the
+  actual method: remesh around the intersection, delete triangle strips, and
+  grow boundary loops together (Join-like), not voxel CSG.
 * The full tool inventory, including tools not yet in mmx (`addTube`,
   `createPivot`, `unwrap`, `generateComplex`, `splitComplex`, `filterComplex`,
   `makePart`, `makeSolidPart`, `makePolygon`, `warp`, `handle`).

@@ -34,8 +34,8 @@ packages/mmx_core/                 pure Dart kernel (no Flutter dependency)
   lib/src/remesh/      isotropic remeshing (split/collapse/flip/relax/project),
                        QEM decimation with boundary quadrics
   lib/src/solid/       narrow-band SDF voxelizer (ray-parity sign, flood fill),
-                       surface-nets polygonizer, make-solid, offset, hollow with
-                       escape holes, boolean CSG
+                       surface-nets polygonizer, make-solid (Fast reprojects onto
+                       the input), offset, hollow with escape holes, boolean CSG
   lib/src/analysis/    thickness, overhang, stability, deviation, mass properties
   lib/src/fab/         support forest (posts + struts + bases), orientation
                        search, 2D raster packing, layer slicing

@@ -16,6 +16,7 @@ class PlaneCut {
     required List<double> normal,
     bool keepPositive = true,
     bool fill = true,
+    HoleFillMode fillMode = HoleFillMode.flatMinimal,
     bool sliceBoth = false,
   }) {
     final nx = normal[0], ny = normal[1], nz = normal[2];
@@ -99,11 +100,15 @@ class PlaneCut {
     out.removeDegenerateFaces();
     out.compact();
     if (fill) {
-      out = HoleFiller.fill(out, mode: HoleFillMode.flatMinimal);
+      out = HoleFiller.fill(out, mode: fillMode);
     }
     if (sliceBoth) {
       final other = cut(mesh,
-          point: point, normal: normal, keepPositive: false, fill: fill);
+          point: point,
+          normal: normal,
+          keepPositive: false,
+          fill: fill,
+          fillMode: fillMode);
       out = _merge(out, other);
     }
     return out;

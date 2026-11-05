@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../geom/bbox.dart';
 import '../mesh/tri_mesh.dart';
 import '../repair/holes.dart';
+import '../spatial/bvh.dart';
 import 'surface_nets.dart';
 import 'voxel.dart';
 
@@ -78,6 +79,21 @@ class Solidifier {
     if (effectiveSmoothing > 0) grid.smooth(effectiveSmoothing);
     var solid = SurfaceNets.polygonize(grid);
     if (solid.signedVolume() < 0) solid = _flip(solid);
+    // Meshmixer's Fast mode reprojects the meshed voxel surface back onto the
+    // input mesh after polygonization (see the Make Solid help page).
+    if (mode == SolidMode.fast && work.vertexCount > 0) {
+      final bvh = TriangleBVH.build(work);
+      final pos = Float32List.fromList(solid.positions);
+      for (var v = 0; v < solid.vertexCount; v++) {
+        final hit =
+            bvh.closestPoint(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
+        if (hit == null) continue;
+        pos[v * 3] = hit.point[0];
+        pos[v * 3 + 1] = hit.point[1];
+        pos[v * 3 + 2] = hit.point[2];
+      }
+      solid.positions = pos;
+    }
     // Keep zero-area faces: surface nets can emit them where two cells
     // collapse, and dropping them would punch holes in the solid.
     solid.removeDegenerateFaces(minArea: -1);
