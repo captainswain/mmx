@@ -130,6 +130,75 @@ void main() {
         expect(pixel(mixed.rgba, 38, 58)[0], 255);
         expect(pixel(mixed.rgba, 58, 58)[2], 255);
       });
+      test('bed outline keeps below-bed geometry visible and mesh depth intact', () {
+        TriMesh belowBed(double y) => TriMesh(
+          Float32List.fromList([1.3, y, 1.3, 2.3, y, 3.3, 3.3, y, 1.3]),
+          Uint32List.fromList([0, 1, 2]),
+        );
+        final above = Camera(
+          yaw: 0,
+          pitch: .75,
+          distance: 6,
+          target: [2.3, -.5, 2.3],
+          near: .1,
+          far: 100,
+        );
+        final near = object(belowBed(-.5), [1, 0, 0]);
+        final far = object(belowBed(-1.2), [0, 0, 1]);
+        final withoutBed = gpu.render([near, far], above, options);
+        expect(pixel(withoutBed.rgba, 48, 48), [255, 0, 0, 255]);
+        expect(pixel(gpu.render([far], above, options).rgba, 48, 48), [
+          0,
+          0,
+          255,
+          255,
+        ]);
+        for (final (showBed, showGrid) in [
+          (true, false),
+          (false, true),
+          (true, true),
+        ]) {
+          final withBed = RenderOptions(
+            width: 96,
+            height: 96,
+            showBed: showBed,
+            showGrid: showGrid,
+            bedSize: 20,
+            ambient: 1,
+          );
+          final first = gpu.render([near, far], above, withBed);
+          final reversed = gpu.render([far, near], above, withBed);
+          final cpu = Rasterizer.render([far, near], above, withBed);
+          // The sightline crosses the bed interior between grid lines. Only
+          // mesh surfaces may cover this pixel; the bed is not an opaque floor.
+          expect(
+            pixel(first.rgba, 48, 48),
+            pixel(withoutBed.rgba, 48, 48),
+            reason: 'showBed=$showBed, showGrid=$showGrid',
+          );
+          expect(pixel(first.rgba, 48, 48), pixel(cpu, 48, 48));
+          expect(first.rgba, reversed.rgba);
+          if (showGrid) expect(first.rgba, isNot(withoutBed.rgba));
+        }
+        // Zoom out so the complete bed boundary is in view. The outline must
+        // still be drawn, while its empty center remains background-colored.
+        final overview = Camera(yaw: .6, pitch: .75, distance: 35);
+        final plain = gpu.render([], overview, options);
+        final outlined = gpu.render(
+          [],
+          overview,
+          const RenderOptions(
+            width: 96,
+            height: 96,
+            showBed: true,
+            showGrid: false,
+            bedSize: 20,
+            ambient: 1,
+          ),
+        );
+        expect(outlined.rgba, isNot(plain.rgba));
+        expect(pixel(outlined.rgba, 48, 48), pixel(plain.rgba, 48, 48));
+      });
       test(
         'near-plane clipping and frame resize retain a valid depth attachment',
         () {

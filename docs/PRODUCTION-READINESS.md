@@ -90,7 +90,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 The optional-feature local run passes 214 kernel and 84 Studio tests with clean
 analyzers and formatting; the separate strict native renderer suite passes all
-five tests. The implementation adds material/texture round trips, immutable
+six tests. The implementation adds material/texture round trips, immutable
 history, advanced manipulators, native depth/texture checks, parser mutations and
 continuous wall verification. Independent reviews cover data persistence,
 transaction rollback, growth bounds and reconstruction topology. Both new wall

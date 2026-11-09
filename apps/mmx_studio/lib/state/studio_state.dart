@@ -768,6 +768,7 @@ class StudioState extends ChangeNotifier {
       height: frameHeight,
       wireframe: wireframe,
       showBed: showBed,
+      showGrid: showBed,
       bedSize: 200,
       background: const <double>[0.086, 0.094, 0.11],
     );

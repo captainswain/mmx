@@ -40,6 +40,7 @@ semantic versioning once it reaches 1.0.
 - QEM candidate invalidation, remesh winding, surface-net lattice degeneracies and tiny-scale ray tolerances.
 - Positive-offset voxel seed distances that could create a phantom grid-boundary shell.
 - Material/UV export fidelity, encoded texture integrity, effective viewport sizing and native test launch isolation.
+- Print-bed visibility and GPU reference outlines, preserving geometry below the bed.
 - Concave import triangulation, PLY schemas/byte order, strict STL parsing and `.mix` metadata rewrites.
 - Recovery write ordering, failed-import metadata rollback and keyboard shortcut focus.
 - Per-session recovery ownership, operation completion races, invalid project cameras and macOS installer placement/provenance.

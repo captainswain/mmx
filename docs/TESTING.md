@@ -8,8 +8,8 @@ Tests use checked-in fixtures; no Meshmixer installation is required.
 
 Optional-feature checkpoint PR #5, observed on 2026-11-09: 214 kernel tests and
 84 Studio tests pass; both analyzers and formatting checks are clean. The ordinary
-Studio suite skips three native capability tests, which run explicitly against
-the built library in the five-test renderer suite. The analytical corpus has
+Studio suite skips four native capability tests, which run explicitly against
+the built library in the six-test renderer suite. The analytical corpus has
 22 cases and runs on each native CI platform.
 
 For focused work:
@@ -76,6 +76,9 @@ python3 -B -m unittest discover -s tool -p 'test_package_release.py'
 
 The collector uses a fresh temporary directory for raw coverage on every run;
 merging stale records after source changes can produce incorrect line counts.
+Coverage runs suites serially: a parallel VM collection stalled after test
+execution during local validation; serial collection completed all 214 tests
+and the unchanged per-module gate. Ordinary correctness tests remain concurrent.
 The current report is `packages/mmx_core/coverage/lcov.info`.
 
 CI requires more than 80% line coverage separately for native project IO,

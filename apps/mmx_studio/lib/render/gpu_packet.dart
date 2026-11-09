@@ -264,17 +264,29 @@ class GpuPacket {
     }
 
     if (options.showBed) {
+      // The bed is a reference outline, not a solid floor: geometry below y=0
+      // must remain editable and visible, as in the software rasterizer.
       for (final p in [
         [-half, 0.0, -half],
-        [-half, 0.0, half],
-        [half, 0.0, half],
-        [-half, 0.0, -half],
-        [half, 0.0, half],
         [half, 0.0, -half],
+        [half, 0.0, -half],
+        [half, 0.0, half],
+        [half, 0.0, half],
+        [-half, 0.0, half],
+        [-half, 0.0, half],
+        [-half, 0.0, -half],
       ]) {
-        vertex(p[0], p[1], p[2], [.12, .14, .16]);
+        vertex(p[0], p[1], p[2], [.55, .58, .62]);
       }
-      add(_Draw(Float32List.fromList(values), identity, identity, flags: 17));
+      add(
+        _Draw(
+          Float32List.fromList(values),
+          identity,
+          identity,
+          lines: true,
+          flags: 17,
+        ),
+      );
       values.clear();
     }
     if (options.showGrid) {
