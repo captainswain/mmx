@@ -88,7 +88,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
-The optional-feature local run passes 214 kernel and 84 Studio tests with clean
+The optional-feature local run passes 214 kernel and 86 Studio tests with clean
 analyzers and formatting; the separate strict native renderer suite passes all
 six tests. The implementation adds material/texture round trips, immutable
 history, advanced manipulators, native depth/texture checks, parser mutations and
@@ -98,8 +98,8 @@ modules have 100% line coverage; all 19 required coverage modules pass. The nati
 matrix builds and tests Vulkan, Direct3D 12 and Metal, records actual adapter
 capability, and packages unsigned installers. Use the exact commit and artifact
 checksums in [PR #5](https://github.com/palindsay/mmx/pull/5) for current evidence.
-Hosted profile measurements retain raw samples and software-adapter status;
-they do not establish release-host performance budgets.
+[Native profile measurements](performance/NATIVE-RENDERER.md) retain raw samples
+and software-adapter status; they do not establish release-host performance budgets.
 
 ### Historical core checkpoint
 

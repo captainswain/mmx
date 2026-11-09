@@ -14,6 +14,8 @@ import 'package:mmx_studio/ui/gizmo.dart';
 import 'package:mmx_studio/ui/screen.dart';
 import 'package:mmx_studio/ui/viewport.dart';
 
+import '../test/support/properties_panel.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -50,6 +52,7 @@ void main() {
         MaterialApp(home: StudioScreen(state: state, enableRecovery: false)),
       );
       await tester.pumpAndSettle();
+      await openPropertiesPanel(tester);
       final amount = find.byKey(const ValueKey('manipulator-amount'));
       await tester.ensureVisible(amount);
       await tester.enterText(amount, '1.3');
@@ -57,11 +60,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pumpAndSettle();
+      await settleStudioInteraction(tester, state);
       expect(state.doc.undoDepth, 1);
       expect(state.selected!.transform[12], closeTo(4, 1e-8));
       expect(state.selected!.transform[13], closeTo(4.5, 1e-8));
       final pivot = objectPivotWorld(state.selected!);
+      await closePropertiesPanel(tester);
       state.setManipulatorMode(ManipulatorMode.scale);
       state.setManipulatorSnap(
         const ManipulatorSnap(enabled: true, scale: .25),
@@ -81,7 +85,7 @@ void main() {
       );
       await drag.moveTo(offset + handle + (handle - projection.origin) * .3);
       await drag.up();
-      await tester.pumpAndSettle();
+      await settleStudioInteraction(tester, state);
       expect(state.doc.undoDepth, 2);
       for (var i = 0; i < 3; i++) {
         expect(objectPivotWorld(state.selected!)[i], closeTo(pivot[i], 1e-8));
@@ -103,7 +107,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       await cancel.up();
-      await tester.pumpAndSettle();
+      await settleStudioInteraction(tester, state);
       expect(state.selected!.transform, savedTransform);
       expect(state.interactionLocked, false);
       expect(state.dirty, false);

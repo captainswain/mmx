@@ -7,7 +7,7 @@ Dart formatting, runs both analyzers, then executes the kernel and Studio suites
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
 Optional-feature checkpoint PR #5, observed on 2026-11-09: 214 kernel tests and
-84 Studio tests pass; both analyzers and formatting checks are clean. The ordinary
+86 Studio tests pass; both analyzers and formatting checks are clean. The ordinary
 Studio suite skips four native capability tests, which run explicitly against
 the built library in the six-test renderer suite. The analytical corpus has
 22 cases and runs on each native CI platform.
@@ -28,6 +28,11 @@ done
 
 Use `-d windows` or `-d macos` on those hosts, without Xvfb, still launching a
 separate `flutter test` process for each file.
+
+Native property workflows open **Tool properties** when the window is narrower
+than 900 logical pixels and dismiss the drawer before viewport gestures. Both
+800×600 (the macOS default) and 1280×720 layouts have widget regressions and
+passed native Linux checks; tests must not assume a permanently visible sidebar.
 
 **Observed SDK limitation (Flutter 3.47.9):** a multi-file desktop invocation such
 as `flutter test integration_test -d linux` passes the first app, then fails to

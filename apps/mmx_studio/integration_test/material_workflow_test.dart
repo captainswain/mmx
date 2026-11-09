@@ -10,6 +10,7 @@ import 'package:mmx_studio/state/workers.dart';
 import 'package:mmx_studio/ui/screen.dart';
 
 import '../test/fixtures/texture_fixture.dart';
+import '../test/support/properties_panel.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ void main() {
         MaterialApp(home: StudioScreen(state: state, enableRecovery: false)),
       );
       await tester.pumpAndSettle();
+      await openPropertiesPanel(tester);
       await tester.ensureVisible(find.text('Material and texture'));
       await tester.tap(find.text('Material and texture'));
       await tester.pumpAndSettle();
@@ -41,9 +43,10 @@ void main() {
       final apply = find.byKey(const ValueKey('apply-material'));
       await tester.ensureVisible(apply);
       await tester.tap(apply);
-      await tester.pumpAndSettle();
+      await settleStudioInteraction(tester, state);
       expect(state.doc.undoDepth, 1, reason: state.status);
       expect(state.activeMesh!.materials.single.baseColor, [.25, 1, 1, 1]);
+      await closePropertiesPanel(tester);
       final image = File('${directory.path}/色.png');
       await image.writeAsBytes(textureFixturePng());
       // Native filesystem/worker decoding; dialog routing has widget coverage.
