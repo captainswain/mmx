@@ -37,11 +37,18 @@ dependencies:
 ```
 
 ```dart
+import 'dart:io';
 import 'package:mmx_core/mmx_core.dart';
 
-final mesh = MeshIO.readFile('model.obj');
-final reduced = Decimator.reduce(mesh, percentage: 0.4);
-MeshIO.writeFile('out.stl', reduced);
+Future<void> main() async {
+  final file = File('model.obj');
+  if (await file.length() > MeshIO.maxFileBytes) {
+    throw const FormatException('Mesh exceeds the import size limit');
+  }
+  final mesh = MeshIO.readBytes(file.path, await file.readAsBytes());
+  final reduced = Decimator.reduce(mesh, percentage: 0.4);
+  await writeFileAtomically('out.stl', MeshIO.writeBytes('out.stl', reduced));
+}
 ```
 
 Heavy operators are deterministic and allocation-bounded; run them in an

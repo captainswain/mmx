@@ -17,8 +17,10 @@ Recheck saved reports: dart run tool/performance.dart \\
   --baseline=baseline.json --compare=candidate.json
 
 Exit codes: 0 pass/capture, 1 median regression >20%, 2 invalid/incompatible.
-Reports contain raw operator latencies and per-case process peak RSS. RSS
-includes input loading, one warmup, three measured runs and result checks.
+Reports contain raw operator latencies and process-lifetime peak RSS. RSS
+includes launch, input loading, warmup, measured runs and result checks.
+On Linux it can include inherited launcher/preparation residency across exec;
+this is an upper bound, not an isolated operator allocation measurement.
 Use a quiet, fixed host; these timings do not measure Studio responsiveness.
 ''';
 
@@ -82,6 +84,7 @@ Future<void> main(List<String> args) async {
       'warmups': 1,
       'samples': 3,
       'isolation': 'process-per-case',
+      'validation': 'closed-oriented-edge-manifold',
       'reducePercentage': 0.5,
       'remeshDiagonalDivisor': 60,
       'remeshIterations': 2,
@@ -106,6 +109,7 @@ Future<void> main(List<String> args) async {
           'sha256': sha256.convert(bytes).toString(),
           'vertices': entry.value.vertexCount,
           'faces': entry.value.faceCount,
+          'topology': _validateMesh(entry.value, 'input ${entry.key}'),
         };
       }
       final report = <String, dynamic>{
@@ -174,17 +178,8 @@ Map<String, Object?> _runCase(String name, File input) {
         'solid' => Solidifier.makeSolid(mesh, resolution: 96).mesh,
         _ => throw ArgumentError.value(name),
       };
-  void validate(TriMesh result) {
-    if (result.faceCount == 0 ||
-        result.validate().isNotEmpty ||
-        !result.signedVolume().isFinite ||
-        result.signedVolume() <= 0) {
-      throw StateError('Invalid $name result');
-    }
-  }
-
   final inputRss = ProcessInfo.currentRss;
-  validate(run());
+  var topology = _validateMesh(run(), name);
   final samples = <int>[];
   final rss = <int>[];
   final outputFaces = <int>[];
@@ -195,7 +190,7 @@ Map<String, Object?> _runCase(String name, File input) {
     samples.add(watch.elapsedMicroseconds);
     rss.add(ProcessInfo.currentRss);
     outputFaces.add(result.faceCount);
-    validate(result);
+    topology = _validateMesh(result, name);
   }
   if (sha256.convert(_encodeMesh(mesh)) != sha256.convert(bytes)) {
     throw StateError('Operator mutated benchmark input: $name');
@@ -206,11 +201,28 @@ Map<String, Object?> _runCase(String name, File input) {
     'medianMicroseconds': sorted[1],
     'minMicroseconds': sorted.first,
     'maxMicroseconds': sorted.last,
+    // Process-lifetime upper bound, including fork/exec launcher residency on
+    // Linux. It must not be interpreted as isolated operator or Dart heap peak.
     'processPeakRssBytes': ProcessInfo.maxRss,
     'rssAfterInputBytes': inputRss,
     'rssAfterOperationBytes': rss,
     'outputFaces': outputFaces,
+    'topology': topology,
   };
+}
+
+Map<String, int> _validateMesh(TriMesh mesh, String context) {
+  if (mesh.faceCount == 0 ||
+      mesh.validate().isNotEmpty ||
+      !mesh.signedVolume().isFinite ||
+      mesh.signedVolume() <= 0) {
+    throw StateError('Invalid $context mesh');
+  }
+  final topology = benchmarkTopology(mesh);
+  if (topology.values.any((count) => count != 0)) {
+    throw StateError('Invalid closed $context mesh: $topology');
+  }
+  return topology;
 }
 
 // Private temporary interchange, deliberately independent of public IO formats.

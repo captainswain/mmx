@@ -5,8 +5,9 @@ set -euo pipefail
 : "${MMX_INSTALLER_IDENTITY:?Set the Developer ID Installer signing identity}"
 : "${MMX_NOTARY_PROFILE:?Set a notarytool keychain profile}"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-stage="$(mktemp -d)"
-trap 'rm -rf "$stage"' EXIT
+scratch="$(mktemp -d)"
+stage="$scratch/root"
+trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$stage/Applications" "$stage/usr/local/bin" "$root/bin/releases"
 app_source="$root/apps/mmx_studio/build/macos/Build/Products/Release/mmx_studio.app"
 ditto "$app_source" "$stage/Applications/mmx Studio.app"
@@ -43,10 +44,11 @@ provenance = {
     'files': module.tree_manifest(stage),
 }
 (stage / 'usr/local/share/mmx/provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
+module.macos_components(stage, stage.parent / 'components.plist')
 PYPROVENANCE
 version="$(sed -n 's/^version: \([0-9.]*\).*/\1/p' "$root/apps/mmx_studio/pubspec.yaml")"
 pkg="$root/bin/releases/mmx-$version-macos-signed.pkg"
-pkgbuild --root "$stage" --identifier com.mmx.studio --version "$version" --install-location / --sign "$MMX_INSTALLER_IDENTITY" "$pkg"
+pkgbuild --root "$stage" --component-plist "$scratch/components.plist" --identifier com.mmx.studio --version "$version" --install-location / --sign "$MMX_INSTALLER_IDENTITY" "$pkg"
 xcrun notarytool submit "$pkg" --keychain-profile "$MMX_NOTARY_PROFILE" --wait
 xcrun stapler staple "$pkg"
 pkgutil --check-signature "$pkg"

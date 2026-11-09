@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:mmx_core/mmx_core.dart';
+
 const performanceSchema = 2;
 const performanceCases = [
   '12k/reduce',
@@ -11,7 +13,8 @@ const performanceCases = [
 ];
 
 /// The timing gate applies only to compatible, complete measurements. Memory
-/// is reported without a budget until a representative limit is established.
+/// is a process-lifetime RSS upper bound (including launch/preparation), reported
+/// without a budget until a representative limit is established.
 Map<String, Object?> comparePerformance(
     Map<String, dynamic> baseline, Map<String, dynamic> candidate) {
   validatePerformanceReport(baseline);
@@ -30,7 +33,10 @@ Map<String, Object?> comparePerformance(
     final after = current[name]['medianMicroseconds'] as int;
     changes[name] = (after / before - 1) * 100;
     // Integer arithmetic keeps the exact 20% boundary inclusive.
-    if (after * 100 > before * 120) regressions.add(name);
+    if (BigInt.from(after) * BigInt.from(100) >
+        BigInt.from(before) * BigInt.from(120)) {
+      regressions.add(name);
+    }
   }
   return {
     'maxRegressionPercent': 20,
@@ -66,7 +72,8 @@ void validatePerformanceReport(Map<String, dynamic> report) {
   if (config['workloadVersion'] != 2 ||
       config['warmups'] != 1 ||
       config['samples'] != 3 ||
-      config['isolation'] != 'process-per-case') {
+      config['isolation'] != 'process-per-case' ||
+      config['validation'] != 'closed-oriented-edge-manifold') {
     throw const FormatException('Unsupported benchmark configuration');
   }
   final inputs = _map(report, 'inputs');
@@ -84,6 +91,7 @@ void validatePerformanceReport(Map<String, dynamic> report) {
         !RegExp(r'^[0-9a-f]{64}$').hasMatch(input['sha256'] as String)) {
       throw FormatException('Invalid input $size sha256');
     }
+    _validateTopology(_map(input, 'topology'), 'input $size');
   }
   final cases = _map(report, 'cases');
   if (!_sameKeys(cases, performanceCases)) {
@@ -98,14 +106,58 @@ void validatePerformanceReport(Map<String, dynamic> report) {
       throw FormatException('Expected three positive latency samples: $name');
     }
     final sorted = samples.cast<int>().toList()..sort();
-    if (result['medianMicroseconds'] != sorted[1]) {
+    if (result['medianMicroseconds'] is! int ||
+        result['medianMicroseconds'] != sorted[1]) {
       throw FormatException('Median does not match raw samples: $name');
     }
     if (result['processPeakRssBytes'] is! int ||
         result['processPeakRssBytes'] <= 0) {
       throw FormatException('Missing process peak RSS: $name');
     }
+    _validateTopology(_map(result, 'topology'), name);
   }
+}
+
+void _validateTopology(Map<String, dynamic> topology, String name) {
+  for (final metric in [
+    'boundaryEdges',
+    'nonManifoldEdges',
+    'inconsistentWindingEdges',
+  ]) {
+    if (topology[metric] is! int || topology[metric] != 0) {
+      throw FormatException('Invalid closed benchmark mesh $name: $metric');
+    }
+  }
+}
+
+/// Edge incidence and orientation checks independent of the production
+/// remesher's acceptance logic. This does not detect self-intersections.
+Map<String, int> benchmarkTopology(TriMesh mesh) {
+  final edges = <int, int>{};
+  final count = mesh.vertexCount;
+  for (var f = 0; f < mesh.indices.length; f += 3) {
+    for (var k = 0; k < 3; k++) {
+      final a = mesh.indices[f + k];
+      final b = mesh.indices[f + (k + 1) % 3];
+      final key = a < b ? a * count + b : b * count + a;
+      final direction = a < b ? 1 : 2;
+      // High bits store incidence count; low two bits store directions seen.
+      final previous = edges[key] ?? 0;
+      edges[key] = (((previous >> 2) + 1) << 2) | (previous & 3) | direction;
+    }
+  }
+  var boundary = 0, nonManifold = 0, inconsistentWinding = 0;
+  for (final edge in edges.values) {
+    final incidence = edge >> 2;
+    if (incidence == 1) boundary++;
+    if (incidence > 2) nonManifold++;
+    if (incidence == 2 && edge & 3 != 3) inconsistentWinding++;
+  }
+  return {
+    'boundaryEdges': boundary,
+    'nonManifoldEdges': nonManifold,
+    'inconsistentWindingEdges': inconsistentWinding,
+  };
 }
 
 Map<String, dynamic> decodePerformanceReport(String contents) {

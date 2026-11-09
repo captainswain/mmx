@@ -6,6 +6,9 @@ Run `./tool/verify.sh` from the repository root. It resolves dependencies, check
 Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
+Observed on 2026-11-09: 166 kernel tests and 33 Studio tests pass; both analyzers
+and formatting checks are clean. The analytical corpus passes all 22 cases.
+
 For focused work:
 
 ```sh
@@ -42,19 +45,23 @@ manual acceptance. See [release procedures](RELEASE.md).
 ## Coverage gate
 
 ```sh
-cd packages/mmx_core
-dart test --coverage=coverage
-dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info \
-  --packages=.dart_tool/package_config.json --report-on=lib
-cd ../..
-dart run tool/check_coverage.dart
+./tool/coverage.sh
 python3 -B -m unittest discover -s tool -p 'test_package_release.py'
 ```
 
+The collector uses a fresh temporary directory for raw coverage on every run;
+merging stale records after source changes can produce incorrect line counts.
+The current report is `packages/mmx_core/coverage/lcov.info`.
+
 CI requires more than 80% line coverage separately for native project IO,
-atomic writes, ZIP, 3MF, polygon triangulation, OBJ, PLY and STL. Missing records
+atomic writes, ZIP, 3MF, polygon triangulation, OBJ, PLY, STL, mesh attribute
+transfer and generated-mesh allocation guards. Missing records
 fail the gate. This is a targeted line-coverage requirement; it does not establish
 exhaustive parser fuzzing, branch coverage or whole-project coverage.
+
+The fresh local run measured 100% for OBJ, PLY, STL, 3MF, atomic writes and mesh
+allocation guards; 99.4% for project IO, 99.3% for ZIP, 98.8% for triangulation
+and 96.4% for attribute transfer.
 
 ## Geometry references and performance
 

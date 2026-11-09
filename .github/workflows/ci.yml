@@ -47,12 +47,7 @@ jobs:
         run: python -B -m unittest discover -s tool -p 'test_package_release.py'
       - name: Kernel coverage gate
         if: runner.os == 'Linux'
-        run: |
-          cd packages/mmx_core
-          dart test --coverage=coverage
-          dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --packages=.dart_tool/package_config.json --report-on=lib
-          cd ../..
-          dart run tool/check_coverage.dart
+        run: ./tool/coverage.sh
       - name: Upload coverage
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -99,6 +94,10 @@ jobs:
           git rev-parse HEAD >> toolchain.txt
           (cd apps/mmx_studio && flutter pub deps --json) > dependencies.json
           python tool/collect_licenses.py
+      - name: Locate Windows redistributable runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tool/release/find_windows_runtime.ps1
       - name: Package unsigned artifacts with checksums
         run: python tool/package_release.py '${{ matrix.platform }}' --native
       - name: Install and remove Linux package

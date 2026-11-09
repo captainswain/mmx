@@ -38,6 +38,19 @@ Windows packaging requires the Inno Setup compiler in `ISCC_PATH`. macOS uses
 Outputs and SHA-256 files live in `bin/releases/`. Inspect the workflow artifacts
 for native `.deb`, `.pkg`, or Windows installer `.exe` files.
 
+macOS packages include only the application bundle and explicitly disable bundle
+relocation, so an existing build-tree copy cannot redirect installation away
+from `/Applications/mmx Studio.app`.
+
+On Windows, run `tool/release/find_windows_runtime.ps1` in the packaging
+PowerShell session first. It sets `MMX_WINDOWS_CRT_DIR` to the Visual Studio
+x64 release redistributables. Packaging places those DLLs beside both executables
+so clean machines do not need a separately installed Visual C++ runtime. They
+remain subject to [Microsoft's redistribution terms](https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution);
+their hashes and attribution are included in the artifact. Rebuild artifacts
+when runtime security updates are released because app-local DLLs are serviced
+with the app. Never redistribute DebugCRT binaries.
+
 `provenance.json` records the source commit, working-tree source digest,
 architecture, package version, dirty status and binary file hashes. Portable
 archive metadata uses the source commit timestamp (override with

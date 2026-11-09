@@ -9,6 +9,6 @@ dart analyze
 dart test
 cd "$root/apps/mmx_studio"
 flutter pub get
-dart format --output=none --set-exit-if-changed lib test integration_test
+dart format --output=none --set-exit-if-changed lib test integration_test test_driver
 flutter analyze
 flutter test

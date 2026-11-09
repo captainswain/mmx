@@ -1,8 +1,8 @@
 # Production readiness
 
 Target: reliable Linux, Windows and macOS core mesh workflows and CLI.
-**Status: implementation complete for local hardening; release acceptance remains
-open until the evidence below is recorded.** This supersedes the historical
+**Status: hardening and local automated validation complete; production
+distribution still requires the external acceptance below.** This supersedes the historical
 finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Implemented plan
@@ -69,21 +69,29 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
-Local Studio analysis, all 33 widget/state/worker tests and native Linux
-integration pass. Kernel final verification, critical coverage, fresh Linux
-release packaging and the remote OS matrix are being recorded for this branch.
-See [TESTING.md](TESTING.md) for reproducible commands. Automated native tests
-inject paths and therefore do not establish file-dialog accessibility.
+`./tool/verify.sh` passes with 166 kernel tests, 33 Studio tests, both analyzers
+clean and no formatting changes. Native Linux integration passes. The 22-case
+analytical corpus and fixed-host performance comparison pass. The optional
+native [profile UI probe](performance/UI-RESPONSIVENESS.md) verifies progress and
+cancellation on a 100k-face scene, while retaining observed frame stalls and
+memory limits. A fresh Linux CLI and release build pass startup smoke testing;
+critical coverage passes at 96.4–100% per required module. Packaging regression
+tests and license collection pass.
 
-## Remaining release acceptance
+The authoritative three-platform build/integration/install/remove results are
+attached to the reviewed commit in [PR #4 checks](https://github.com/palindsay/mmx/pull/4/checks).
+See [TESTING.md](TESTING.md) for reproduction. Native integration injects paths,
+so it does not establish file-dialog accessibility or clean-account permissions.
+
+## Release acceptance criteria
 
 | Gate | Required evidence | Dependency |
 |---|---|---|
-| OS matrix | Successful build, integration and install/remove jobs for the reviewed commit | GitHub-hosted native runners |
+| Automated OS matrix | Successful build, integration and install/remove jobs for the reviewed commit, linked above | GitHub-hosted native runners |
 | Signing | Verified Windows signature and macOS signed/notarized/stapled installer | Publisher identities, signing host and credentials |
 | Native manual acceptance | Clean-account dialogs, permissions, overwrite/exit prompts, forced-exit recovery, keyboard/accessibility and units | Human operator on each supported OS |
 | Reference fidelity | Real Meshmixer outputs, recorded settings/provenance and passing agreed tolerances | Licensed usable installation and independently acquired corpus |
-| Sustained performance | Repeat fixed-host baseline comparisons; large-scene interaction/frame and memory acceptance | Designated release host and interactive workload |
+| Sustained performance | Repeat the measured fixed-host baseline and native profile probe; accept interactive frame/memory budgets on each supported platform | Designated release hosts and interactive workloads |
 
 Do not label unsigned review artifacts production-ready or claim oracle fidelity
 from analytical tests. No release is published by this work.

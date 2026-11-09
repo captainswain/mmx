@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 
+import '../tool/corpus/analytic_meshes.dart';
 import '../tool/performance_support.dart';
 
 Map<String, dynamic> report() => {
@@ -22,6 +25,7 @@ Map<String, dynamic> report() => {
         'warmups': 1,
         'samples': 3,
         'isolation': 'process-per-case',
+        'validation': 'closed-oriented-edge-manifold',
       },
       'inputs': {
         for (final size in ['12k', '100k'])
@@ -29,6 +33,11 @@ Map<String, dynamic> report() => {
             'vertices': 6000,
             'faces': 12000,
             'sha256': List.filled(64, 'a').join(),
+            'topology': {
+              'boundaryEdges': 0,
+              'nonManifoldEdges': 0,
+              'inconsistentWindingEdges': 0,
+            },
           },
       },
       'cases': {
@@ -37,6 +46,11 @@ Map<String, dynamic> report() => {
             'samplesMicroseconds': [99, 100, 101],
             'medianMicroseconds': 100,
             'processPeakRssBytes': 1000000,
+            'topology': {
+              'boundaryEdges': 0,
+              'nonManifoldEdges': 0,
+              'inconsistentWindingEdges': 0,
+            },
           },
       },
     };
@@ -57,7 +71,7 @@ void main() {
     expect(comparePerformance(report(), candidate)['passed'], isTrue);
   });
 
-  test('a slower median fails even when other cases improve', () {
+  test('a single slower median fails', () {
     final candidate = report();
     setMedian(candidate, 121);
     final comparison = comparePerformance(report(), candidate);
@@ -65,6 +79,52 @@ void main() {
     expect(comparison['regressions'], ['12k/reduce']);
     expect((comparison['medianChangePercent'] as Map)['12k/reduce'],
         closeTo(21, 1e-9));
+  });
+
+  test('large integer samples cannot overflow the threshold comparison', () {
+    final baseline = report();
+    final candidate = report();
+    setMedian(baseline, 100000000000000000);
+    setMedian(candidate, 121000000000000000);
+    expect(comparePerformance(baseline, candidate)['passed'], isFalse);
+  });
+
+  test('independent topology checks detect holes, duplicates and winding', () {
+    final cube = analyticCube();
+    expect(benchmarkTopology(cube).values, everyElement(0));
+    final open =
+        TriMesh(cube.positions, Uint32List.fromList(cube.indices.sublist(3)));
+    expect(benchmarkTopology(open)['boundaryEdges'], 3);
+    final duplicate = TriMesh(
+        cube.positions,
+        Uint32List.fromList([
+          ...cube.indices,
+          ...cube.indices.take(3),
+        ]));
+    expect(benchmarkTopology(duplicate)['nonManifoldEdges'], 3);
+    final reversed = cube.clone();
+    final a = reversed.indices[0];
+    reversed.indices[0] = reversed.indices[1];
+    reversed.indices[1] = a;
+    expect(benchmarkTopology(reversed)['inconsistentWindingEdges'], 3);
+  });
+
+  test('invalid topology cannot pass a performance gate', () {
+    for (final metric in [
+      'boundaryEdges',
+      'nonManifoldEdges',
+      'inconsistentWindingEdges',
+    ]) {
+      final candidate = report();
+      candidate['cases']['100k/reduce']['topology'][metric] = 3;
+      expect(
+          () => comparePerformance(report(), candidate), throwsFormatException,
+          reason: metric);
+      final input = report();
+      input['inputs']['100k']['topology'][metric] = 3;
+      expect(() => comparePerformance(report(), input), throwsFormatException,
+          reason: 'input $metric');
+    }
   });
 
   test('host identity, hardware and runtime must match', () {

@@ -122,6 +122,7 @@ class Decimator {
     }
 
     var guard = 0;
+    final destination = Float32List(3);
     while (liveFaces > target && heap.isNotEmpty) {
       final e = heap.pop();
       final a = e.a, b = e.b;
@@ -131,14 +132,21 @@ class Decimator {
       if (e.revisionA != revisions[a] || e.revisionB != revisions[b]) continue;
       if (!_isEdge(vFaces[a], vFaces[b], faces)) continue;
       if (maxDeviation != null && e.cost > maxDeviation * maxDeviation) break;
-      if (!_legalCollapse(
-          vFaces, faces, vAlive, a, b, positions, e.x, e.y, e.z)) {
+      // Geometry is stored as float32. Check the actual representable point:
+      // validating a float64 optimum can accept distinct vertices that become
+      // coincident only when the final output buffer is constructed.
+      destination[0] = e.x;
+      destination[1] = e.y;
+      destination[2] = e.z;
+      final x = destination[0], y = destination[1], z = destination[2];
+      if (!x.isFinite || !y.isFinite || !z.isFinite) continue;
+      if (!_legalCollapse(vFaces, faces, vAlive, a, b, positions, x, y, z)) {
         continue;
       }
       // Move b to the optimal position, kill a.
-      positions[b * 3] = e.x;
-      positions[b * 3 + 1] = e.y;
-      positions[b * 3 + 2] = e.z;
+      positions[b * 3] = x;
+      positions[b * 3 + 1] = y;
+      positions[b * 3 + 2] = z;
       revisions[b]++;
       guard++;
       for (var k = 0; k < 10; k++) {
@@ -190,7 +198,8 @@ class Decimator {
     }
     final out = builder.build()
       ..faceGroups = groups == null ? null : Uint16List.fromList(groups);
-    out.removeDegenerateFaces();
+    // Every accepted destination was validated at output precision. Deleting
+    // surviving faces here would silently open a previously closed surface.
     out.compact();
     out.vertexColors = transferVertexColors(input, out);
     return out;
@@ -229,7 +238,25 @@ class Decimator {
     na.remove(a);
     nb.remove(b);
     final common = na.intersection(nb);
-    if (common.length > 2) return false;
+    final opposite = <int>{};
+    var sharedFaces = 0;
+    for (final face in vFaces[a]) {
+      if (!vFaces[b].contains(face)) continue;
+      sharedFaces++;
+      for (final vertex in faces[face]) {
+        if (vertex != a && vertex != b) opposite.add(vertex);
+      }
+    }
+    // The edge link must equal the intersection of its endpoint links, not
+    // merely contain at most two vertices. Otherwise collapsing the edge can
+    // identify unrelated surface fans or duplicate an existing triangle.
+    if (sharedFaces < 1 ||
+        sharedFaces > 2 ||
+        opposite.length != sharedFaces ||
+        common.length != opposite.length ||
+        !common.containsAll(opposite)) {
+      return false;
+    }
     if (na.length + nb.length - 2 * common.length < 3) return false;
     for (final f in vFaces[a]) {
       final tri = faces[f];
@@ -269,7 +296,20 @@ class Decimator {
     final nx = uy * wz - uz * wy,
         ny = uz * wx - ux * wz,
         nz = ux * wy - uy * wx;
-    return nx * nx + ny * ny + nz * nz > 1e-18;
+    if (nx * nx + ny * ny + nz * nz <= 1e-18) return false;
+    final ax = positions[tri[0] * 3],
+        ay = positions[tri[0] * 3 + 1],
+        az = positions[tri[0] * 3 + 2];
+    final ux0 = positions[tri[1] * 3] - ax,
+        uy0 = positions[tri[1] * 3 + 1] - ay,
+        uz0 = positions[tri[1] * 3 + 2] - az;
+    final wx0 = positions[tri[2] * 3] - ax,
+        wy0 = positions[tri[2] * 3 + 1] - ay,
+        wz0 = positions[tri[2] * 3 + 2] - az;
+    final beforeX = uy0 * wz0 - uz0 * wy0;
+    final beforeY = uz0 * wx0 - ux0 * wz0;
+    final beforeZ = ux0 * wy0 - uy0 * wx0;
+    return nx * beforeX + ny * beforeY + nz * beforeZ > 0;
   }
 
   static List<double> _faceNormal(List<double> positions, List<int> tri) {

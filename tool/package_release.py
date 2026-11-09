@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import platform as host_platform
+import plistlib
 import re
 import shutil
 import subprocess
@@ -79,6 +80,19 @@ def portable(stage, destination, system, epoch):
     return destination
 
 
+def macos_components(root, destination):
+    """Install app bundles at their declared paths, never an existing build copy."""
+    subprocess.run(['pkgbuild', '--analyze', '--root', str(root), str(destination)], check=True)
+    components = plistlib.loads(destination.read_bytes())
+    def fixed_location(component):
+        component['BundleIsRelocatable'] = False
+        for child in component.get('ChildBundles', []):
+            fixed_location(child)
+    for component in components:
+        fixed_location(component)
+    destination.write_bytes(plistlib.dumps(components))
+
+
 def native_installer(stage, output, system, version, epoch):
     if system == 'linux':
         with tempfile.TemporaryDirectory(prefix='mmx-deb-') as scratch:
@@ -102,7 +116,8 @@ def native_installer(stage, output, system, version, epoch):
                            env={**os.environ, 'SOURCE_DATE_EPOCH': str(epoch)}, check=True)
     elif system == 'macos':
         with tempfile.TemporaryDirectory(prefix='mmx-pkg-') as scratch:
-            root = Path(scratch)
+            root = Path(scratch) / 'root'
+            root.mkdir()
             apps = list((stage / 'studio').glob('*.app'))
             if len(apps) != 1:
                 raise RuntimeError('Expected exactly one macOS application bundle')
@@ -115,8 +130,11 @@ def native_installer(stage, output, system, version, epoch):
                 if (stage / item).exists():
                     shutil.copy2(stage / item, root / 'usr/local/share/mmx' / item)
             destination = output / f'mmx-{version}-macos-unsigned.pkg'
+            components = Path(scratch) / 'components.plist'
+            macos_components(root, components)
             subprocess.run(['pkgbuild', '--root', str(root), '--identifier', 'com.mmx.studio',
-                            '--version', version, '--install-location', '/', str(destination)], check=True)
+                            '--component-plist', str(components), '--version', version,
+                            '--install-location', '/', str(destination)], check=True)
     else:
         compiler = os.environ.get('ISCC_PATH') or shutil.which('ISCC')
         if not compiler:
@@ -150,8 +168,30 @@ def main():
     with tempfile.TemporaryDirectory(prefix='mmx-package-') as scratch:
         stage = Path(scratch) / name
         stage.mkdir()
-        shutil.copytree(bundle, stage / 'studio', symlinks=True)
+        if args.platform == 'macos':
+            apps = list(bundle.glob('*.app'))
+            if len(apps) != 1:
+                raise RuntimeError('Expected exactly one macOS application bundle')
+            # Xcode's Products/Release also contains standalone frameworks,
+            # debug symbols and intermediates already embedded inside the app.
+            (stage / 'studio').mkdir()
+            shutil.copytree(apps[0], stage / 'studio' / apps[0].name, symlinks=True)
+        else:
+            shutil.copytree(bundle, stage / 'studio', symlinks=True)
         shutil.copy2(cli, stage / ('mmx.exe' if args.platform == 'windows' else 'mmx'))
+        if args.platform == 'windows':
+            runtime = Path(os.environ.get('MMX_WINDOWS_CRT_DIR', ''))
+            if not all((runtime / name).is_file() for name in ('msvcp140.dll', 'vcruntime140.dll')):
+                raise RuntimeError('Run tool/release/find_windows_runtime.ps1 and set MMX_WINDOWS_CRT_DIR')
+            # Both the CLI and Studio must work without a system-wide VC runtime.
+            for library in sorted(runtime.glob('*.dll')):
+                shutil.copy2(library, stage / library.name)
+                shutil.copy2(library, stage / 'studio' / library.name)
+            (stage / 'MICROSOFT_RUNTIME_NOTICE.txt').write_text(
+                'Microsoft Visual C++ release runtime, deployed app-local from the build host Visual Studio redistributable directory.\n'
+                'Copyright Microsoft Corporation. Redistribution is subject to Microsoft Software License Terms.\n'
+                'https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution\n'
+                'https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files\n', encoding='utf-8')
         for item in ('LICENSE', 'NOTICE'):
             shutil.copy2(ROOT / item, stage / item)
         for item in ('toolchain.txt', 'dependencies.json', 'THIRD_PARTY_LICENSES.txt'):

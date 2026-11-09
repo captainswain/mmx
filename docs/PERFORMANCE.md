@@ -58,19 +58,77 @@ dart test test/performance_test.dart
 Per-case `processPeakRssBytes` uses Dart's process resident-memory high-water
 mark. It includes loading the prepared mesh, warmup, all three operations,
 validation, and fingerprint checks. This is neither incremental operator
-allocation nor peak Dart heap usage. Fresh processes prevent another workload's
-peak from contaminating the value. RSS meanings differ across operating systems;
-compare only the same host and OS. Post-operation RSS samples and startup RSS
-are also retained. No memory threshold is asserted without a reviewed capacity
-budget.
+allocation nor peak Dart heap usage. On Linux, the process-lifetime high-water
+mark can also include launcher residency inherited across fork/exec, including
+prepared inputs held by the parent. It is therefore an upper bound for the
+worker process lifecycle, not an isolated operator-memory peak. Separate workers
+isolate operation runs but do not eliminate that launch contribution. RSS
+meanings differ across operating systems; compare only the same host and OS.
+Post-operation RSS samples and startup RSS are also retained. No memory
+threshold is asserted without a reviewed capacity budget.
 
-The benchmark validates basic mesh structure and positive finite output volume.
-Topology and geometric accuracy are covered separately by
+The benchmark rejects prepared inputs and every output with invalid mesh
+structure, nonpositive/nonfinite volume, boundary edges, edges with more than
+two incident faces, or inconsistent winding. Raw reports include those topology
+counts. The edge checks do not detect self-intersections or all nonmanifold
+vertex configurations. Broader topology and geometric accuracy are covered by
 `test/geometry_acceptance_test.dart` and `tool/validate_corpus.dart`; faster
 results do not establish correctness. These measurements are kernel latency,
 not UI frame time, interaction latency, cancellation latency, or responsiveness.
-Studio still needs representative hardware measurements of those properties.
+The separate [native UI probe](../apps/mmx_studio/integration_test/desktop_performance.md)
+measures Studio operation time, UI-isolate progress, frame callbacks, and
+cancellation on a procedural 100k-face scene. Its separate
+[debug/profile results](performance/UI-RESPONSIVENESS.md) record the headless
+measurements. Representative interactive hardware and repeated samples are
+still required for UI performance budgets.
 
 ## Observed local evidence
 
-Measurements and historical comparison are recorded below after capture.
+The original [schema-1 report](performance/2026-11-09-legacy.json) is preserved.
+It lacks input hashes, raw samples, topology checks, and complete host metadata,
+so the new gate rejects it with exit status 2. Historical timing ratios are
+informational only: process isolation and verification changed, and the 100k
+prepared input changed with correctness repairs.
+
+A [pre-fix diagnostic capture](performance/2026-11-09-before-closure-fix.json)
+produced 49,999 triangles from its nominal 100k-face Reduce workload. A closed
+triangle manifold cannot have an odd triangle count. Investigation reproduced
+a Float32 rounding problem in reducer collapse validation. That capture is
+**not an accepted baseline**; it is retained to make the correction visible.
+The runner now checks edge closure/orientation on inputs and every output, and
+the reducer has a full-size regression test.
+
+
+**Observed, 2026-11-09:** the corrected
+[baseline](performance/2026-11-09-linux-baseline.json) and
+[candidate](performance/2026-11-09-linux-candidate.json) were captured consecutively
+on the same Linux workstation: Ryzen 9 7950X, 32 logical processors, 107.4 GiB
+reported physical RAM, performance governor, Dart 3.13.7 AOT. Both reports have
+the same executable and kernel source hashes; their dirty working-tree state is
+recorded. These are repeated runs of one corrected build, demonstrating local
+repeatability and the functioning gate, not cross-version performance proof.
+
+| Case | Baseline median (ms) | Candidate median (ms) | Change | Peak RSS, baseline / candidate (MiB) | Raw change vs legacy |
+|---|---:|---:|---:|---:|---:|
+| `12k/reduce` | 45.853 | 49.198 | +7.30% | 95.6 / 81.5 | +3.86% |
+| `12k/remesh` | 6378.595 | 6477.221 | +1.55% | 95.6 / 73.0 | +13.88% |
+| `12k/solid` | 346.385 | 352.698 | +1.82% | 93.8 / 73.5 | +4.99% |
+| `100k/reduce` | 480.717 | 479.274 | -0.30% | 236.6 / 194.0 | +3.67% |
+| `100k/remesh` | 12907.856 | 13086.266 | +1.38% | 207.0 / 136.6 | +3.68% |
+| `100k/solid` | 1003.860 | 1016.668 | +1.28% | 127.2 / 119.0 | -0.24% |
+
+The compatible comparison passed with exit status 0. Both inputs (12,600 and
+100,000 faces) and all outputs have zero boundary, nonmanifold, or inconsistently
+oriented edges. The 100k Reduce output contains exactly 50,000 faces. The last
+column preserves the historical timing comparison but is **not a valid gate**
+for the provenance/workload reasons above. No historical raw median exceeded
+the former 20% budget; that observation does not validate the old geometry.
+
+The real saved reports also exercised failure behavior: replacing the 12k
+Reduce samples with a synthetic 21% slower median produced exit status 1 and
+identified that case. Comparing against the legacy report produced exit status
+2. All 13 comparator/CLI/topology tests passed; targeted analysis was clean.
+The largest process-lifetime RSS was 236.6 MiB in the baseline and 194.0 MiB
+in the candidate. Identical code and launch/allocation variability mean this
+is not evidence of a memory optimization. Windows/macOS captures and
+representative memory budgets remain unmeasured.

@@ -294,6 +294,28 @@ void main() {
     expect(IsotropicRemesher.linearSubdivide(cube, maximumFaces: 48).faceCount,
         48);
   });
+  test('large reduction keeps topology after float32 output quantization', () {
+    final sphere = MeshIO.readBytes('sphere.obj',
+        File('test/fixtures/models/sphere.obj').readAsBytesSync());
+    final subdivided = IsotropicRemesher.linearSubdivide(
+        IsotropicRemesher.linearSubdivide(sphere));
+    final large = Decimator.reduce(subdivided, targetFaceCount: 100000);
+    final reduced = Decimator.reduce(large, percentage: .5);
+    for (final mesh in [large, reduced]) {
+      expectClosed(mesh);
+      final topology = MeshTopology(mesh);
+      expect(topology.nonManifoldVertices(), isEmpty);
+      expect(mesh.vertexCount - topology.edgeFaces.length + mesh.faceCount, 2,
+          reason: 'sphere Euler characteristic must survive reduction');
+      expect(mesh.signedVolume(),
+          closeTo(sphere.signedVolume(), sphere.signedVolume() * .001));
+      // Checking the actual float32 output must not discover hidden faces
+      // that a late cleanup could delete and turn into holes.
+      expect(mesh.clone().removeDegenerateFaces(minArea: 0), 0);
+    }
+    expect(large.faceCount, lessThanOrEqualTo(100000));
+    expect(reduced.faceCount, lessThanOrEqualTo(50000));
+  });
   test('reference corpus honors provenance, tolerances and topology', () {
     final directory = Directory.systemTemp.createTempSync('mmx-corpus-');
     addTearDown(() => directory.deleteSync(recursive: true));

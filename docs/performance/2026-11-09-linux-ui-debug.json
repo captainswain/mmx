@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "host": {
+    "id": "local-linux-x64",
+    "os": "linux",
+    "osVersion": "Linux 7.0.0-42-generic #42-Ubuntu SMP PREEMPT_DYNAMIC Thu Oct 15 08:06:44 UTC 2026",
+    "abi": "linux_x64",
+    "cpu": "AMD Ryzen 9 7950X 16-Core Processor",
+    "logicalProcessors": 32,
+    "displayEnvironment": ":99"
+  },
+  "runtime": {
+    "declaredToolchain": "Flutter-3.47.9",
+    "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"linux_x64\"",
+    "buildMode": "debug",
+    "framePolicy": "fullyLive",
+    "viewportLogicalPixels": [
+      892,
+      674
+    ],
+    "devicePixelRatio": 1.0
+  },
+  "workload": {
+    "generator": "periodic torus 224x224, major radius 20, minor radius 5",
+    "vertices": 50176,
+    "faces": 100352,
+    "fnv1a32LittleEndianMeshBytes": "efae274e",
+    "operator": "StudioState.doReduce / Decimator.reduce",
+    "percentage": 0.5,
+    "outputFaces": 50176,
+    "samples": 1,
+    "operatorWarmups": 0
+  },
+  "idle500ms": {
+    "operationCompletionMs": 502.528,
+    "workerAwaitPhaseMs": null,
+    "heartbeatTargetMs": 16,
+    "heartbeatIntervals": {
+      "samples": 31,
+      "medianMs": 16.0,
+      "p95Ms": 16.597,
+      "maxMs": 17.814
+    },
+    "heartbeatIntervalsDuringWorker": {
+      "samples": 0
+    },
+    "postFrameIntervals": {
+      "samples": 30,
+      "medianMs": 16.996,
+      "p95Ms": 17.453,
+      "maxMs": 17.697
+    },
+    "postFrameIntervalsDuringWorker": {
+      "samples": 0
+    },
+    "finalHeartbeatTailMs": 4.844,
+    "finalPostFrameTailMs": 2.414,
+    "sampledPeakProcessRssBytes": 428060672,
+    "processHighWaterRssBytes": 439844864
+  },
+  "reduce": {
+    "operationCompletionMs": 914.745,
+    "workerAwaitPhaseMs": 813.358,
+    "heartbeatTargetMs": 16,
+    "heartbeatIntervals": {
+      "samples": 48,
+      "medianMs": 16.021,
+      "p95Ms": 50.522,
+      "maxMs": 87.02
+    },
+    "heartbeatIntervalsDuringWorker": {
+      "samples": 45,
+      "medianMs": 15.997,
+      "p95Ms": 20.6,
+      "maxMs": 87.02
+    },
+    "postFrameIntervals": {
+      "samples": 44,
+      "medianMs": 17.237,
+      "p95Ms": 32.637,
+      "maxMs": 94.305
+    },
+    "postFrameIntervalsDuringWorker": {
+      "samples": 43,
+      "medianMs": 17.212,
+      "p95Ms": 26.966,
+      "maxMs": 83.936
+    },
+    "finalHeartbeatTailMs": 0.23,
+    "finalPostFrameTailMs": 4.825,
+    "sampledPeakProcessRssBytes": 567910400,
+    "processHighWaterRssBytes": 562647040
+  },
+  "cancelReduceOnFirstWorkerHeartbeat": {
+    "operationCompletionMs": 188.916,
+    "workerAwaitPhaseMs": 52.927,
+    "heartbeatTargetMs": 16,
+    "heartbeatIntervals": {
+      "samples": 3,
+      "medianMs": 50.577,
+      "p95Ms": 100.516,
+      "maxMs": 100.516
+    },
+    "heartbeatIntervalsDuringWorker": {
+      "samples": 1,
+      "medianMs": 50.577,
+      "p95Ms": 50.577,
+      "maxMs": 50.577
+    },
+    "postFrameIntervals": {
+      "samples": 2,
+      "medianMs": 135.52,
+      "p95Ms": 135.52,
+      "maxMs": 135.52
+    },
+    "postFrameIntervalsDuringWorker": {
+      "samples": 1,
+      "medianMs": 49.281,
+      "p95Ms": 49.281,
+      "maxMs": 49.281
+    },
+    "finalHeartbeatTailMs": 2.866,
+    "finalPostFrameTailMs": 4.115,
+    "sampledPeakProcessRssBytes": 573562880,
+    "processHighWaterRssBytes": 667160576,
+    "requestToOperationCompletionMs": 138.218,
+    "requestToWorkerPhaseEndMs": 4.054
+  },
+  "processHighWaterRssBytes": 667160576,
+  "limits": [
+    "Heartbeat and framework post-frame intervals measure UI isolate progress; they are not kernel-only or GPU presentation timings.",
+    "Worker await phase includes isolate startup/result transfer; overall completion also includes checkpoint, validation and render.",
+    "Continuous framework frames are requested by this probe; scene rasterization still follows normal Studio scheduling.",
+    "Process RSS includes Flutter, all isolates, setup and validation; the process high-water mark cannot reset between samples.",
+    "Debug/headless single-run evidence cannot certify profile/release interactive frame rates or establish timing regressions."
+  ]
+}
