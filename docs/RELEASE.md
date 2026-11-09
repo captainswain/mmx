@@ -57,6 +57,9 @@ archive metadata uses the source commit timestamp (override with
 `SOURCE_DATE_EPOCH`); identical staged binaries produce identical archives.
 This proves container reproducibility, not cross-host compiler reproducibility.
 Dependency inventories and collected license texts accompany CI artifacts.
+The install checks verify every declared file hash and symlink against the
+installed payload. macOS regenerates its manifest for installed filesystem paths
+and includes the same inventories as the portable package.
 
 The app starts with our procedural geometry. Packaging rejects accidentally
 bundled repository-only Autodesk model assets. Source fixtures and research

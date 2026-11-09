@@ -2,7 +2,10 @@
 import hashlib
 import os
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -42,6 +45,27 @@ class PackageTests(unittest.TestCase):
             root = Path(scratch)
             (root / 'a').write_bytes(b'abc')
             self.assertEqual(packaging.tree_manifest(root)['a']['sha256'], hashlib.sha256(b'abc').hexdigest())
+
+    def test_installed_manifest_detects_corruption_and_unsafe_paths(self):
+        with tempfile.TemporaryDirectory(prefix='mmx package ') as scratch:
+            root = Path(scratch)
+            payload = root / 'binary'
+            payload.write_bytes(b'original executable')
+            manifest = root / 'provenance.json'
+            data = {'files': packaging.tree_manifest(root)}
+            manifest.write_text(json.dumps(data), encoding='utf-8')
+            command = [sys.executable, str(Path(__file__).with_name('verify_manifest.py')),
+                       str(manifest), '--root', str(root)]
+            self.assertEqual(subprocess.run(command, capture_output=True).returncode, 0)
+            payload.write_bytes(b'corrupt executable!')
+            corrupt = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(corrupt.returncode, 0)
+            self.assertIn('Content mismatch', corrupt.stderr)
+            data['files'] = {'../outside': {'sha256': '0' * 64, 'size': 0}}
+            manifest.write_text(json.dumps(data), encoding='utf-8')
+            unsafe = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(unsafe.returncode, 0)
+            self.assertIn('Invalid manifest path', unsafe.stderr)
 
 
 if __name__ == '__main__':

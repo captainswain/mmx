@@ -32,14 +32,14 @@
     "operatorWarmups": 0
   },
   "idle500ms": {
-    "operationCompletionMs": 501.751,
+    "operationCompletionMs": 501.796,
     "workerAwaitPhaseMs": null,
     "heartbeatTargetMs": 16,
     "heartbeatIntervals": {
       "samples": 31,
-      "medianMs": 16.001,
-      "p95Ms": 16.245,
-      "maxMs": 17.849
+      "medianMs": 15.999,
+      "p95Ms": 16.128,
+      "maxMs": 18.539
     },
     "heartbeatIntervalsDuringWorker": {
       "samples": 0
@@ -47,86 +47,86 @@
     "postFrameIntervals": {
       "samples": 30,
       "medianMs": 16.979,
-      "p95Ms": 17.544,
-      "maxMs": 17.851
+      "p95Ms": 17.597,
+      "maxMs": 17.879
     },
     "postFrameIntervalsDuringWorker": {
       "samples": 0
     },
-    "finalHeartbeatTailMs": 4.001,
-    "finalPostFrameTailMs": 1.822,
-    "sampledPeakProcessRssBytes": 280948736,
-    "processHighWaterRssBytes": 291856384
+    "finalHeartbeatTailMs": 4.006,
+    "finalPostFrameTailMs": 1.818,
+    "sampledPeakProcessRssBytes": 282144768,
+    "processHighWaterRssBytes": 296079360
   },
   "reduce": {
-    "operationCompletionMs": 733.882,
-    "workerAwaitPhaseMs": 663.114,
+    "operationCompletionMs": 741.463,
+    "workerAwaitPhaseMs": 667.35,
     "heartbeatTargetMs": 16,
     "heartbeatIntervals": {
       "samples": 43,
-      "medianMs": 16.003,
-      "p95Ms": 19.996,
-      "maxMs": 46.921
+      "medianMs": 16.001,
+      "p95Ms": 20.565,
+      "maxMs": 54.552
     },
     "heartbeatIntervalsDuringWorker": {
-      "samples": 41,
+      "samples": 40,
       "medianMs": 16.001,
-      "p95Ms": 17.648,
-      "maxMs": 32.586
+      "p95Ms": 20.565,
+      "maxMs": 34.133
     },
     "postFrameIntervals": {
       "samples": 41,
-      "medianMs": 16.84,
-      "p95Ms": 20.306,
-      "maxMs": 56.874
+      "medianMs": 16.655,
+      "p95Ms": 20.928,
+      "maxMs": 59.495
     },
     "postFrameIntervalsDuringWorker": {
-      "samples": 38,
-      "medianMs": 16.894,
-      "p95Ms": 20.306,
-      "maxMs": 32.548
+      "samples": 39,
+      "medianMs": 16.655,
+      "p95Ms": 20.928,
+      "maxMs": 33.026
     },
-    "finalHeartbeatTailMs": 10.381,
-    "finalPostFrameTailMs": 1.676,
-    "sampledPeakProcessRssBytes": 367865856,
-    "processHighWaterRssBytes": 387964928
+    "finalHeartbeatTailMs": 3.36,
+    "finalPostFrameTailMs": 10.081,
+    "sampledPeakProcessRssBytes": 365019136,
+    "processHighWaterRssBytes": 368402432
   },
   "cancelReduceOnFirstWorkerHeartbeat": {
-    "operationCompletionMs": 147.647,
-    "workerAwaitPhaseMs": 30.549,
+    "operationCompletionMs": 161.288,
+    "workerAwaitPhaseMs": 16.768,
     "heartbeatTargetMs": 16,
     "heartbeatIntervals": {
-      "samples": 4,
-      "medianMs": 31.754,
-      "p95Ms": 82.457,
-      "maxMs": 82.457
+      "samples": 5,
+      "medianMs": 16.059,
+      "p95Ms": 89.275,
+      "maxMs": 89.275
     },
     "heartbeatIntervalsDuringWorker": {
       "samples": 1,
-      "medianMs": 31.754,
-      "p95Ms": 31.754,
-      "maxMs": 31.754
+      "medianMs": 18.076,
+      "p95Ms": 18.076,
+      "maxMs": 18.076
     },
     "postFrameIntervals": {
-      "samples": 3,
-      "medianMs": 23.189,
-      "p95Ms": 94.652,
-      "maxMs": 94.652
+      "samples": 5,
+      "medianMs": 12.73,
+      "p95Ms": 105.449,
+      "maxMs": 105.449
     },
     "postFrameIntervalsDuringWorker": {
-      "samples": 1,
-      "medianMs": 23.189,
-      "p95Ms": 23.189,
-      "maxMs": 23.189
+      "samples": 2,
+      "medianMs": 12.73,
+      "p95Ms": 12.73,
+      "maxMs": 12.73
     },
-    "finalHeartbeatTailMs": 1.761,
-    "finalPostFrameTailMs": 15.026,
-    "sampledPeakProcessRssBytes": 348835840,
-    "processHighWaterRssBytes": 387964928,
-    "requestToOperationCompletionMs": 115.883,
-    "requestToWorkerPhaseEndMs": 0.115
+    "finalHeartbeatTailMs": 16.025,
+    "finalPostFrameTailMs": 9.723,
+    "sampledPeakProcessRssBytes": 421027840,
+    "processHighWaterRssBytes": 422391808,
+    "requestToOperationCompletionMs": 143.197,
+    "requestToWorkerPhaseEndMs": 0.081
   },
-  "processHighWaterRssBytes": 387964928,
+  "processHighWaterRssBytes": 422391808,
   "limits": [
     "Heartbeat and framework post-frame intervals measure UI isolate progress; they are not kernel-only or GPU presentation timings.",
     "Worker await phase includes isolate startup/result transfer; overall completion also includes checkpoint, validation and render.",

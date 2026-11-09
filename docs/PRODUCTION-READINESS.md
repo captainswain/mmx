@@ -24,6 +24,13 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 - Native dialogs, dirty prompts, unit selection, Ctrl/Command shortcuts and
   recovery autosaves are implemented. Recovery waits for pending writes before
   cleanup and preserves unreadable recovery data instead of overwriting it.
+  Per-session files and exclusive leases prevent other app instances from
+  overwriting, recovering or deleting a live session's autosave. Legacy recovery
+  files remain recoverable; closing a lease preserves its unsaved data.
+- Open/save/import remain locked through final previews. Completion listeners
+  cannot have newer edits marked clean; invalid incoming cameras/previews roll
+  back the prior scene. A preview failure after a successful disk save leaves
+  that save successful and releases the operation lock.
 - Procedural startup geometry replaces redistributed demo assets. Release
   packaging rejects accidental Autodesk fixture assets in the app bundle.
 
@@ -69,7 +76,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
-`./tool/verify.sh` passes with 166 kernel tests, 33 Studio tests, both analyzers
+`./tool/verify.sh` passes with 169 kernel tests, 53 Studio tests, both analyzers
 clean and no formatting changes. Native Linux integration passes. The 22-case
 analytical corpus and fixed-host performance comparison pass. The optional
 native [profile UI probe](performance/UI-RESPONSIVENESS.md) verifies progress and

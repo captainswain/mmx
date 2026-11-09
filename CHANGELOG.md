@@ -33,6 +33,7 @@ semantic versioning once it reaches 1.0.
 - QEM candidate invalidation, remesh winding, surface-net lattice degeneracies and tiny-scale ray tolerances.
 - Concave import triangulation, PLY schemas/byte order, strict STL parsing and `.mix` metadata rewrites.
 - Recovery write ordering, failed-import metadata rollback and keyboard shortcut focus.
+- Per-session recovery ownership, operation completion races, invalid project cameras and macOS installer placement/provenance.
 - Plane Cut honours `keepPositive` on both sides and supports a negative-side
   slice group.
 - Smooth hole filling relaxes only the filled patch.

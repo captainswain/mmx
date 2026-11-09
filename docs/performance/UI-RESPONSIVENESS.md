@@ -9,7 +9,8 @@ integration driver because `flutter test` forces debug mode in Flutter 3.47.9.
 
 ## Workload and capture conditions
 
-Captured on 2026-11-09 in separate quiet windows from the kernel benchmarks:
+Recaptured after the operation-completion and per-session recovery fixes on
+2026-11-09, in separate quiet windows from the kernel benchmarks:
 Linux x64, AMD Ryzen 9 7950X, 32 logical processors, Linux 7.0.0-42,
 Flutter 3.47.9, Dart 3.13.7. Xvfb provided the display; the viewport was
 892 × 674 logical pixels at device pixel ratio 1. Raw reports include exact
@@ -32,18 +33,18 @@ across independent runs or a regression threshold.
 
 | Measurement | Debug | Profile |
 | --- | ---: | ---: |
-| Reduce operation completion | 914.745 | 733.882 |
-| Worker await phase | 813.358 | 663.114 |
-| UI heartbeat interval during worker, p95 / max | 20.600 / 87.020 | 17.648 / 32.586 |
-| Framework post-frame interval during worker, p95 / max | 26.966 / 83.936 | 20.306 / 32.548 |
-| Whole-operation maximum post-frame interval | 94.305 | 56.874 |
-| Cancel request to worker phase end | 4.054 | 0.115 |
-| Cancel request to operation settled | 138.218 | 115.883 |
-| Whole-process peak RSS, MiB | 636.254 | 369.992 |
+| Reduce operation completion | 955.195 | 741.463 |
+| Worker await phase | 841.885 | 667.350 |
+| UI heartbeat interval during worker, p95 / max | 22.367 / 95.681 | 20.565 / 34.133 |
+| Framework post-frame interval during worker, p95 / max | 24.591 / 93.116 | 20.928 / 33.026 |
+| Whole-operation maximum post-frame interval | 118.324 | 59.495 |
+| Cancel request to worker phase end | 12.609 | 0.081 |
+| Cancel request to operation settled | 141.758 | 143.197 |
+| Whole-process peak RSS, MiB | 572.586 | 402.824 |
 
 The UI loop and frame callbacks made progress during computation. The profile
-capture still showed a 56.874 ms frame interval over the complete Reduce and
-94.652 ms during cancellation/rollback. Those observations leave interactive
+capture still showed a 59.495 ms frame interval over the complete Reduce and
+105.449 ms during cancellation/rollback. Those observations leave interactive
 frame-budget work open; they do not establish a sustained 60 FPS experience.
 
 ## Interpretation and limits

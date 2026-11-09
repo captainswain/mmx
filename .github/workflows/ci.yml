@@ -104,6 +104,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo dpkg -i bin/releases/*.deb
+          python tool/verify_manifest.py /opt/mmx/provenance.json --root /opt/mmx
           /usr/bin/mmx --help
           xvfb-run -a python tool/smoke_desktop.py /usr/bin/mmx-studio
           sudo dpkg -r mmx
@@ -112,6 +113,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           sudo installer -pkg "$(find bin/releases -name '*.pkg' -print -quit)" -target /
+          python tool/verify_manifest.py /usr/local/share/mmx/provenance.json --root /
           /usr/local/bin/mmx --help
           test -d '/Applications/mmx Studio.app'
           python tool/smoke_desktop.py '/Applications/mmx Studio.app/Contents/MacOS/mmx_studio'
@@ -126,6 +128,8 @@ jobs:
           $destination = Join-Path $env:RUNNER_TEMP 'mmx installed'
           $process = Start-Process -FilePath $installer.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$destination`"") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Installer failed' }
+          python tool/verify_manifest.py "$destination/provenance.json" --root "$destination"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed manifest verification failed' }
           & "$destination/mmx.exe" --help
           if ($LASTEXITCODE -ne 0) { throw 'Installed CLI failed' }
           python tool/smoke_desktop.py "$destination/studio/mmx_studio.exe"

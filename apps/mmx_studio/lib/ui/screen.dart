@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../state/studio_state.dart';
+import '../state/recovery_store.dart';
 import 'panels.dart';
 import 'viewport.dart';
 
@@ -36,57 +37,84 @@ class _StudioScreenState extends State<StudioScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   String? _lastDirectory;
-  String? _recoveryPath;
+  RecoveryStore? _recovery;
   Timer? _autosave;
   AppLifecycleListener? _lifecycle;
   bool _savingRecovery = false;
   Future<void>? _recoveryTask;
-  bool _recoveryOwned = false;
   bool _exitPending = false;
 
   Future<void> _initializeRecovery() async {
     try {
       final dir =
           await (widget.recoveryDirectory ?? getApplicationSupportDirectory)();
-      await dir.create(recursive: true);
-      _recoveryPath = '${dir.path}/recovery.mmx';
-      if (!mounted) return;
-      if (await File(_recoveryPath!).exists() && mounted) {
-        final recover = await showDialog<bool>(
-          barrierDismissible: false,
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Recover unsaved project?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Discard'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Recover'),
-              ),
-            ],
-          ),
-        );
-        if (recover == true) {
-          if (!await state.openProject(_recoveryPath!)) return;
-          state.projectPath = null;
-          state.dirty = true;
-          state.notify();
-        } else if (recover == false) {
-          await File(_recoveryPath!).delete();
-        } else {
-          return;
+      final store = await RecoveryStore.open(dir);
+      _recovery = store;
+      if (!mounted) {
+        await store.close();
+        return;
+      }
+      final candidate = await store.claimNext();
+      if (candidate != null) {
+        try {
+          final modified = await File(candidate.path).lastModified();
+          if (!mounted) return;
+          final decision = await showDialog<String>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Recover unsaved project?'),
+              content: Text('Last saved ${modified.toLocal()}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'keep'),
+                  child: const Text('Keep for later'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'discard'),
+                  child: const Text('Discard recovery'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, 'recover'),
+                  child: const Text('Recover'),
+                ),
+              ],
+            ),
+          );
+          if (!mounted) return;
+          if (decision == 'recover') {
+            final recovered = await candidate.withPath(
+              (path) => state.openProject(path, asRecovery: true),
+            );
+            if (recovered && mounted) {
+              final revision = state.doc.revision;
+              try {
+                // Keep the prior session's recovery until this session has a
+                // complete copy. An intervening edit leaves the prior copy too.
+                _recoveryTask = store.withPath(state.autosave);
+                await _recoveryTask;
+                if (mounted &&
+                    state.doc.revision == revision &&
+                    await File(store.path).exists()) {
+                  await candidate.clear();
+                }
+              } catch (e) {
+                state.status = 'Recovery copy failed: $e';
+                state.notify();
+              }
+            }
+          } else if (decision == 'discard') {
+            await candidate.clear();
+          }
+        } finally {
+          await candidate.release();
         }
       }
-      _recoveryOwned = true;
       if (!mounted) return;
       _autosave = Timer.periodic(const Duration(seconds: 30), (_) async {
         if (_savingRecovery || _exitPending) return;
         _savingRecovery = true;
         try {
-          _recoveryTask = state.autosave(_recoveryPath!);
+          _recoveryTask = store.withPath(state.autosave);
           await _recoveryTask;
         } catch (e) {
           state.status = 'Recovery save failed: $e';
@@ -101,24 +129,45 @@ class _StudioScreenState extends State<StudioScreen> {
     }
   }
 
-  Future<void> _clearRecovery() async {
-    if (!_recoveryOwned || _recoveryPath == null) return;
+  Future<void> _clearRecovery({
+    int? expectedRevision,
+    bool allowDirty = false,
+  }) async {
+    final store = _recovery;
+    if (store == null) return;
+    final revision = expectedRevision ?? state.doc.revision;
+    bool stillSafeToClear() =>
+        state.doc.revision == revision &&
+        !state.interactionLocked &&
+        (allowDirty || !state.dirty);
     try {
-      await _recoveryTask;
-      if (await File(_recoveryPath!).exists()) {
-        await File(_recoveryPath!).delete();
-      }
+      // Queue cleanup behind this session's writes, then recheck whether the
+      // user has made a newer edit while a prior recovery write was settling.
+      await store.withPath((path) async {
+        if (!stillSafeToClear()) return;
+        final file = File(path);
+        if (await file.exists() && stillSafeToClear()) await file.delete();
+      });
     } catch (e) {
-      // Keep a stale recovery file rather than turn a successful save into a
-      // failure or lose an unreadable recovery candidate.
       state.status = 'Recovery cleanup failed: $e';
       state.notify();
+    }
+  }
+
+  Future<void> _closeRecovery() async {
+    try {
+      // Closing waits for queued reads/writes and never deletes recovery data.
+      await _recovery?.close();
+    } catch (_) {
+      // A disposed screen cannot present cleanup errors. The OS also releases
+      // the session lease when its process exits.
     }
   }
 
   Future<bool> _confirmDiscard() async {
     if (state.interactionLocked) return false;
     if (!state.dirty) return true;
+    final revision = state.doc.revision;
     final answer = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -140,8 +189,12 @@ class _StudioScreenState extends State<StudioScreen> {
         ],
       ),
     );
-    if (answer == 'save') return _saveProject();
-    return answer == 'discard';
+    if (answer == 'save') {
+      return await _saveProject() && !state.dirty && !state.interactionLocked;
+    }
+    return answer == 'discard' &&
+        state.doc.revision == revision &&
+        !state.interactionLocked;
   }
 
   @override
@@ -155,7 +208,7 @@ class _StudioScreenState extends State<StudioScreen> {
         final revision = state.doc.revision;
         try {
           if (!await _confirmDiscard()) return AppExitResponse.cancel;
-          await _clearRecovery();
+          await _clearRecovery(expectedRevision: revision, allowDirty: true);
           if (state.doc.revision != revision || state.interactionLocked) {
             return AppExitResponse.cancel;
           }
@@ -175,6 +228,7 @@ class _StudioScreenState extends State<StudioScreen> {
   @override
   void dispose() {
     _autosave?.cancel();
+    unawaited(_closeRecovery());
     _lifecycle?.dispose();
     if (widget.state == null) state.dispose();
     super.dispose();
@@ -491,9 +545,10 @@ class _StudioScreenState extends State<StudioScreen> {
         ],
       ))?.path;
       if (path == null) return false;
+      final savedRevision = state.doc.revision;
       final saved = await state.saveProject(path);
       if (saved) {
-        await _clearRecovery();
+        await _clearRecovery(expectedRevision: savedRevision);
         _lastDirectory = File(path).parent.path;
       }
       return saved;

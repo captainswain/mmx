@@ -126,9 +126,14 @@ def native_installer(stage, output, system, version, epoch):
             (root / 'usr/local/bin').mkdir(parents=True)
             shutil.copy2(stage / 'mmx', root / 'usr/local/bin/mmx')
             (root / 'usr/local/share/mmx').mkdir(parents=True)
-            for item in ('LICENSE', 'NOTICE', 'provenance.json', 'THIRD_PARTY_LICENSES.txt'):
+            for item in ('LICENSE', 'NOTICE', 'THIRD_PARTY_LICENSES.txt', 'toolchain.txt', 'dependencies.json'):
                 if (stage / item).exists():
                     shutil.copy2(stage / item, root / 'usr/local/share/mmx' / item)
+            provenance = json.loads((stage / 'provenance.json').read_text(encoding='utf-8'))
+            provenance['manifestRoot'] = '/'
+            provenance['files'] = tree_manifest(root)
+            (root / 'usr/local/share/mmx/provenance.json').write_text(
+                json.dumps(provenance, indent=2, sort_keys=True) + '\n', encoding='utf-8')
             destination = output / f'mmx-{version}-macos-unsigned.pkg'
             components = Path(scratch) / 'components.plist'
             macos_components(root, components)

@@ -6,7 +6,7 @@ Run `./tool/verify.sh` from the repository root. It resolves dependencies, check
 Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
-Observed on 2026-11-09: 166 kernel tests and 33 Studio tests pass; both analyzers
+Observed on 2026-11-09: 169 kernel tests and 53 Studio tests pass; both analyzers
 and formatting checks are clean. The analytical corpus passes all 22 cases.
 
 For focused work:
@@ -37,6 +37,10 @@ manual acceptance. See [release procedures](RELEASE.md).
 - Studio tests cover transform/pivot gestures, single-entry sculpt undo, spatial
   cache invalidation, stale results, failed/canceled import rollback, recovery
   write ordering, unreadable recovery preservation and keyboard save shortcuts.
+- Completion tests keep open/save/import locked through rendering, preserve new
+  edits from completion listeners, and roll back failed incoming previews.
+  Recovery leases isolate simultaneous sessions; a real child-process crash
+  test verifies exclusive ownership and subsequent recovery.
 - Worker tests terminate an active synchronous CPU loop, cancel during spawn,
   propagate errors, and verify unexpected worker exit completes promptly.
 - Python packaging tests verify repeated archives are byte-identical and file
@@ -60,7 +64,7 @@ fail the gate. This is a targeted line-coverage requirement; it does not establi
 exhaustive parser fuzzing, branch coverage or whole-project coverage.
 
 The fresh local run measured 100% for OBJ, PLY, STL, 3MF, atomic writes and mesh
-allocation guards; 99.4% for project IO, 99.3% for ZIP, 98.8% for triangulation
+allocation guards; 99.5% for project IO, 99.3% for ZIP, 98.8% for triangulation
 and 96.4% for attribute transfer.
 
 ## Geometry references and performance

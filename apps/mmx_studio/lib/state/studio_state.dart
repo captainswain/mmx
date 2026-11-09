@@ -262,12 +262,16 @@ class StudioState extends ChangeNotifier {
     }
   }
 
-  Future<void> _perform(String label, Future<void> Function() action) async {
+  Future<bool> _perform(
+    String label,
+    Future<void> Function() action, {
+    bool cleanOnSuccess = false,
+  }) async {
     if (busy ||
         _disposed ||
         _manipulator != null ||
         (_sculptGesture != null && label != 'sculptAt')) {
-      return;
+      return false;
     }
     busy = true;
     _cancelled = false;
@@ -283,13 +287,16 @@ class StudioState extends ChangeNotifier {
     operationWarning = null;
     status = '$label…';
     notify();
+    var succeeded = false;
     try {
       await action();
       if (doc.revision != revision) {
         dirty = true;
         _invalidateGeometry();
       }
+      if (cleanOnSuccess) dirty = false;
       if (operationWarning != null) status += ' ($operationWarning)';
+      succeeded = true;
     } catch (e) {
       if (label == 'sculptAt' && e is _OperationCancelled && e.stale) {
         _sculptInterrupted = true;
@@ -313,12 +320,28 @@ class StudioState extends ChangeNotifier {
           ? '$label cancelled'
           : '$label failed: $e';
     } finally {
-      busy = false;
-      if (!_disposed) {
-        await render();
+      // The transaction stays locked until its final preview settles. Finalize
+      // dirty/path metadata before unlocking, including synchronous listeners
+      // that start the next edit when they observe busy becoming false.
+      final completionStatus = status;
+      try {
+        if (!_disposed) {
+          operationPhase = 'Rendering preview';
+          await render();
+          status = completionStatus;
+        }
+      } catch (e) {
+        // A committed edit or successful disk write remains successful when
+        // only the preview fails. Open/import validate their preview inside the
+        // action so an unreadable incoming scene can still be rolled back.
+        status = '$completionStatus (Preview failed: $e)';
+      } finally {
+        operationPhase = null;
+        busy = false;
         notify();
       }
     }
+    return succeeded;
   }
 
   void _invalidateGeometry() {
@@ -412,8 +435,8 @@ class StudioState extends ChangeNotifier {
 
   Future<bool> saveProject(String path) async {
     if (interactionLocked || _disposed) return false;
-    var saved = false;
-    await _perform('Save project', () async {
+    return _perform('Save project', () async {
+      final savedRevision = doc.revision;
       final project = ProjectData(
         doc.objects.map((o) => o.clone()).toList(),
         camera: camera.clone(),
@@ -422,18 +445,17 @@ class StudioState extends ChangeNotifier {
       );
       final bytes = await _work(encodeProjectWorker(project));
       await writeFileAtomically(path, bytes);
+      if (doc.revision != savedRevision) {
+        throw const _OperationCancelled(stale: true);
+      }
       projectPath = path;
-      dirty = false;
-      saved = true;
       status = 'Saved $path';
-    });
-    return saved;
+    }, cleanOnSuccess: true);
   }
 
-  Future<bool> openProject(String path) async {
+  Future<bool> openProject(String path, {bool asRecovery = false}) async {
     if (interactionLocked || _disposed) return false;
-    var opened = false;
-    await _perform('Open project', () async {
+    return _perform('Open project', () async {
       final project = await _work(decodeProjectWorker(path));
       doc.replaceObjects(project.objects);
       sourceAttachments
@@ -441,13 +463,17 @@ class StudioState extends ChangeNotifier {
         ..addAll(project.sourceAttachments);
       camera = project.camera;
       selectedObjectId = project.selectedId;
-      projectPath = path;
-      opened = true;
+      projectPath = asRecovery ? null : path;
+      // Presentation of incoming data is part of accepting an open: retain the
+      // previous unsaved document/history when a loaded camera cannot render.
+      final appliedRevision = doc.revision;
+      await render();
+      if (doc.revision != appliedRevision) {
+        throw const _OperationCancelled(stale: true);
+      }
+      if (_disposed || _cancelled) throw const _OperationCancelled();
       status = 'Opened $path';
-    });
-    if (opened) dirty = false;
-    notify();
-    return opened;
+    }, cleanOnSuccess: !asRecovery);
   }
 
   Future<void> autosave(String path) async {

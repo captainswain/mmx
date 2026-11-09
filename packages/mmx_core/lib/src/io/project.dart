@@ -27,23 +27,56 @@ class ProjectData {
 }
 
 class ProjectIO {
+  static void _validateCamera(Camera camera) {
+    if (camera.target.length != 3 ||
+        ![
+          camera.yaw,
+          camera.pitch,
+          camera.distance,
+          camera.fovDegrees,
+          camera.near,
+          camera.far,
+          ...camera.target
+        ].every((v) => v.isFinite) ||
+        camera.distance <= 0 ||
+        camera.near <= 0 ||
+        camera.far <= camera.near ||
+        camera.fovDegrees <= 0 ||
+        camera.fovDegrees >= 180) {
+      throw const FormatException('Invalid camera');
+    }
+    // Finite input scalars alone do not guarantee usable camera arithmetic:
+    // tiny FOVs and near-plane gaps can overflow, huge targets can erase the
+    // eye offset, and projection depth can underflow to a singular matrix.
+    final eye = camera.position();
+    final view = camera.viewMatrix();
+    final projection = camera.projectionMatrix(1);
+    final combined = camera.viewProjection(1);
+    final basisDeterminant =
+        view[0] * (view[5] * view[10] - view[9] * view[6]) -
+            view[4] * (view[1] * view[10] - view[9] * view[2]) +
+            view[8] * (view[1] * view[6] - view[5] * view[2]);
+    if (![...eye, ...view, ...projection, ...combined]
+            .every((v) => v.isFinite) ||
+        Iterable<int>.generate(3).every((i) => eye[i] == camera.target[i]) ||
+        basisDeterminant == 0 ||
+        projection[0] <= 0 ||
+        projection[5] <= 0 ||
+        projection[14] == 0) {
+      throw const FormatException('Numerically unusable camera');
+    }
+  }
+
   static Uint8List write(ProjectData project) {
     final entries = <ZipEntry>[];
     final objects = <Map<String, Object?>>[];
     final ids = <int>{};
     final c = project.camera;
     if (project.objects.length > 1024 ||
-        project.sourceAttachments.length > 1024 ||
-        ![c.yaw, c.pitch, c.distance, c.fovDegrees, c.near, c.far, ...c.target]
-            .every((v) => v.isFinite) ||
-        c.target.length != 3 ||
-        c.distance <= 0 ||
-        c.near <= 0 ||
-        c.far <= c.near ||
-        c.fovDegrees <= 0 ||
-        c.fovDegrees >= 180) {
+        project.sourceAttachments.length > 1024) {
       throw const FormatException('Invalid project metadata');
     }
+    _validateCamera(c);
     for (final o in project.objects) {
       if (o.id <= 0 ||
           !ids.add(o.id) ||
@@ -249,24 +282,21 @@ class ProjectIO {
       final v = vector(
           [c['yaw'], c['pitch'], c['distance'], c['fov'], c['near'], c['far']],
           6);
-      if (v[2] <= 0 || v[3] <= 0 || v[3] >= 180 || v[4] <= 0 || v[5] <= v[4]) {
-        throw const FormatException('Invalid camera');
-      }
+      final camera = Camera(
+          yaw: v[0],
+          pitch: v[1],
+          distance: v[2],
+          fovDegrees: v[3],
+          near: v[4],
+          far: v[5],
+          target: vector(c['target'], 3));
+      _validateCamera(camera);
       final selected = m['selectedId'] as int?;
       if (selected != null && !ids.contains(selected)) {
         throw const FormatException('Missing selected object');
       }
       return ProjectData(objects,
-          sourceAttachments: sources,
-          selectedId: selected,
-          camera: Camera(
-              yaw: v[0],
-              pitch: v[1],
-              distance: v[2],
-              fovDegrees: v[3],
-              near: v[4],
-              far: v[5],
-              target: vector(c['target'], 3)));
+          sourceAttachments: sources, selectedId: selected, camera: camera);
     } on FormatException {
       rethrow;
     } catch (_) {
