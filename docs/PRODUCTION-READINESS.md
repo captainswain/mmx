@@ -1,0 +1,105 @@
+# Production readiness
+
+Target: reliable Linux, Windows and macOS core mesh workflows and CLI.
+**Status: implementation complete for local hardening; release acceptance remains
+open until the evidence below is recorded.** This supersedes the historical
+finish/remediation plans; full Meshmixer parity is a separate target.
+
+## Implemented plan
+
+### Desktop interaction and persistence
+
+- Geometry workers are owned isolates: cancel terminates synchronous CPU work,
+  stale results cannot replace a newer document, and failed edits restore scene,
+  camera, project path and original-source metadata. Status reports operation
+  phases rather than an invented completion percentage.
+- Rendering coalesces requests; spatial data caches key on document/object/mesh
+  and transform state. Viewport translation, rotation, uniform scale and local
+  pivot editing commit one undo entry. Sculpt drags group stamps into one entry
+  and cancel rolls back the whole stroke.
+- Native `.mmx` projects preserve objects, IDs, transforms, colors/groups, pivots,
+  visibility, targets, camera, selection and original imported `.mix` bytes.
+  Save/Save As is separate from mesh export. Writes flush a temporary sibling
+  before replacement; failed reads keep the current scene.
+- Native dialogs, dirty prompts, unit selection, Ctrl/Command shortcuts and
+  recovery autosaves are implemented. Recovery waits for pending writes before
+  cleanup and preserves unreadable recovery data instead of overwriting it.
+- Procedural startup geometry replaces redistributed demo assets. Release
+  packaging rejects accidental Autodesk fixture assets in the app bundle.
+
+### File and kernel correctness
+
+- OBJ/OFF/PLY use bounded concave triangulation. PLY decodes ASCII and either
+  binary byte order by property schema, including reordered fields, lists,
+  colors/groups and unknown elements. STL validates grammar and binary sizes.
+- ZIP bounds expanded content to 256 MiB and 4096 entries, checks CRC/size/method
+  consistency and rejects unsafe names. 3MF resolves relationships, units,
+  transforms, repeated instances and component graphs; unsupported material or
+  extension semantics fail explicitly. `.mix` rewrite consumes records in order
+  and fails rather than silently replacing metadata with a minimal mesh.
+- Plane clipping preserves winding and attributes; reflected transforms reverse
+  faces; invalid transforms fail atomically. Welding avoids packed-key
+  collisions. Remesh/reduce and other edits preserve/interpolate supported
+  colors/groups where correspondence exists.
+- QEM heap entries are versioned and compare valid endpoint/midpoint choices;
+  remeshing validates orientation. Surface-net lattice degeneracies and tiny-scale
+  ray tolerances are corrected. Exact empty/disjoint booleans stay exact;
+  invalid precise outputs take an explicitly reported grid fallback.
+- Voxel allocations and generated pattern/subdivision/remesh output are bounded
+  before allocation. CLI arguments reject nonfinite/unknown/invalid values, use
+  exit 2 for usage errors, and write outputs atomically.
+
+### Validation and release tooling
+
+- Seeded geometry acceptance and an analytical corpus check topology, winding,
+  components and explicit volume tolerances. An external-reference manifest
+  harness compares independently acquired outputs without inventing oracle data.
+- Critical IO coverage has a >80% per-module gate. Desktop tests exercise
+  cancellation, manipulation, recovery, metadata rollback and shortcuts; native
+  integration covers Unicode import/edit/undo/save/reopen/export workflows.
+- CI pins Flutter 3.47.9 and targets Ubuntu 24.04 x64, Windows Server 2022 x64 and
+  macOS 15 arm64. It builds CLIs/apps, runs native integration, creates unsigned
+  native installers and checks installation/removal on disposable runners.
+- Portable archives normalize metadata; artifacts include checksums, source and
+  content provenance, dependency inventories and license texts. Signing scripts,
+  manual acceptance and rollback steps are in [RELEASE.md](RELEASE.md).
+- The AOT benchmark identifies exact inputs, host and toolchain, records raw
+  latency samples and isolated-process peak RSS, and rejects incompatible
+  baselines. See [PERFORMANCE.md](PERFORMANCE.md) for measured results and limits.
+
+## Validation record
+
+Local Studio analysis, all 33 widget/state/worker tests and native Linux
+integration pass. Kernel final verification, critical coverage, fresh Linux
+release packaging and the remote OS matrix are being recorded for this branch.
+See [TESTING.md](TESTING.md) for reproducible commands. Automated native tests
+inject paths and therefore do not establish file-dialog accessibility.
+
+## Remaining release acceptance
+
+| Gate | Required evidence | Dependency |
+|---|---|---|
+| OS matrix | Successful build, integration and install/remove jobs for the reviewed commit | GitHub-hosted native runners |
+| Signing | Verified Windows signature and macOS signed/notarized/stapled installer | Publisher identities, signing host and credentials |
+| Native manual acceptance | Clean-account dialogs, permissions, overwrite/exit prompts, forced-exit recovery, keyboard/accessibility and units | Human operator on each supported OS |
+| Reference fidelity | Real Meshmixer outputs, recorded settings/provenance and passing agreed tolerances | Licensed usable installation and independently acquired corpus |
+| Sustained performance | Repeat fixed-host baseline comparisons; large-scene interaction/frame and memory acceptance | Designated release host and interactive workload |
+
+Do not label unsigned review artifacts production-ready or claim oracle fidelity
+from analytical tests. No release is published by this work.
+
+## Documented limits and future improvements
+
+- Whole-scene undo snapshots count mesh buffers and respect a byte budget but
+  are not incremental history. Large scenes can have transient snapshot memory.
+- Manipulators use world axes and uniform scale; snapping, nonuniform handles,
+  face deformation and local-axis modes are future interaction work.
+- Hollow thickness is an SDF approximation with voxel error. Make Solid rejects
+  positive `minThickness`; a guaranteed global wall-thickness solver is absent.
+- Grid reconstruction does not promise original material-region correspondence.
+  Native source attachments preserve unknown `.mix` bytes without interpreting
+  their semantics. Unsupported 3MF materials/extensions are explicit errors.
+- Parser regression suites are bounded/adversarial examples, not exhaustive
+  fuzzing. Expand them when new real-world formats and failures are reported.
+- Full Meshmixer parity, mobile, UV/texture authoring, image stamps and GPU
+  rendering remain outside the desktop core release target. See [TOOL-MATRIX.md](TOOL-MATRIX.md).

@@ -1,4 +1,11 @@
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:file_selector/file_selector.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:mmx_core/mmx_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,19 +16,156 @@ import 'viewport.dart';
 
 class StudioScreen extends StatefulWidget {
   final StudioTool? initialTool;
-  const StudioScreen({super.key, this.initialTool});
+  final StudioState? state;
+  final bool enableRecovery;
+  final Future<Directory> Function()? recoveryDirectory;
+  const StudioScreen({
+    super.key,
+    this.initialTool,
+    this.state,
+    this.enableRecovery = true,
+    this.recoveryDirectory,
+  });
 
   @override
   State<StudioScreen> createState() => _StudioScreenState();
 }
 
 class _StudioScreenState extends State<StudioScreen> {
-  final StudioState state = StudioState();
+  late final StudioState state = widget.state ?? StudioState();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  String? _lastDirectory;
+  String? _recoveryPath;
+  Timer? _autosave;
+  AppLifecycleListener? _lifecycle;
+  bool _savingRecovery = false;
+  Future<void>? _recoveryTask;
+  bool _recoveryOwned = false;
+  bool _exitPending = false;
+
+  Future<void> _initializeRecovery() async {
+    try {
+      final dir =
+          await (widget.recoveryDirectory ?? getApplicationSupportDirectory)();
+      await dir.create(recursive: true);
+      _recoveryPath = '${dir.path}/recovery.mmx';
+      if (!mounted) return;
+      if (await File(_recoveryPath!).exists() && mounted) {
+        final recover = await showDialog<bool>(
+          barrierDismissible: false,
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Recover unsaved project?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Discard'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Recover'),
+              ),
+            ],
+          ),
+        );
+        if (recover == true) {
+          if (!await state.openProject(_recoveryPath!)) return;
+          state.projectPath = null;
+          state.dirty = true;
+          state.notify();
+        } else if (recover == false) {
+          await File(_recoveryPath!).delete();
+        } else {
+          return;
+        }
+      }
+      _recoveryOwned = true;
+      if (!mounted) return;
+      _autosave = Timer.periodic(const Duration(seconds: 30), (_) async {
+        if (_savingRecovery || _exitPending) return;
+        _savingRecovery = true;
+        try {
+          _recoveryTask = state.autosave(_recoveryPath!);
+          await _recoveryTask;
+        } catch (e) {
+          state.status = 'Recovery save failed: $e';
+          state.notify();
+        } finally {
+          _savingRecovery = false;
+        }
+      });
+    } catch (e) {
+      state.status = 'Recovery unavailable: $e';
+      state.notify();
+    }
+  }
+
+  Future<void> _clearRecovery() async {
+    if (!_recoveryOwned || _recoveryPath == null) return;
+    try {
+      await _recoveryTask;
+      if (await File(_recoveryPath!).exists()) {
+        await File(_recoveryPath!).delete();
+      }
+    } catch (e) {
+      // Keep a stale recovery file rather than turn a successful save into a
+      // failure or lose an unreadable recovery candidate.
+      state.status = 'Recovery cleanup failed: $e';
+      state.notify();
+    }
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (state.interactionLocked) return false;
+    if (!state.dirty) return true;
+    final answer = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save changes?'),
+        content: const Text('This project has unsaved changes.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'cancel'),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'discard'),
+            child: const Text('Discard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'save'),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (answer == 'save') return _saveProject();
+    return answer == 'discard';
+  }
 
   @override
   void initState() {
     super.initState();
+    if (widget.enableRecovery) _initializeRecovery();
+    _lifecycle = AppLifecycleListener(
+      onExitRequested: () async {
+        if (_exitPending) return AppExitResponse.cancel;
+        _exitPending = true;
+        final revision = state.doc.revision;
+        try {
+          if (!await _confirmDiscard()) return AppExitResponse.cancel;
+          await _clearRecovery();
+          if (state.doc.revision != revision || state.interactionLocked) {
+            return AppExitResponse.cancel;
+          }
+          _autosave?.cancel();
+          return AppExitResponse.exit;
+        } finally {
+          _exitPending = false;
+        }
+      },
+    );
     final initial = widget.initialTool;
     if (initial != null) {
       state.setTool(initial);
@@ -30,7 +174,9 @@ class _StudioScreenState extends State<StudioScreen> {
 
   @override
   void dispose() {
-    state.dispose();
+    _autosave?.cancel();
+    _lifecycle?.dispose();
+    if (widget.state == null) state.dispose();
     super.dispose();
   }
 
@@ -40,41 +186,56 @@ class _StudioScreenState extends State<StudioScreen> {
       listenable: state,
       builder: (context, _) {
         final narrow = MediaQuery.sizeOf(context).width < 900;
-        return Focus(
-          autofocus: true,
-          child: CallbackShortcuts(
-            bindings: <ShortcutActivator, VoidCallback>{
-              const SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                control: true,
-              ): () =>
-                  state.undo(),
-              const SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                control: true,
-                shift: true,
-              ): () =>
-                  state.redo(),
-              const SingleActivator(
-                LogicalKeyboardKey.keyY,
-                control: true,
-              ): () =>
-                  state.redo(),
-              const SingleActivator(
-                LogicalKeyboardKey.keyO,
-                control: true,
-              ): () =>
-                  _showImport(context),
-              const SingleActivator(
-                LogicalKeyboardKey.keyS,
-                control: true,
-              ): () =>
-                  _showExport(context),
+        final useMeta = Theme.of(context).platform == TargetPlatform.macOS;
+        return CallbackShortcuts(
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.escape): () {
+              state.cancelInteraction();
             },
+            SingleActivator(
+              LogicalKeyboardKey.keyZ,
+              control: !useMeta,
+              meta: useMeta,
+            ): () =>
+                state.undo(),
+            SingleActivator(
+              LogicalKeyboardKey.keyZ,
+              control: !useMeta,
+              meta: useMeta,
+              shift: true,
+            ): () =>
+                state.redo(),
+            SingleActivator(
+              LogicalKeyboardKey.keyY,
+              control: !useMeta,
+              meta: useMeta,
+            ): () =>
+                state.redo(),
+            SingleActivator(
+              LogicalKeyboardKey.keyO,
+              control: !useMeta,
+              meta: useMeta,
+            ): () =>
+                _showImport(context),
+            SingleActivator(
+              LogicalKeyboardKey.keyS,
+              control: !useMeta,
+              meta: useMeta,
+            ): () =>
+                _saveProject(),
+          },
+          child: Focus(
+            autofocus: true,
             child: Scaffold(
               key: _scaffoldKey,
               endDrawer: narrow
-                  ? Drawer(width: 330, child: PropertiesPanel(state: state))
+                  ? Drawer(
+                      width: 330,
+                      child: AbsorbPointer(
+                        absorbing: state.interactionLocked,
+                        child: PropertiesPanel(state: state),
+                      ),
+                    )
                   : null,
               appBar: AppBar(
                 toolbarHeight: 46,
@@ -96,6 +257,8 @@ class _StudioScreenState extends State<StudioScreen> {
                         letterSpacing: 1.4,
                       ),
                     ),
+                    if (state.dirty)
+                      const Text(' *', semanticsLabel: 'Unsaved changes'),
                     const SizedBox(width: 16),
                     if (state.busy)
                       const SizedBox(
@@ -106,7 +269,9 @@ class _StudioScreenState extends State<StudioScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        state.status,
+                        state.operationPhase == null
+                            ? state.status
+                            : '${state.status} · ${state.operationPhase}',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 11,
@@ -117,25 +282,66 @@ class _StudioScreenState extends State<StudioScreen> {
                   ],
                 ),
                 actions: [
+                  if (state.busy)
+                    IconButton(
+                      tooltip: 'Cancel operation',
+                      icon: const Icon(Icons.cancel_outlined),
+                      onPressed: state.cancelInteraction,
+                    ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Project',
+                    enabled: !state.interactionLocked,
+                    onSelected: (action) async {
+                      if (action == 'save') await _saveProject();
+                      if (action == 'saveAs') await _saveProject(saveAs: true);
+                      if (action == 'open') await _openProject();
+                      if (action == 'transform') await _transform();
+                      if (action == 'boolean') await _boolean();
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'open',
+                        child: Text('Open project…'),
+                      ),
+                      PopupMenuItem(value: 'save', child: Text('Save project')),
+                      PopupMenuItem(
+                        value: 'saveAs',
+                        child: Text('Save project as…'),
+                      ),
+                      PopupMenuItem(
+                        value: 'transform',
+                        child: Text('Transform selected…'),
+                      ),
+                      PopupMenuItem(value: 'boolean', child: Text('Boolean…')),
+                    ],
+                  ),
                   IconButton(
                     tooltip: 'Undo',
                     icon: const Icon(Icons.undo, size: 18),
-                    onPressed: state.doc.canUndo ? () => state.undo() : null,
+                    onPressed: !state.interactionLocked && state.doc.canUndo
+                        ? () => state.undo()
+                        : null,
                   ),
                   IconButton(
                     tooltip: 'Redo',
                     icon: const Icon(Icons.redo, size: 18),
-                    onPressed: state.doc.canRedo ? () => state.redo() : null,
+                    onPressed: !state.interactionLocked && state.doc.canRedo
+                        ? () => state.redo()
+                        : null,
                   ),
                   IconButton(
                     tooltip: 'Import mesh',
                     icon: const Icon(Icons.file_open_outlined, size: 18),
-                    onPressed: () => _showImport(context),
+                    onPressed: state.interactionLocked
+                        ? null
+                        : () => _showImport(context),
                   ),
                   IconButton(
                     tooltip: 'Export selected',
                     icon: const Icon(Icons.save_outlined, size: 18),
-                    onPressed: () => _showExport(context),
+                    onPressed: state.interactionLocked
+                        ? null
+                        : () => _showExport(context),
                   ),
                   if (narrow)
                     IconButton(
@@ -152,9 +358,16 @@ class _StudioScreenState extends State<StudioScreen> {
                   final compact = constraints.maxWidth < 900;
                   return Row(
                     children: [
-                      LeftRail(state: state),
+                      AbsorbPointer(
+                        absorbing: state.interactionLocked,
+                        child: LeftRail(state: state),
+                      ),
                       Expanded(child: MeshViewport(state: state)),
-                      if (!compact) PropertiesPanel(state: state),
+                      if (!compact)
+                        AbsorbPointer(
+                          absorbing: state.interactionLocked,
+                          child: PropertiesPanel(state: state),
+                        ),
                     ],
                   );
                 },
@@ -167,62 +380,183 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 
   Future<void> _showImport(BuildContext context) async {
-    const roots = <String>[
-      '/data/re/meshmixer/extract/meshmixer/models',
-      '/data/mmx',
-    ];
-    final selected = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Import mesh'),
-        content: SizedBox(
-          width: 520,
-          height: 420,
-          child: DefaultTabController(
-            length: roots.length,
-            child: Column(
-              children: [
-                TabBar(
-                  tabs: roots.map((r) => Tab(text: r.split('/').last)).toList(),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: roots
-                        .map((root) => _FileList(root: root))
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
+    if (state.interactionLocked) return;
+    try {
+      final file = await openFile(
+        initialDirectory: _lastDirectory,
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'Mesh', extensions: MeshIO.importExtensions),
         ],
-      ),
-    );
-    if (selected != null) {
-      await state.importPath(selected);
+      );
+      if (file == null) return;
+      var unitScale = 1.0;
+      if ([
+        'obj',
+        'stl',
+        'ply',
+        'off',
+      ].contains(file.path.toLowerCase().split('.').last)) {
+        if (!context.mounted) return;
+        final units = await showDialog<double>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: const Text('Units used by this mesh'),
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'This format does not specify units. Coordinates are converted to millimeters.',
+                ),
+              ),
+              for (final entry in const {
+                'Millimeters': 1.0,
+                'Centimeters': 10.0,
+                'Meters': 1000.0,
+                'Inches': 25.4,
+                'Feet': 304.8,
+              }.entries)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, entry.value),
+                  child: Text(entry.key),
+                ),
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+        if (units == null) return;
+        unitScale = units;
+      }
+      await state.importPath(file.path, unitScale: unitScale);
+      _lastDirectory = File(file.path).parent.path;
+    } catch (e) {
+      state.status = 'Import failed: $e';
+      state.notify();
     }
   }
 
   Future<void> _showExport(BuildContext context) async {
-    final obj = state.selected;
-    if (obj == null) return;
-    final controller = TextEditingController(
-      text: '/data/mmx/${obj.name.replaceAll(RegExp(r'\.[^.]+$'), '')}_out.stl',
+    if (state.interactionLocked || state.selected == null) return;
+    try {
+      final file = await getSaveLocation(
+        initialDirectory: _lastDirectory,
+        suggestedName: 'mesh.stl',
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'Mesh', extensions: MeshIO.exportExtensions),
+        ],
+      );
+      if (file == null) return;
+      if (file.path.toLowerCase().endsWith('.mix')) {
+        if (!context.mounted) return;
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Export geometry to Meshmixer'),
+            content: const Text(
+              'This export contains the selected geometry. Original opaque Meshmixer records are retained only in the saved .mmx project, not copied into this edited export.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Export'),
+              ),
+            ],
+          ),
+        );
+        if (proceed != true) return;
+      }
+      await state.exportSelected(file.path);
+      _lastDirectory = File(file.path).parent.path;
+    } catch (e) {
+      state.status = 'Export failed: $e';
+      state.notify();
+    }
+  }
+
+  Future<bool> _saveProject({bool saveAs = false}) async {
+    if (state.interactionLocked) return false;
+    try {
+      var path = saveAs ? null : state.projectPath;
+      path ??= (await getSaveLocation(
+        initialDirectory: _lastDirectory,
+        suggestedName: 'project.mmx',
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'mmx project', extensions: ['mmx']),
+        ],
+      ))?.path;
+      if (path == null) return false;
+      final saved = await state.saveProject(path);
+      if (saved) {
+        await _clearRecovery();
+        _lastDirectory = File(path).parent.path;
+      }
+      return saved;
+    } catch (e) {
+      state.status = 'Save failed: $e';
+      state.notify();
+      return false;
+    }
+  }
+
+  Future<void> _openProject() async {
+    if (!await _confirmDiscard()) return;
+    try {
+      final file = await openFile(
+        initialDirectory: _lastDirectory,
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'mmx project', extensions: ['mmx']),
+        ],
+      );
+      if (file != null) {
+        if (await state.openProject(file.path)) {
+          await _clearRecovery();
+          _lastDirectory = File(file.path).parent.path;
+        }
+      }
+    } catch (e) {
+      state.status = 'Open failed: $e';
+      state.notify();
+    }
+  }
+
+  Future<void> _transform() async {
+    if (state.selected == null) return;
+    final controllers = List.generate(
+      7,
+      (i) => TextEditingController(text: i == 6 ? '1' : '0'),
     );
-    final path = await showDialog<String>(
+    const labels = [
+      'X (mm)',
+      'Y (mm)',
+      'Z (mm)',
+      'Rotate X (degrees)',
+      'Rotate Y (degrees)',
+      'Rotate Z (degrees)',
+      'Uniform scale',
+    ];
+    final values = await showDialog<List<double>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Export'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Path (.stl / .obj / .ply)',
+        title: const Text('Transform selected'),
+        content: SizedBox(
+          width: 300,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < 7; i++)
+                  TextField(
+                    controller: controllers[i],
+                    decoration: InputDecoration(labelText: labels[i]),
+                  ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -231,58 +565,113 @@ class _StudioScreenState extends State<StudioScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Export'),
+            onPressed: () {
+              final v = controllers
+                  .map((c) => double.tryParse(c.text))
+                  .toList();
+              if (v.any((n) => n == null || !n.isFinite) || v[6]! <= 0) return;
+              Navigator.pop(context, v.cast<double>());
+            },
+            child: const Text('Apply'),
           ),
         ],
       ),
     );
-    if (path != null) await state.exportSelected(path);
-  }
-}
-
-class _FileList extends StatelessWidget {
-  final String root;
-  const _FileList({required this.root});
-
-  @override
-  Widget build(BuildContext context) {
-    final dir = Directory(root);
-    if (!dir.existsSync()) {
-      return Center(child: Text('$root not found'));
+    for (final c in controllers) {
+      c.dispose();
     }
-    final files =
-        dir
-            .listSync()
-            .whereType<File>()
-            .where(
-              (f) =>
-                  f.path.endsWith('.obj') ||
-                  f.path.endsWith('.stl') ||
-                  f.path.endsWith('.ply') ||
-                  f.path.endsWith('.off'),
-            )
-            .toList()
-          ..sort((a, b) => a.path.compareTo(b.path));
-    return ListView.builder(
-      itemCount: files.length,
-      itemBuilder: (context, i) {
-        final f = files[i];
-        final size = (f.lengthSync() / 1024).toStringAsFixed(0);
-        return ListTile(
-          dense: true,
-          leading: const Icon(Icons.insert_drive_file_outlined, size: 16),
-          title: Text(
-            f.path.split('/').last,
-            style: const TextStyle(fontSize: 12),
-          ),
-          subtitle: Text(
-            '${f.path.split('/').sublist(0, f.path.split('/').length - 1).join('/')}  ·  $size KB',
-            style: const TextStyle(fontSize: 10),
-          ),
-          onTap: () => Navigator.pop(context, f.path),
-        );
-      },
+    if (values == null) return;
+    Float64List m = scale4(values[6]);
+    for (var i = 0; i < 3; i++) {
+      m = multiply4(
+        rotation4(
+          i == 0 ? 1 : 0,
+          i == 1 ? 1 : 0,
+          i == 2 ? 1 : 0,
+          values[i + 3] * 3.141592653589793 / 180,
+        ),
+        m,
+      );
+    }
+    final pivot = state.selected?.pivot;
+    if (pivot != null) {
+      final local = pivot.position, t = state.selected!.transform;
+      final p = [
+        for (var i = 0; i < 3; i++)
+          t[i] * local[0] +
+              t[i + 4] * local[1] +
+              t[i + 8] * local[2] +
+              t[i + 12],
+      ];
+      m = multiply4(
+        translation4(p[0], p[1], p[2]),
+        multiply4(m, translation4(-p[0], -p[1], -p[2])),
+      );
+    }
+    await state.transformSelected(
+      multiply4(translation4(values[0], values[1], values[2]), m),
     );
+  }
+
+  Future<void> _boolean() async {
+    final others = state.doc.objects
+        .where((o) => o.id != state.selectedObjectId)
+        .toList();
+    if (state.selected == null || others.isEmpty) {
+      state.status = 'Boolean needs two objects';
+      state.notify();
+      return;
+    }
+    var target = others.first.id;
+    var op = BooleanOp.union;
+    var precise = true;
+    final apply = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('Boolean selected with…'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButton<int>(
+                value: target,
+                items: others
+                    .map(
+                      (o) => DropdownMenuItem(value: o.id, child: Text(o.name)),
+                    )
+                    .toList(),
+                onChanged: (v) => update(() => target = v!),
+              ),
+              DropdownButton<BooleanOp>(
+                value: op,
+                items: BooleanOp.values
+                    .map((o) => DropdownMenuItem(value: o, child: Text(o.name)))
+                    .toList(),
+                onChanged: (v) => update(() => op = v!),
+              ),
+              CheckboxListTile(
+                title: const Text('Precise (may fall back to grid)'),
+                value: precise,
+                onChanged: (v) => update(() => precise = v!),
+              ),
+              const Text(
+                'Replaces the selected object; keeps the other operand.',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (apply == true) await state.doBoolean(target, op, precise: precise);
   }
 }

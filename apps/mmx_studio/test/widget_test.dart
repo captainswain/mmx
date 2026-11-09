@@ -14,8 +14,9 @@ void main() {
   });
 
   testWidgets('UI state drives a kernel operator end to end', (tester) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       // Wait for the startup model to load and render.
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -49,8 +50,9 @@ void main() {
   });
 
   testWidgets('mirror operator is wired through app state', (tester) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
@@ -84,8 +86,9 @@ void main() {
   });
 
   testWidgets('flip normals and measure run through app state', (tester) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
@@ -105,8 +108,9 @@ void main() {
   });
 
   testWidgets('stamp runs through app state', (tester) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
@@ -122,8 +126,9 @@ void main() {
   });
 
   testWidgets('align to target runs through app state', (tester) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
@@ -141,8 +146,9 @@ void main() {
   });
 
   testWidgets('mix scene import loads mesh objects', (tester) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
@@ -184,8 +190,9 @@ void main() {
   testWidgets('extract and make part are wired through app state', (
     tester,
   ) async {
-    final state = StudioState();
+    late StudioState state;
     await tester.runAsync(() async {
+      state = StudioState();
       for (var i = 0; i < 100 && state.selected == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
@@ -196,6 +203,8 @@ void main() {
       expect(state.doc.objects.length, greaterThan(before));
       expect(state.status, contains('Extracted'));
       final afterExtract = state.doc.objects.length;
+      expect(state.selection, isNull);
+      await state.selectAll();
       await state.makePart();
       expect(state.doc.objects.length, greaterThan(afterExtract));
       expect(state.status, contains('solid part'));

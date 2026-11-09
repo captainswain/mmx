@@ -1,81 +1,120 @@
 import 'dart:typed_data';
+import 'dart:convert';
+import 'polygon_triangulation.dart';
 
 import '../mesh/tri_mesh.dart';
 
 /// Wavefront OBJ import/export. Supports negative indices, polygon faces
-/// (fan triangulated), and per-object/group segmentation.
+/// (ear-clipped), and per-object/group segmentation.
 class ObjIO {
   static TriMesh read(String text, {bool keepGroups = true}) {
-    final positions = <double>[];
-    final builder = MeshBuilder();
-    // OBJ vertex ids are 1-based over the *file*, so keep an explicit map from
-    // file vertex id to builder vertex id.
-    final fileToLocal = <int, int>{};
-    final groupIds = <int>[];
-    var currentGroup = 0;
+    if (text.length > 256 * 1024 * 1024) {
+      throw const FormatException('OBJ exceeds size limit');
+    }
+    final positions = <double>[], colors = <double>[];
+    final indices = <int>[], groupIds = <int>[];
     final groupNames = <String, int>{};
-
-    int resolve(int objIndex) {
-      // objIndex is 1-based and may be negative (relative).
-      final abs =
-          objIndex > 0 ? objIndex : positions.length ~/ 3 + objIndex + 1;
-      final cached = fileToLocal[abs];
-      if (cached != null) return cached;
-      final base = (abs - 1) * 3;
-      if (base < 0 || base + 2 >= positions.length) return 0;
-      final id = builder.addVertex(
-          positions[base], positions[base + 1], positions[base + 2]);
-      fileToLocal[abs] = id;
-      return id;
+    var currentGroup = 0, anyColor = false;
+    int resolve(String token) {
+      final n = int.tryParse(token.split('/').first);
+      if (n == null || n == 0) {
+        throw const FormatException('Invalid OBJ vertex index');
+      }
+      final i = n > 0 ? n - 1 : positions.length ~/ 3 + n;
+      if (i < 0 || i >= positions.length ~/ 3) {
+        throw const FormatException('Invalid OBJ vertex index');
+      }
+      return i;
     }
 
-    for (final raw in text.split('\n')) {
-      final line = raw.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
+    for (final raw
+        in LineSplitter.split(text.replaceAll(RegExp(r'\\\r?\n'), ' '))) {
+      final line = raw.split('#').first.trim();
+      if (line.isEmpty) continue;
+      if (line.length > 1024 * 1024) {
+        throw const FormatException('OBJ line exceeds size limit');
+      }
       final parts = line.split(RegExp(r'\s+'));
       switch (parts[0]) {
         case 'v':
-          if (parts.length >= 4) {
-            positions.add(double.parse(parts[1]));
-            positions.add(double.parse(parts[2]));
-            positions.add(double.parse(parts[3]));
+          if (positions.length >= 6000000 ||
+              ![4, 5, 7].contains(parts.length)) {
+            throw const FormatException(
+                'Invalid OBJ vertex or vertex limit exceeded');
+          }
+          final values = parts.skip(1).map(double.parse).toList();
+          if (values.any((v) => !v.isFinite)) {
+            throw const FormatException('Non-finite OBJ vertex');
+          }
+          final w = parts.length == 5 ? values[3] : 1.0;
+          if (w == 0) {
+            throw const FormatException('Zero homogeneous OBJ coordinate');
+          }
+          positions.addAll(values.take(3).map((v) => v / w));
+          if (parts.length == 7) {
+            final rgb = values.skip(3).toList();
+            if (rgb.any((v) => v < 0 || v > 1)) {
+              throw const FormatException('OBJ color outside [0,1]');
+            }
+            colors.addAll(rgb);
+            anyColor = true;
+          } else {
+            colors.addAll([1, 1, 1]);
           }
         case 'g':
         case 'o':
           if (keepGroups && parts.length > 1) {
-            currentGroup = groupNames.putIfAbsent(
-                parts.sublist(1).join(' '), () => groupNames.length + 1);
+            final name = parts.sublist(1).join(' ');
+            final encoded = RegExp(r'^group_(\d+)$').firstMatch(name);
+            final group = encoded == null
+                ? groupNames.putIfAbsent(name, () => groupNames.length + 1)
+                : int.parse(encoded.group(1)!);
+            if (group > 65535) {
+              throw const FormatException('OBJ face group limit exceeded');
+            }
+            currentGroup = group;
           }
         case 'f':
-          final idx = <int>[];
-          for (var i = 1; i < parts.length; i++) {
-            final token = parts[i].split('/').first;
-            final v = int.tryParse(token);
-            if (v != null) idx.add(resolve(v));
+          if (parts.length < 4 || parts.length > 4097) {
+            throw const FormatException('Invalid OBJ polygon');
           }
-          for (var i = 2; i < idx.length; i++) {
-            builder.addTriangle(idx[0], idx[i - 1], idx[i]);
-            groupIds.add(currentGroup);
+          final face = parts.skip(1).map(resolve).toList();
+          final triangles = triangulatePolygon(positions, face);
+          if (indices.length + triangles.length > 12000000) {
+            throw const FormatException('OBJ triangle limit exceeded');
           }
+          indices.addAll(triangles);
+          groupIds
+              .addAll(List<int>.filled(triangles.length ~/ 3, currentGroup));
       }
     }
-    final mesh = builder.build();
+    final mesh = TriMesh(
+        Float32List.fromList(positions), Uint32List.fromList(indices),
+        vertexColors: anyColor ? Float32List.fromList(colors) : null,
+        faceGroups: keepGroups && groupIds.isNotEmpty
+            ? Uint16List.fromList(groupIds)
+            : null);
+    if (mesh.validate().isNotEmpty) {
+      throw const FormatException('Invalid OBJ geometry');
+    }
     mesh.removeDegenerateFaces();
-    if (keepGroups && groupIds.isNotEmpty) {
-      final groups = List<int>.filled(mesh.faceCount, 0);
-      for (var i = 0; i < groups.length && i < groupIds.length; i++) {
-        groups[i] = groupIds[i];
-      }
-      mesh.faceGroups = Uint16List.fromList(groups);
-    }
     return mesh;
   }
 
   static String write(TriMesh mesh,
       {String name = 'mesh', bool writeGroups = true}) {
+    if (mesh.validate().isNotEmpty) {
+      throw const FormatException('Invalid OBJ geometry');
+    }
+    name = name.replaceAll(RegExp(r'[\r\n]'), ' ');
     final sb = StringBuffer('# exported by mmx_core\n');
     for (var i = 0; i < mesh.vertexCount; i++) {
-      sb.writeln('v ${mesh.vx(i)} ${mesh.vy(i)} ${mesh.vz(i)}');
+      sb.write('v ${mesh.vx(i)} ${mesh.vy(i)} ${mesh.vz(i)}');
+      if (mesh.vertexColors != null) {
+        sb.write(
+            ' ${mesh.vertexColors![i * 3]} ${mesh.vertexColors![i * 3 + 1]} ${mesh.vertexColors![i * 3 + 2]}');
+      }
+      sb.writeln();
     }
     if (writeGroups && mesh.faceGroups != null) {
       var last = -1;

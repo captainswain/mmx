@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../mesh/topology.dart';
+import '../mesh/attributes.dart';
 import '../mesh/tri_mesh.dart';
 
 /// Quadric-error-metric decimation.
@@ -40,6 +41,7 @@ class Decimator {
     }
     final faceAlive = List<bool>.filled(faces.length, true);
     final vAlive = List<bool>.filled(n, true);
+    final revisions = Uint32List(n);
     final vFaces = List<Set<int>>.generate(n, (_) => <int>{});
     for (var f = 0; f < faces.length; f++) {
       for (final v in faces[f]) {
@@ -104,11 +106,14 @@ class Decimator {
               w,
               (positions[v * 3] + positions[w * 3]) * 0.5,
               (positions[v * 3 + 1] + positions[w * 3 + 1]) * 0.5,
-              (positions[v * 3 + 2] + positions[w * 3 + 2]) * 0.5);
+              (positions[v * 3 + 2] + positions[w * 3 + 2]) * 0.5,
+              revisions[v],
+              revisions[w]);
           continue;
         }
         final cost = _collapseCost(quadrics[v], quadrics[w], positions, v, w);
-        heap.push(cost.cost, v, w, cost.x, cost.y, cost.z);
+        heap.push(cost.cost, v, w, cost.x, cost.y, cost.z, revisions[v],
+            revisions[w]);
       }
     }
 
@@ -117,12 +122,15 @@ class Decimator {
     }
 
     var guard = 0;
-    while (liveFaces > target && heap.isNotEmpty && guard++ < n * 20) {
+    while (liveFaces > target && heap.isNotEmpty) {
       final e = heap.pop();
-      if (maxDeviation != null && e.cost > maxDeviation * maxDeviation) break;
       final a = e.a, b = e.b;
       if (!vAlive[a] || !vAlive[b]) continue;
+      // An earlier collapse changes both the endpoint quadric and its position.
+      // Reject stale queue entries before using their cost or destination.
+      if (e.revisionA != revisions[a] || e.revisionB != revisions[b]) continue;
       if (!_isEdge(vFaces[a], vFaces[b], faces)) continue;
+      if (maxDeviation != null && e.cost > maxDeviation * maxDeviation) break;
       if (!_legalCollapse(
           vFaces, faces, vAlive, a, b, positions, e.x, e.y, e.z)) {
         continue;
@@ -131,6 +139,8 @@ class Decimator {
       positions[b * 3] = e.x;
       positions[b * 3 + 1] = e.y;
       positions[b * 3 + 2] = e.z;
+      revisions[b]++;
+      guard++;
       for (var k = 0; k < 10; k++) {
         quadrics[b][k] += quadrics[a][k];
       }
@@ -158,6 +168,7 @@ class Decimator {
     progress?.call(liveFaces, target);
 
     final builder = MeshBuilder();
+    final groups = input.faceGroups == null ? null : <int>[];
     final remap = Int32List(n);
     for (var v = 0; v < n; v++) {
       remap[v] = -1;
@@ -175,10 +186,13 @@ class Decimator {
       }
       if (ids[0] == ids[1] || ids[1] == ids[2] || ids[0] == ids[2]) continue;
       builder.addTriangle(ids[0], ids[1], ids[2]);
+      groups?.add(input.faceGroups![f]);
     }
-    final out = builder.build();
+    final out = builder.build()
+      ..faceGroups = groups == null ? null : Uint16List.fromList(groups);
     out.removeDegenerateFaces();
     out.compact();
+    out.vertexColors = transferVertexColors(input, out);
     return out;
   }
 
@@ -325,7 +339,9 @@ class Decimator {
     for (var i = 0; i < 10; i++) {
       q[i] = qa[i] + qb[i];
     }
-    // Solve for the optimal position; fall back to the midpoint.
+    // Solve for the optimal position; a singular quadric is common on planar
+    // surfaces. Choose the best endpoint/midpoint instead of moving corners
+    // off their constraint planes merely because the system is singular.
     final m11 = q[0], m12 = q[1], m13 = q[2];
     final m22 = q[4], m23 = q[5], m33 = q[7];
     final r1 = -q[3], r2 = -q[6], r3 = -q[8];
@@ -350,6 +366,17 @@ class Decimator {
       x = (positions[a * 3] + positions[b * 3]) * 0.5;
       y = (positions[a * 3 + 1] + positions[b * 3 + 1]) * 0.5;
       z = (positions[a * 3 + 2] + positions[b * 3 + 2]) * 0.5;
+      var best = _quadricError(q, x, y, z);
+      for (final v in [a, b]) {
+        final error = _quadricError(
+            q, positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]);
+        if (error < best) {
+          best = error;
+          x = positions[v * 3];
+          y = positions[v * 3 + 1];
+          z = positions[v * 3 + 2];
+        }
+      }
     }
     final err = _quadricError(q, x, y, z);
     // Bias toward short edges so we do not skip small features early.
@@ -384,7 +411,9 @@ class _Edge {
   final double cost;
   final int a, b;
   final double x, y, z;
-  _Edge(this.cost, this.a, this.b, this.x, this.y, this.z);
+  final int revisionA, revisionB;
+  _Edge(this.cost, this.a, this.b, this.x, this.y, this.z, this.revisionA,
+      this.revisionB);
 }
 
 /// Binary min-heap over edges.
@@ -394,8 +423,9 @@ class _EdgeHeap {
   bool get isEmpty => _items.isEmpty;
   bool get isNotEmpty => _items.isNotEmpty;
 
-  void push(double cost, int a, int b, double x, double y, double z) {
-    _items.add(_Edge(cost, a, b, x, y, z));
+  void push(double cost, int a, int b, double x, double y, double z,
+      int revisionA, int revisionB) {
+    _items.add(_Edge(cost, a, b, x, y, z, revisionA, revisionB));
     var i = _items.length - 1;
     while (i > 0) {
       final parent = (i - 1) >> 1;

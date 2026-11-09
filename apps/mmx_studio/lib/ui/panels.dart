@@ -252,6 +252,25 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.planeCut:
         return <Widget>[
           _sectionTitle('Plane Cut'),
+          DropdownButton<int>(
+            value: state.planeAxis,
+            items: [
+              for (var i = 0; i < 3; i++)
+                DropdownMenuItem(value: i, child: Text(['X', 'Y', 'Z'][i])),
+            ],
+            onChanged: (v) {
+              state.planeAxis = v!;
+              state.notify();
+            },
+          ),
+          SwitchListTile(
+            title: const Text('Keep positive side'),
+            value: state.planeKeepPositive,
+            onChanged: (v) {
+              state.planeKeepPositive = v;
+              state.notify();
+            },
+          ),
           _slider(
             'Offset',
             state.planeOffset,
@@ -267,7 +286,7 @@ class PropertiesPanel extends StatelessWidget {
             onChanged: (v) => state.planeFill = v,
           ),
           const SizedBox(height: 6),
-          _button(context, 'Cut (discard top)', state.doPlaneCut),
+          _button(context, 'Apply cut', state.doPlaneCut),
         ];
       case StudioTool.mirror:
         return <Widget>[
@@ -745,7 +764,7 @@ class PropertiesPanel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           textStyle: const TextStyle(fontSize: 11),
         ),
-        onPressed: state.busy ? null : () => fn(),
+        onPressed: state.interactionLocked ? null : () => fn(),
         child: Text(label),
       ),
     );
@@ -816,25 +835,7 @@ class PropertiesPanel extends StatelessWidget {
     });
   }
 
-  Future<void> _packAll() async {
-    final meshes = state.doc.objects.map((o) => o.worldMesh()).toList();
-    if (meshes.isEmpty) return;
-    final result = Packer.pack(
-      meshes,
-      bedWidth: 200,
-      bedDepth: 200,
-      quality: 1,
-    );
-    for (var i = 0; i < result.placed.length; i++) {
-      final p = result.placed[i];
-      final obj = state.doc.objects[p.index];
-      obj.transform = Float64List.fromList(p.transform);
-    }
-    state.status =
-        'Packed ${result.placed.length} objects '
-        '(${(result.bedUtilization * 100).toStringAsFixed(1)}% bed use)';
-    await state.render();
-  }
+  Future<void> _packAll() => state.packAll();
 
   Future<void> _sliceReport() async {
     final obj = state.selected;

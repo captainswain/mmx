@@ -12,39 +12,13 @@ class ComplexTools {
   /// face-group assignment of each component.
   static List<TriMesh> split(TriMesh mesh) {
     final (ids, count) = MeshTopology(mesh).components();
-    if (count == 0) return <TriMesh>[];
-    final out = <TriMesh>[];
-    for (var c = 0; c < count; c++) {
-      final builder = MeshBuilder();
-      final vertexMap = <int, int>{};
-      final groups = <int>[];
-      for (var f = 0; f < mesh.faceCount; f++) {
-        if (ids[f] != c) continue;
-        final face = <int>[
-          mesh.indices[f * 3],
-          mesh.indices[f * 3 + 1],
-          mesh.indices[f * 3 + 2],
-        ];
-        final mapped = <int>[];
-        for (final v in face) {
-          final existing = vertexMap[v];
-          if (existing != null) {
-            mapped.add(existing);
-          } else {
-            final id = builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v));
-            vertexMap[v] = id;
-            mapped.add(id);
-          }
-        }
-        builder.addTriangle(mapped[0], mapped[1], mapped[2]);
-        groups.add(mesh.faceGroups == null ? 0 : mesh.faceGroups![f]);
-      }
-      if (builder.faceCount == 0) continue;
-      final part = builder.build();
-      out.add(TriMesh(part.positions, part.indices,
-          faceGroups: Uint16List.fromList(groups)));
-    }
-    return out;
+    return [
+      for (var c = 0; c < count; c++)
+        mesh.extractFaces([
+          for (var f = 0; f < mesh.faceCount; f++)
+            if (ids[f] == c) f,
+        ])
+    ];
   }
 
   /// Keeps the shells that match [keep] (or all shells when [keep] is null),
@@ -70,29 +44,7 @@ class ComplexTools {
 
   /// Extracts the selected faces as a new mesh (Make Part).
   static TriMesh extract(TriMesh mesh, Set<int> faces) {
-    final builder = MeshBuilder();
-    final vertexMap = <int, int>{};
-    final groups = <int>[];
-    for (final f in faces) {
-      if (f < 0 || f >= mesh.faceCount) continue;
-      final mapped = <int>[];
-      for (var k = 0; k < 3; k++) {
-        final v = mesh.indices[f * 3 + k];
-        final existing = vertexMap[v];
-        if (existing != null) {
-          mapped.add(existing);
-        } else {
-          final id = builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v));
-          vertexMap[v] = id;
-          mapped.add(id);
-        }
-      }
-      builder.addTriangle(mapped[0], mapped[1], mapped[2]);
-      groups.add(mesh.faceGroups == null ? 0 : mesh.faceGroups![f]);
-    }
-    final part = builder.build();
-    return TriMesh(part.positions, part.indices,
-        faceGroups: Uint16List.fromList(groups));
+    return mesh.extractFaces(faces.where((f) => f >= 0 && f < mesh.faceCount));
   }
 
   /// Converts a selected face region into a solid part (Make Solid Part).

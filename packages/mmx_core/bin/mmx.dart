@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:args/args.dart';
 import 'dart:typed_data';
 
 import 'package:mmx_core/mmx_core.dart';
@@ -6,7 +8,7 @@ import 'package:mmx_core/mmx_core.dart';
 const String _usage = '''
 mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
 
-  mmx info <file>
+  mmx info <file> [--json]
   mmx repair <in> <out> [--weld 1e-5]
   mmx remesh <in> <out> --edge <len> [--iters 6] [--adaptive 0-1]
   mmx reduce <in> <out> --percent <0-1> | --faces <n> [--uniform] [--max-dev <d>]
@@ -17,7 +19,7 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
   mmx supports <in> <out> [--angle 45] [--density 0.5] [--bed 0]
   mmx pack <out> <in...> [--bed 200] [--quality 1]
   mmx slice <in> [--layer 0.2]
-  mmx analyze <in> [--thickness 1.0] [--overhang 45]
+  mmx analyze <in> [--thickness 1.0] [--overhang 45] [--json]
   mmx mirror <in> <out> [--plane <x>] [--keep] [--weld <tol>]
   mmx flip <in> <out>
   mmx smooth <in> <out> [--iters 8]
@@ -27,46 +29,198 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
   mmx combine <out> <in...>
   mmx pattern <in> <out> [--nx 3] [--nz 2] [--gap 2]
   mmx primitive <in> <out> [--kind box|cylinder|sphere]
-  mmx measure <in>
+  mmx measure <in> [--json]
   mmx clearance <a> <b>
   mmx convert <in> <out> [.mix supported]
   mmx render <in> <out.png> [--width 960] [--height 640] [--yaw 0.6] [--pitch 0.35] [--wire]
 ''';
 
+class UsageError implements Exception {
+  final String message;
+  UsageError(this.message);
+  @override
+  String toString() => message;
+}
+
 Future<void> main(List<String> args) async {
+  try {
+    await run(args);
+  } on UsageError catch (e) {
+    stderr.writeln('$e\nUse mmx --help for usage.');
+    exitCode = 2;
+  } on Object catch (e) {
+    stderr.writeln('mmx: $e');
+    exitCode = 1;
+  }
+}
+
+Future<void> run(List<String> args) async {
   if (args.isEmpty || args.first == '-h' || args.first == '--help') {
     stdout.writeln(_usage);
     return;
   }
+  const specs = <String, (int, String)>{
+    'info': (1, 'json'),
+    'repair': (2, 'weld'),
+    'remesh': (2, 'edge iters adaptive debug-topology'),
+    'reduce': (2, 'percent faces uniform max-dev'),
+    'solid': (2, 'mode res offset smooth'),
+    'boolean': (3, 'op precise edge res'),
+    'hollow': (2, 'thickness holes hole-radius res'),
+    'offset': (2, 'distance res'),
+    'supports': (2, 'angle density post base bed'),
+    'pack': (2, 'bed quality'),
+    'slice': (1, 'layer'),
+    'analyze': (1, 'thickness overhang json'),
+    'mirror': (2, 'plane keep weld'),
+    'separate': (2, ''),
+    'merge': (2, ''),
+    'combine': (2, ''),
+    'flip': (2, ''),
+    'smooth': (2, 'iters'),
+    'drop': (2, 'bed'),
+    'center': (2, 'bed'),
+    'duplicate': (2, 'dx dy dz'),
+    'pattern': (2, 'nx nz gap'),
+    'primitive': (2, 'kind'),
+    'measure': (1, 'json'),
+    'clearance': (2, ''),
+    'convert': (2, ''),
+    'render': (2, 'width height yaw pitch wire bed'),
+  };
   final cmd = args.first;
-  final rest = args.sublist(1);
-  final positional = <String>[];
-  final flags = <String, String>{};
-  for (var i = 0; i < rest.length; i++) {
-    final a = rest[i];
-    if (a.startsWith('--')) {
-      final key = a.substring(2);
-      if (i + 1 < rest.length && !rest[i + 1].startsWith('--')) {
-        flags[key] = rest[++i];
-      } else {
-        flags[key] = 'true';
-      }
+  final spec = specs[cmd];
+  if (spec == null) throw UsageError('Unknown command: $cmd');
+  final parser = ArgParser()..addFlag('help', abbr: 'h', negatable: false);
+  const switches = {
+    'precise',
+    'keep',
+    'uniform',
+    'wire',
+    'debug-topology',
+    'json'
+  };
+  for (final key in spec.$2.split(' ').where((s) => s.isNotEmpty)) {
+    if (switches.contains(key)) {
+      parser.addFlag(key, negatable: false);
     } else {
-      positional.add(a);
+      parser.addOption(key);
     }
+  }
+  late ArgResults parsed;
+  try {
+    parsed = parser.parse(args.sublist(1));
+  } on FormatException catch (e) {
+    throw UsageError(e.message);
+  }
+  if (parsed['help'] == true) {
+    stdout.writeln(_usage);
+    stdout.writeln(parser.usage);
+    return;
+  }
+  final positional = parsed.rest;
+  final variable = {'pack', 'merge', 'combine'}.contains(cmd);
+  if (positional.length < spec.$1 ||
+      (!variable && positional.length != spec.$1)) {
+    throw UsageError(
+        '$cmd requires ${variable ? "at least " : ""}${spec.$1} path arguments');
+  }
+  final flags = <String, String>{
+    for (final key in parser.options.keys)
+      if (parsed.wasParsed(key)) key: parsed[key].toString()
+  };
+  const enums = {
+    'mode': ['fast', 'accurate', 'blocky'],
+    'op': ['union', 'intersection', 'difference'],
+    'kind': ['box', 'cylinder', 'sphere']
+  };
+  const integers = {
+    'faces',
+    'iters',
+    'res',
+    'smooth',
+    'holes',
+    'quality',
+    'nx',
+    'nz',
+    'width',
+    'height'
+  };
+  const signed = {
+    'offset',
+    'distance',
+    'bed',
+    'plane',
+    'dx',
+    'dy',
+    'dz',
+    'yaw',
+    'pitch'
+  };
+  for (final e in flags.entries) {
+    if (switches.contains(e.key)) continue;
+    if (enums.containsKey(e.key)) {
+      if (!enums[e.key]!.contains(e.value)) {
+        throw UsageError('Invalid --${e.key}: ${e.value}');
+      }
+      continue;
+    }
+    final n = double.tryParse(e.value);
+    if (n == null ||
+        !n.isFinite ||
+        (integers.contains(e.key) && n != n.truncateToDouble()) ||
+        (!signed.contains(e.key) && n < 0)) {
+      throw UsageError('Invalid --${e.key}: ${e.value}');
+    }
+    if ({
+          'edge',
+          'thickness',
+          'hole-radius',
+          'layer',
+          'post',
+          'base',
+          'width',
+          'height',
+          'nx',
+          'nz',
+          'faces',
+          'quality'
+        }.contains(e.key) &&
+        n <= 0) {
+      throw UsageError('--${e.key} must be positive');
+    }
+    if ({'percent', 'density', 'adaptive'}.contains(e.key) && n > 1) {
+      throw UsageError('--${e.key} must be in [0,1]');
+    }
+    if ({'angle', 'overhang'}.contains(e.key) && n > 180) {
+      throw UsageError('--${e.key} must be in [0,180]');
+    }
+    if (e.key == 'res' && (n < 8 || n > 256)) {
+      throw UsageError('--res must be in [8,256]');
+    }
+    if ({'width', 'height'}.contains(e.key) && n > 4096) {
+      throw UsageError('--${e.key} exceeds 4096');
+    }
+    if ({'iters', 'smooth', 'holes', 'nx', 'nz', 'quality'}.contains(e.key) &&
+        n > 1000) {
+      throw UsageError('--${e.key} exceeds 1000');
+    }
+  }
+  if (flags.containsKey('percent') && flags.containsKey('faces')) {
+    throw UsageError('Choose --percent or --faces');
   }
 
   TriMesh load(String path) {
     final f = File(path);
     if (!f.existsSync()) {
       stderr.writeln('missing file: $path');
-      exit(2);
+      throw FileSystemException('Input file does not exist', path);
     }
     return MeshIO.readBytes(path, f.readAsBytesSync());
   }
 
-  void save(String path, TriMesh mesh) {
-    File(path).writeAsBytesSync(MeshIO.writeBytes(path, mesh));
+  Future<void> save(String path, TriMesh mesh) async {
+    await writeFileAtomically(path, MeshIO.writeBytes(path, mesh));
     stdout.writeln(
         'wrote $path (${mesh.vertexCount} verts, ${mesh.faceCount} faces)');
   }
@@ -78,6 +232,14 @@ Future<void> main(List<String> args) async {
     case 'info':
       {
         final mesh = load(positional[0]);
+        if (flags.containsKey('json')) {
+          stdout.writeln(jsonEncode({
+            'vertices': mesh.vertexCount,
+            'faces': mesh.faceCount,
+            ...Modify.measure(mesh).toJson()
+          }));
+          return;
+        }
         final topo = MeshTopology(mesh);
         final b = mesh.bounds();
         stdout.writeln('file: ${positional[0]}');
@@ -109,18 +271,21 @@ Future<void> main(List<String> args) async {
         Weld.removeDuplicateFaces(mesh);
         mesh = MeshInspector.splitNonManifold(mesh);
         mesh = HoleFiller.fill(mesh, mode: HoleFillMode.smooth);
-        save(positional[1], mesh);
+        await save(positional[1], mesh);
       }
     case 'remesh':
       {
         final mesh = load(positional[0]);
         final edge = flag('edge', mesh.bounds().diagonal / 100);
-        final out = IsotropicRemesher.remesh(mesh,
+        final out = IsotropicRemesher.remeshDetailed(mesh,
             targetEdgeLength: edge,
             iterations: flag('iters', 6).toInt(),
             adaptiveDensity: flag('adaptive', 0),
             debugTopology: flags.containsKey('debug-topology'));
-        save(positional[1], out);
+        if (out.usedUniformFallback) {
+          stderr.writeln('remesh fallback: ${out.fallbackReason}');
+        }
+        await save(positional[1], out.mesh);
       }
     case 'reduce':
       {
@@ -135,7 +300,7 @@ Future<void> main(List<String> args) async {
             percentage: pct,
             uniform: flags.containsKey('uniform'),
             maxDeviation: maxDev == null || maxDev <= 0 ? null : maxDev);
-        save(positional[1], out);
+        await save(positional[1], out);
       }
     case 'solid':
       {
@@ -153,7 +318,7 @@ Future<void> main(List<String> args) async {
         stdout.writeln(
             'grid ${r.gridResolution} cell ${r.cellSize.toStringAsFixed(4)} '
             '${r.elapsedMs}ms');
-        save(positional[1], r.mesh);
+        await save(positional[1], r.mesh);
       }
     case 'boolean':
       {
@@ -165,13 +330,17 @@ Future<void> main(List<String> args) async {
           _ => BooleanOp.union,
         };
         final r = flags.containsKey('precise')
-            ? PreciseBoolean.compute(a, b, op,
+            ? PreciseBoolean.computeDetailed(a, b, op,
                 edgeLength:
                     flags['edge'] == null ? null : double.parse(flags['edge']!),
                 resolution: flag('res', 160).toInt())
-            : Solidifier.boolean(a, b, op, resolution: flag('res', 160).toInt())
-                .mesh;
-        save(positional[2], r);
+            : BooleanResult(Solidifier.boolean(a, b, op,
+                    resolution: flag('res', 160).toInt())
+                .mesh);
+        if (r.usedFallback) {
+          stderr.writeln('boolean fallback: ${r.fallbackReason}');
+        }
+        await save(positional[2], r.mesh);
       }
     case 'hollow':
       {
@@ -181,14 +350,14 @@ Future<void> main(List<String> args) async {
             holes: flag('holes', 3).toInt(),
             holeRadius: flag('hole-radius', mesh.bounds().diagonal * 0.02),
             resolution: flag('res', 128).toInt());
-        save(positional[1], r.mesh);
+        await save(positional[1], r.mesh);
       }
     case 'offset':
       {
         final mesh = load(positional[0]);
         final r = Solidifier.offsetSolid(mesh, flag('distance', 1),
             resolution: flag('res', 128).toInt());
-        save(positional[1], r.mesh);
+        await save(positional[1], r.mesh);
       }
     case 'supports':
       {
@@ -202,7 +371,7 @@ Future<void> main(List<String> args) async {
         final r = SupportGenerator.generate(mesh,
             settings: settings, bedY: flag('bed', 0));
         stdout.writeln('posts ${r.postCount} struts ${r.strutCount}');
-        save(positional[1], r.supports);
+        await save(positional[1], r.supports);
       }
     case 'pack':
       {
@@ -236,7 +405,7 @@ Future<void> main(List<String> args) async {
           }
           offset += m.vertexCount;
         }
-        save(out, TriMesh(pos, Uint32List.fromList(idx)));
+        await save(out, TriMesh(pos, Uint32List.fromList(idx)));
       }
     case 'slice':
       {
@@ -258,6 +427,24 @@ Future<void> main(List<String> args) async {
             OverhangAnalysis.run(mesh, angleDegrees: flag('overhang', 45));
         final s = StabilityAnalysis.run(mesh);
         final mp = MassProperties.compute(mesh);
+        if (flags.containsKey('json')) {
+          double? finite(double n) => n.isFinite ? n : null;
+          stdout.writeln(jsonEncode({
+            'volume': finite(mp.volume),
+            'area': finite(mp.surfaceArea),
+            'thickness': {
+              'min': finite(t.minThickness),
+              'mean': finite(t.meanThickness),
+              'belowThreshold': t.belowThresholdCount
+            },
+            'overhang': {'faces': o.faceCount, 'area': finite(o.overhangArea)},
+            'stability': {
+              'centerInsideSupport': s.centerInsideSupport,
+              'tipAngle': finite(s.minTipAngleDegrees)
+            }
+          }));
+          return;
+        }
         stdout.writeln('mass: volume=${mp.volume.toStringAsFixed(2)} '
             'area=${mp.surfaceArea.toStringAsFixed(2)} '
             'com=${mp.centerOfMass.map((v) => v.toStringAsFixed(2)).toList()}');
@@ -280,7 +467,7 @@ Future<void> main(List<String> args) async {
             normal: <double>[1, 0, 0],
             keepOriginal: flags['keep'] == 'true',
             weldTolerance: flag('weld', b.diagonal * 1e-4));
-        save(positional[1], out);
+        await save(positional[1], out);
       }
     case 'separate':
       {
@@ -294,7 +481,7 @@ Future<void> main(List<String> args) async {
         final ext =
             base.contains('.') ? base.substring(base.lastIndexOf('.')) : '.obj';
         for (var i = 0; i < shells.length; i++) {
-          save('${stem}_${i + 1}$ext', shells[i]);
+          await save('${stem}_${i + 1}$ext', shells[i]);
         }
       }
     case 'merge':
@@ -317,28 +504,28 @@ Future<void> main(List<String> args) async {
           }
           off += m.vertexCount;
         }
-        save(positional[0], TriMesh(pos, idx));
+        await save(positional[0], TriMesh(pos, idx));
       }
     case 'combine':
       {
         final meshes = positional.sublist(1).map(load).toList();
-        save(positional[0], Modify.combine(meshes));
+        await save(positional[0], Modify.combine(meshes));
       }
     case 'flip':
-      save(positional[1], Modify.flipNormals(load(positional[0])));
+      await save(positional[1], Modify.flipNormals(load(positional[0])));
     case 'smooth':
-      save(
+      await save(
           positional[1],
           Modify.smooth(load(positional[0]),
               iterations: flag('iters', 8).toInt()));
     case 'drop':
-      save(positional[1],
+      await save(positional[1],
           Modify.dropToBed(load(positional[0]), bedY: flag('bed', 0)));
     case 'center':
-      save(positional[1],
+      await save(positional[1],
           Modify.centerOnBed(load(positional[0]), bedY: flag('bed', 0)));
     case 'duplicate':
-      save(
+      await save(
           positional[1],
           Modify.duplicate(load(positional[0]), offset: <double>[
             flag('dx', 0),
@@ -346,7 +533,7 @@ Future<void> main(List<String> args) async {
             flag('dz', 0),
           ]));
     case 'pattern':
-      save(
+      await save(
           positional[1],
           Modify.makePattern(load(positional[0]),
               countX: flag('nx', 3).toInt(),
@@ -359,11 +546,16 @@ Future<void> main(List<String> args) async {
           'cylinder' => PrimitiveKind.cylinder,
           _ => PrimitiveKind.box,
         };
-        save(positional[1], Modify.fitPrimitive(load(positional[0]), kind));
+        await save(
+            positional[1], Modify.fitPrimitive(load(positional[0]), kind));
       }
     case 'measure':
       {
         final r = Modify.measure(load(positional[0]));
+        if (flags.containsKey('json')) {
+          stdout.writeln(jsonEncode(r.toJson()));
+          return;
+        }
         stdout.writeln(
             'dimensions: ${r.dimensions.map((v) => v.toStringAsFixed(3)).join(' x ')}');
         stdout.writeln('area: ${r.surfaceArea.toStringAsFixed(3)}  '
@@ -380,7 +572,7 @@ Future<void> main(List<String> args) async {
         stdout.writeln('clearance: ${gap.toStringAsFixed(3)}');
       }
     case 'convert':
-      save(positional[1], load(positional[0]));
+      await save(positional[1], load(positional[0]));
     case 'render':
       {
         final mesh = load(positional[0]);
@@ -404,7 +596,7 @@ Future<void> main(List<String> args) async {
         ], cam, opts);
         sw.stop();
         final png = PngEncoder.encodeRGBA(rgba, opts.width, opts.height);
-        File(positional[1]).writeAsBytesSync(png);
+        await writeFileAtomically(positional[1], png);
         stdout.writeln(
             'rendered ${opts.width}x${opts.height} in ${sw.elapsedMilliseconds}ms '
             '-> ${positional[1]}');

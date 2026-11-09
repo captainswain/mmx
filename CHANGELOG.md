@@ -8,6 +8,11 @@ semantic versioning once it reaches 1.0.
 
 ### Added
 
+- Native `.mmx` projects, recovery saves, unsaved-change prompts and native file dialogs.
+- Viewport manipulation, grouped sculpt undo, unit selection and cancelable workers.
+- Desktop integration tests, parser/geometry regression suites and analytical corpus.
+- Native installer jobs, deterministic portable archives, checksums and source provenance.
+- Exact-input AOT performance comparisons with latency samples and peak memory.
 - Tool matrix and finish plan for closing the reverse-engineering project.
 - Studio actions for Extract, Make Part and Pivot.
 - `BooleanResult` and `RemeshResult` fallback reporting.
@@ -17,16 +22,21 @@ semantic versioning once it reaches 1.0.
 
 ### Changed
 
+- Studio starts with procedural geometry; repository-only model assets are excluded from releases.
+- Unsupported 3MF materials and positive Make Solid minimum-wall requests now fail explicitly.
 - Extract in Studio now delegates to `ComplexTools.extract`.
 - Pivot state is preserved by document undo/redo snapshots.
 - CI runs on GitHub-hosted runners using the vendored fixtures.
 
 ### Fixed
 
+- QEM candidate invalidation, remesh winding, surface-net lattice degeneracies and tiny-scale ray tolerances.
+- Concave import triangulation, PLY schemas/byte order, strict STL parsing and `.mix` metadata rewrites.
+- Recovery write ordering, failed-import metadata rollback and keyboard shortcut focus.
 - Plane Cut honours `keepPositive` on both sides and supports a negative-side
   slice group.
 - Smooth hole filling relaxes only the filled patch.
-- Hollow enforces the requested minimum wall thickness.
+- Hollow uses the requested minimum thickness as an inner SDF offset, subject to voxel discretization error.
 - Make Polygon uses ear clipping for concave loops.
 - Adaptive remesh fallback is explicit instead of silent.
 

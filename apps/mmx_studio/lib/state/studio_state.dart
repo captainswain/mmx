@@ -1,10 +1,16 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
+import 'dart:typed_data';
+
+import 'workers.dart';
+import 'spatial_cache.dart';
+import 'manipulator.dart';
+export 'manipulator.dart' show ManipulatorMode;
+import 'worker_runtime.dart';
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:mmx_core/mmx_core.dart';
 
 enum StudioTool {
@@ -41,7 +47,289 @@ class StudioState extends ChangeNotifier {
   bool _disposed = false;
   String status = 'Ready';
 
-  int? selectedObjectId;
+  int? _selectedObjectId;
+  int? get selectedObjectId => _selectedObjectId;
+  set selectedObjectId(int? value) {
+    if (_selectedObjectId == value || gestureActive) return;
+    _spatialCache.clear();
+    _selectedObjectId = value;
+    selection = null;
+    overlay = AnalysisOverlay.none;
+    overlayColors = null;
+  }
+
+  final SceneSpatialCache _spatialCache = SceneSpatialCache();
+  ManipulatorMode manipulatorMode = ManipulatorMode.none;
+  ManipulatorGesture? _manipulator;
+  int? _sculptGesture;
+  int _nextSculptGesture = 0;
+  int? _sculptSnapshotGesture;
+  (double, double)? _pendingSculpt;
+  Future<void>? _sculptDrain;
+  void Function()? _sculptRollback;
+  bool _sculptDirtyBefore = false;
+  bool _strokeEnding = false;
+  bool _strokeCancelRequested = false;
+  Future<void>? _strokeCompletion;
+  int? _sculptExpectedRevision;
+  bool _sculptInterrupted = false;
+  bool get gestureActive => _manipulator != null || _sculptGesture != null;
+  bool get sculptGestureActive => _sculptGesture != null;
+  bool get interactionLocked => busy || gestureActive;
+
+  @visibleForTesting
+  int get bvhBuildCount => _spatialCache.bvhBuilds;
+  @visibleForTesting
+  int get topologyBuildCount => _spatialCache.topologyBuilds;
+
+  void setManipulatorMode(ManipulatorMode mode) {
+    if (interactionLocked) return;
+    manipulatorMode = mode;
+    notify();
+  }
+
+  bool beginManipulator(int axis) {
+    final obj = selected;
+    if (_disposed ||
+        interactionLocked ||
+        obj == null ||
+        manipulatorMode == ManipulatorMode.none ||
+        axis < 0 ||
+        axis > 2) {
+      return false;
+    }
+    _manipulator = ManipulatorGesture(obj, manipulatorMode, axis);
+    notify();
+    return true;
+  }
+
+  void updateManipulator(double amount) {
+    final gesture = _manipulator;
+    if (gesture == null || doc.byId(gesture.object.id) != gesture.object) {
+      return;
+    }
+    try {
+      gesture.preview(amount);
+      _spatialCache.clear();
+      status = '${gesture.mode.name}: ${amount.toStringAsFixed(2)}';
+      _scheduleRender();
+    } catch (e) {
+      status = '$e';
+      notify();
+    }
+  }
+
+  Future<void> endManipulator({bool cancel = false}) async {
+    final gesture = _manipulator;
+    if (gesture == null) return;
+    _manipulator = null;
+    if (doc.byId(gesture.object.id) != gesture.object) return;
+    final transform = Float64List.fromList(gesture.object.transform);
+    final pivot = gesture.object.pivot;
+    gesture.restore();
+    if (!cancel && gesture.changed) {
+      doc.snapshot(
+        gesture.mode == ManipulatorMode.pivot ? 'Move pivot' : 'Transform',
+      );
+      gesture.object.transform = transform;
+      gesture.object.pivot = pivot;
+      dirty = true;
+    }
+    _invalidateGeometry();
+    status = cancel ? 'Transform cancelled' : 'Ready';
+    if (!_disposed) {
+      await render();
+      notify();
+    }
+  }
+
+  bool beginSculptStroke() {
+    if (_disposed || interactionLocked || selected == null) return false;
+    _sculptGesture = ++_nextSculptGesture;
+    _sculptSnapshotGesture = null;
+    _sculptRollback = doc.checkpoint();
+    _sculptDirtyBefore = dirty;
+    _strokeEnding = false;
+    _strokeCancelRequested = false;
+    _sculptInterrupted = false;
+    _sculptExpectedRevision = doc.revision;
+    return true;
+  }
+
+  Future<void> queueSculptSample(double x, double y) {
+    if (_sculptGesture == null || _strokeEnding) return Future<void>.value();
+    _pendingSculpt = (x, y);
+    return _sculptDrain ??= _drainSculpt().whenComplete(() {
+      _sculptDrain = null;
+    });
+  }
+
+  Future<void> _drainSculpt() async {
+    while (_pendingSculpt != null && _sculptGesture != null && !_disposed) {
+      final point = _pendingSculpt!;
+      _pendingSculpt = null;
+      await sculptAt(point.$1, point.$2);
+      if (_sculptInterrupted) {
+        _pendingSculpt = null;
+        break;
+      }
+    }
+  }
+
+  Future<void> endSculptStroke({bool cancel = false}) {
+    if (_sculptGesture == null) return Future<void>.value();
+    _strokeEnding = true;
+    if (cancel) {
+      _strokeCancelRequested = true;
+      _pendingSculpt = null;
+      cancelOperation();
+    }
+    return _strokeCompletion ??= _finishSculptStroke().whenComplete(() {
+      _strokeCompletion = null;
+    });
+  }
+
+  Future<void> _finishSculptStroke() async {
+    await _sculptDrain;
+    if (_strokeCancelRequested &&
+        !_sculptInterrupted &&
+        _sculptExpectedRevision == doc.revision) {
+      _sculptRollback?.call();
+      dirty = _sculptDirtyBefore;
+    }
+    _sculptGesture = null;
+    _sculptRollback = null;
+    _sculptSnapshotGesture = null;
+    _sculptExpectedRevision = null;
+    _invalidateGeometry();
+    if (!_disposed) {
+      await render();
+      notify();
+    }
+  }
+
+  Future<void> cancelInteraction() async {
+    if (_manipulator != null) await endManipulator(cancel: true);
+    if (_sculptGesture != null) {
+      await endSculptStroke(cancel: true);
+    } else {
+      cancelOperation();
+    }
+  }
+
+  final List<ProjectSourceAttachment> sourceAttachments = [];
+  bool dirty = false;
+  String? projectPath;
+  int _operationId = 0;
+  bool _cancelled = false;
+  Future<Object?>? _activeWork;
+  String? operationPhase;
+  int _renderId = 0;
+  String? operationWarning;
+
+  void cancelOperation() {
+    if (!busy) return;
+    _cancelled = true;
+    final work = _activeWork;
+    if (work != null) cancelWorker(work);
+    status = 'Cancelling…';
+    notify();
+  }
+
+  Future<T> _work<T>(Future<T> computation) async {
+    final id = _operationId;
+    final revision = doc.revision;
+    _activeWork = computation;
+    operationPhase = 'Computing';
+    notify();
+    try {
+      if (_disposed || _cancelled) cancelWorker(computation);
+      final result = await computation;
+      if (revision != doc.revision) {
+        throw const _OperationCancelled(stale: true);
+      }
+      if (_disposed || _cancelled || id != _operationId) {
+        throw const _OperationCancelled();
+      }
+      operationPhase = 'Applying result';
+      return result;
+    } on WorkerCancelled {
+      throw _OperationCancelled(stale: revision != doc.revision);
+    } finally {
+      if (identical(_activeWork, computation)) _activeWork = null;
+      operationPhase = null;
+      notify();
+    }
+  }
+
+  Future<void> _perform(String label, Future<void> Function() action) async {
+    if (busy ||
+        _disposed ||
+        _manipulator != null ||
+        (_sculptGesture != null && label != 'sculptAt')) {
+      return;
+    }
+    busy = true;
+    _cancelled = false;
+    _operationId++;
+    final rollback = doc.checkpoint();
+    final revision = doc.revision;
+    final selectedId = selectedObjectId;
+    final wasDirty = dirty;
+    final sculptSnapshotBefore = _sculptSnapshotGesture;
+    final cameraBefore = camera.clone();
+    final pathBefore = projectPath;
+    final sourcesBefore = List<ProjectSourceAttachment>.from(sourceAttachments);
+    operationWarning = null;
+    status = '$label…';
+    notify();
+    try {
+      await action();
+      if (doc.revision != revision) {
+        dirty = true;
+        _invalidateGeometry();
+      }
+      if (operationWarning != null) status += ' ($operationWarning)';
+    } catch (e) {
+      if (label == 'sculptAt' && e is _OperationCancelled && e.stale) {
+        _sculptInterrupted = true;
+      }
+      if (e is! _OperationCancelled || !e.stale) {
+        rollback();
+        selectedObjectId = selectedId;
+        dirty = wasDirty;
+        camera = cameraBefore;
+        projectPath = pathBefore;
+        sourceAttachments
+          ..clear()
+          ..addAll(sourcesBefore);
+        if (label == 'sculptAt' && _sculptGesture != null) {
+          _sculptSnapshotGesture = sculptSnapshotBefore;
+          _sculptExpectedRevision = doc.revision;
+        }
+      }
+      _invalidateGeometry();
+      status = e is _OperationCancelled
+          ? '$label cancelled'
+          : '$label failed: $e';
+    } finally {
+      busy = false;
+      if (!_disposed) {
+        await render();
+        notify();
+      }
+    }
+  }
+
+  void _invalidateGeometry() {
+    _spatialCache.clear();
+    selection = null;
+    overlay = AnalysisOverlay.none;
+    overlayColors = null;
+    if (selected == null) selectedObjectId = doc.objects.firstOrNull?.id;
+    refreshShellCount();
+  }
+
   int shellCount = 0;
   Selection? selection;
   Uint8List? overlayColors;
@@ -73,6 +361,8 @@ class StudioState extends ChangeNotifier {
   double overhangAngle = 45;
   double planeOffset = 0;
   bool planeFill = true;
+  bool planeKeepPositive = true;
+  int planeAxis = 1;
   double mirrorPlaneOffset = 0;
   bool mirrorKeepOriginal = true;
   bool mirrorWeld = true;
@@ -84,8 +374,8 @@ class StudioState extends ChangeNotifier {
   PrimitiveKind primitiveKind = PrimitiveKind.box;
   bool remeshGroupAware = false;
 
-  StudioState() {
-    _loadStartupModel();
+  StudioState({bool loadStartup = true}) {
+    if (loadStartup) _loadStartupModel();
   }
 
   SceneObject? get selected {
@@ -97,26 +387,14 @@ class StudioState extends ChangeNotifier {
   TriMesh? get activeMesh => selected?.mesh;
 
   Future<void> _loadStartupModel() async {
-    final candidates = <String>[
-      '/data/re/meshmixer/extract/meshmixer/models/bunnyr.obj',
-      '/data/re/meshmixer/extract/meshmixer/models/dog.obj',
-    ];
-    for (final path in candidates) {
-      final f = File(path);
-      if (!f.existsSync()) continue;
-      final mesh = MeshIO.readBytes(path, f.readAsBytesSync());
-      _install(mesh, path.split('/').last);
-      await render();
-      return;
-    }
-    // Bundled fallback so the app is self-contained on any machine.
-    try {
-      final data = await rootBundle.load('assets/models/bunnyr.obj');
-      final mesh = MeshIO.readBytes('bunnyr.obj', data.buffer.asUint8List());
-      _install(mesh, 'bunnyr.obj (bundled)');
-    } catch (e) {
-      status = 'No model loaded: $e';
-    }
+    // Original procedural starter geometry; no third-party model redistribution.
+    final bounds = TriMesh(
+      Float32List.fromList([-12.5, -12.5, -12.5, 12.5, 12.5, 12.5]),
+      Uint32List(0),
+    );
+    final mesh = Modify.fitPrimitive(bounds, PrimitiveKind.sphere);
+    if (_disposed || busy || doc.objects.isNotEmpty) return;
+    _install(mesh, 'Starter sphere');
     await render();
   }
 
@@ -131,6 +409,102 @@ class StudioState extends ChangeNotifier {
     final b = obj.worldBounds();
     camera.frame(b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
   }
+
+  Future<bool> saveProject(String path) async {
+    if (interactionLocked || _disposed) return false;
+    var saved = false;
+    await _perform('Save project', () async {
+      final project = ProjectData(
+        doc.objects.map((o) => o.clone()).toList(),
+        camera: camera.clone(),
+        selectedId: selectedObjectId,
+        sourceAttachments: List.of(sourceAttachments),
+      );
+      final bytes = await _work(encodeProjectWorker(project));
+      await writeFileAtomically(path, bytes);
+      projectPath = path;
+      dirty = false;
+      saved = true;
+      status = 'Saved $path';
+    });
+    return saved;
+  }
+
+  Future<bool> openProject(String path) async {
+    if (interactionLocked || _disposed) return false;
+    var opened = false;
+    await _perform('Open project', () async {
+      final project = await _work(decodeProjectWorker(path));
+      doc.replaceObjects(project.objects);
+      sourceAttachments
+        ..clear()
+        ..addAll(project.sourceAttachments);
+      camera = project.camera;
+      selectedObjectId = project.selectedId;
+      projectPath = path;
+      opened = true;
+      status = 'Opened $path';
+    });
+    if (opened) dirty = false;
+    notify();
+    return opened;
+  }
+
+  Future<void> autosave(String path) async {
+    if (!dirty || interactionLocked || _disposed) return;
+    final revision = doc.revision;
+    final project = ProjectData(
+      doc.objects.map((o) => o.clone()).toList(),
+      camera: camera.clone(),
+      selectedId: selectedObjectId,
+      sourceAttachments: List.of(sourceAttachments),
+    );
+    final bytes = await encodeProjectWorker(project);
+    if (!_disposed && revision == doc.revision && dirty) {
+      await writeFileAtomically(path, bytes);
+    }
+  }
+
+  Future<void> doBoolean(
+    int otherId,
+    BooleanOp op, {
+    bool precise = true,
+  }) async {
+    final obj = selected, other = doc.byId(otherId);
+    if (obj == null || other == null || obj.id == other.id) return;
+    final a = obj.worldMesh(), b = other.worldMesh();
+    final resolution = solidResolution.toInt();
+    await runOp('Boolean ${op.name}', () async {
+      final result = await _work(booleanWorker(a, b, op, precise, resolution));
+      operationWarning = result.fallbackReason;
+      return result.mesh;
+    }, worldSpace: true);
+  }
+
+  Future<void> transformSelected(Float64List transform) =>
+      _perform('Transform', () async {
+        final obj = selected;
+        if (obj == null) return;
+        if (transform.length != 16 || transform.any((v) => !v.isFinite)) {
+          throw const FormatException('Invalid transform');
+        }
+        doc.snapshot('Transform');
+        obj.transform = multiply4(transform, obj.transform);
+        status = 'Transformed ${obj.name}';
+      });
+
+  Future<void> packAll() => _perform('Pack', () async {
+    final meshes = doc.objects.map((o) => o.worldMesh()).toList();
+    final result = await _work(packWorker(meshes));
+    doc.snapshot('Pack');
+    for (final p in result.placed) {
+      doc.objects[p.index].transform = multiply4(
+        Float64List.fromList(p.transform),
+        doc.objects[p.index].transform,
+      );
+    }
+    status = 'Packed ${result.placed.length} objects';
+  });
 
   // ---------------------------------------------------------------- camera
   void orbit(double dx, double dy) {
@@ -165,7 +539,23 @@ class StudioState extends ChangeNotifier {
     });
   }
 
-  Future<void> render() async {
+  Future<void>? _renderTask;
+  Future<void> render() {
+    _renderId++;
+    return _renderTask ??= _renderLoop().whenComplete(() {
+      _renderTask = null;
+    });
+  }
+
+  Future<void> _renderLoop() async {
+    while (!_disposed) {
+      final id = _renderId;
+      await _renderFrame(id);
+      if (id == _renderId) break;
+    }
+  }
+
+  Future<void> _renderFrame(int id) async {
     final objects = <RenderObject>[];
     for (final o in doc.objects) {
       if (!o.visible) continue;
@@ -197,11 +587,12 @@ class StudioState extends ChangeNotifier {
       background: const <double>[0.086, 0.094, 0.11],
     );
     final sw = Stopwatch()..start();
-    final rgba = Rasterizer.render(objects, camera, opts);
+    final cameraCopy = camera.clone();
+    final rgba = await renderWorker(objects, cameraCopy, opts);
     sw.stop();
     lastRenderMs = sw.elapsedMilliseconds;
-    final img = await _decode(rgba, frameWidth, frameHeight);
-    if (_disposed) {
+    final img = await _decode(rgba, opts.width, opts.height);
+    if (_disposed || id != _renderId) {
       img.dispose();
       return;
     }
@@ -262,14 +653,14 @@ class StudioState extends ChangeNotifier {
       frameWidth.toDouble(),
       frameHeight.toDouble(),
     );
-    final bvh = TriangleBVH.build(obj.worldMesh());
+    final bvh = _spatialCache.bvh(obj, doc.revision);
     final hit = bvh.raycast(ray.origin, ray.direction);
     if (hit == null) {
       status = 'No surface under cursor';
       notify();
       return;
     }
-    final world = obj.worldMesh();
+    final world = _spatialCache.worldMesh(obj, doc.revision);
     final sel = Selection.sphereBrush(world, hit.point, brushRadius);
     selection = sel;
     status = 'Selected ${sel.count} faces';
@@ -306,7 +697,17 @@ class StudioState extends ChangeNotifier {
   }
 
   // --------------------------------------------------------------- sculpt
-  Future<void> sculptAt(double sx, double sy, {bool secondary = false}) async {
+  Future<void> sculptAt(double sx, double sy, {bool secondary = false}) =>
+      _perform('sculptAt', () => _sculptAtImpl(sx, sy, secondary: secondary));
+
+  Future<void> _sculptAtImpl(
+    double sx,
+    double sy, {
+    bool secondary = false,
+  }) async {
+    if (_sculptGesture != null && _sculptExpectedRevision != doc.revision) {
+      throw const _OperationCancelled(stale: true);
+    }
     final obj = selected;
     if (obj == null) return;
     final ray = camera.screenToRay(
@@ -315,7 +716,7 @@ class StudioState extends ChangeNotifier {
       frameWidth.toDouble(),
       frameHeight.toDouble(),
     );
-    final bvh = TriangleBVH.build(obj.mesh);
+    final bvh = _spatialCache.bvh(obj, doc.revision);
     final hit = bvh.raycast(ray.origin, ray.direction);
     if (hit == null) return;
     final op = secondary ? BrushOp.smooth : brushOp;
@@ -323,51 +724,53 @@ class StudioState extends ChangeNotifier {
     final radius = brushRadius;
     final strength = brushStrength;
     final dir = ray.direction;
-    doc.snapshot('Sculpt ${op.name}');
-    final mesh = obj.mesh;
-    final result = await Isolate.run(
-      () => Sculptor.apply(
-        mesh,
-        op: op,
-        center: center,
-        radius: radius,
-        strength: strength,
-        direction: <double>[-dir[0], -dir[1], -dir[2]],
-        refine: true,
-      ),
+    final mesh = _spatialCache.worldMesh(obj, doc.revision);
+    final pivot = obj.pivot;
+    final worldPivot = pivot == null
+        ? null
+        : Pivot(
+            position: objectPivotWorld(obj),
+            normal: transformNormal(obj.transform, pivot.normal),
+          );
+    final result = await _work(
+      sculptWorker(mesh, op, center, radius, strength, dir),
     );
+    if (_sculptGesture == null || _sculptSnapshotGesture != _sculptGesture) {
+      doc.snapshot('Sculpt ${op.name}');
+      _sculptSnapshotGesture = _sculptGesture;
+    } else {
+      doc.revision++;
+    }
     obj.mesh = result;
+    obj.transform = identity4();
+    obj.pivot = worldPivot;
+    if (_sculptGesture != null) _sculptExpectedRevision = doc.revision;
     status = 'Sculpted (${result.faceCount} faces)';
     await render();
   }
 
   // ------------------------------------------------------------ operations
-  Future<void> runOp(String label, Future<TriMesh> Function() fn) async {
+  Future<void> runOp(
+    String label,
+    Future<TriMesh> Function() fn, {
+    bool worldSpace = false,
+  }) => _perform(label, () async {
     final obj = selected;
     if (obj == null) return;
-    busy = true;
-    status = '$label...';
-    notify();
-    try {
-      final sw = Stopwatch()..start();
-      final result = await fn();
-      sw.stop();
-      doc.snapshot(label);
-      obj.mesh = result;
-      selection = null;
-      overlay = AnalysisOverlay.none;
-      overlayColors = null;
-      refreshShellCount();
-      status =
-          '$label done in ${sw.elapsedMilliseconds} ms '
-          '(${result.vertexCount} verts, ${result.faceCount} faces)';
-    } catch (e) {
-      status = '$label failed: $e';
-    } finally {
-      busy = false;
-      await render();
+    final revision = doc.revision;
+    final result = await fn();
+    if (revision != doc.revision || doc.byId(obj.id) != obj) {
+      throw const _OperationCancelled(stale: true);
     }
-  }
+    if (_disposed || _cancelled) throw const _OperationCancelled();
+    if (result.validate().isNotEmpty) {
+      throw FormatException(result.validate().join(', '));
+    }
+    doc.snapshot(label);
+    obj.mesh = result;
+    if (worldSpace) obj.transform = identity4();
+    status = '$label done (${result.faceCount} faces)';
+  });
 
   Future<void> doRemesh({bool groupAware = false}) async {
     final obj = selected;
@@ -375,17 +778,11 @@ class StudioState extends ChangeNotifier {
     final target = obj.mesh.bounds().diagonal * (0.02 + remeshDensity * 0.06);
     final mesh = obj.mesh;
     final preserveGroups = groupAware && mesh.faceGroups != null;
-    await runOp(
-      'Remesh',
-      () => Isolate.run(
-        () => IsotropicRemesher.remesh(
-          mesh,
-          targetEdgeLength: target,
-          iterations: 5,
-          preserveGroupBoundaries: preserveGroups,
-        ),
-      ),
-    );
+    await runOp('Remesh', () async {
+      final result = await _work(remeshWorker(mesh, target, preserveGroups));
+      operationWarning = result.fallbackReason;
+      return result.mesh;
+    });
   }
 
   Future<void> doReduce() async {
@@ -393,13 +790,13 @@ class StudioState extends ChangeNotifier {
     if (obj == null) return;
     final pct = reducePercent;
     final mesh = obj.mesh;
-    await runOp(
-      'Reduce',
-      () => Isolate.run(() => Decimator.reduce(mesh, percentage: pct)),
-    );
+    await runOp('Reduce', () => _work(reduceWorker(mesh, pct)));
   }
 
-  Future<void> extractSelection() async {
+  Future<void> extractSelection() =>
+      _perform('extractSelection', () => _extractSelectionImpl());
+
+  Future<void> _extractSelectionImpl() async {
     final obj = selected;
     final sel = selection;
     if (obj == null || sel == null) return;
@@ -408,13 +805,15 @@ class StudioState extends ChangeNotifier {
         if (sel.faceMask[f] != 0) f,
     };
     if (faces.isEmpty) return;
-    final out = ComplexTools.extract(obj.mesh, faces);
+    final out = ComplexTools.extract(obj.worldMesh(), faces);
     if (out.faceCount == 0) return;
-    await addObject(out, 'Extracted region');
+    await _addObjectImpl(out, 'Extracted region');
     status = 'Extracted ${out.faceCount} faces';
   }
 
-  Future<void> makePart() async {
+  Future<void> makePart() => _perform('makePart', () => _makePartImpl());
+
+  Future<void> _makePartImpl() async {
     final obj = selected;
     final sel = selection;
     if (obj == null || sel == null) return;
@@ -423,14 +822,19 @@ class StudioState extends ChangeNotifier {
         if (sel.faceMask[f] != 0) f,
     };
     if (faces.isEmpty) return;
-    final out = ComplexTools.makeSolidPart(obj.mesh, faces, resolution: 64);
-    await addObject(out, 'Solid part');
+    final mesh = obj.worldMesh();
+    final out = await _work(makePartWorker(mesh, faces));
+    await _addObjectImpl(out, 'Solid part');
     status = 'Made solid part (${out.faceCount} faces)';
   }
 
-  Future<void> doCreatePivot() async {
+  Future<void> doCreatePivot() =>
+      _perform('doCreatePivot', () => _doCreatePivotImpl());
+
+  Future<void> _doCreatePivotImpl() async {
     final obj = selected;
     if (obj == null) return;
+    if (obj.mesh.vertexCount == 0) return;
     var vertex = 0;
     final sel = selection;
     if (sel != null) {
@@ -457,15 +861,7 @@ class StudioState extends ChangeNotifier {
     final smooth = solidSmoothing;
     await runOp(
       'Make Solid',
-      () => Isolate.run(
-        () => Solidifier.makeSolid(
-          mesh,
-          mode: mode,
-          resolution: res,
-          offset: offset,
-          smoothing: smooth,
-        ).mesh,
-      ),
+      () => _work(makeSolidWorker(mesh, mode, res, offset, smooth)),
     );
   }
 
@@ -476,18 +872,7 @@ class StudioState extends ChangeNotifier {
     final t = hollowThickness;
     final holes = hollowHoles;
     final res = solidResolution.toInt();
-    await runOp(
-      'Hollow',
-      () => Isolate.run(
-        () => Solidifier.hollow(
-          mesh,
-          thickness: t,
-          holes: holes,
-          holeRadius: t * 1.2,
-          resolution: res,
-        ).mesh,
-      ),
-    );
+    await runOp('Hollow', () => _work(hollowWorker(mesh, t, holes, res)));
   }
 
   Future<void> doPlaneCut() async {
@@ -495,19 +880,12 @@ class StudioState extends ChangeNotifier {
     if (obj == null) return;
     final mesh = obj.mesh;
     final b = mesh.bounds();
-    final y = (b.minY + b.maxY) / 2 + planeOffset;
+    final mins = [b.minX, b.minY, b.minZ], maxs = [b.maxX, b.maxY, b.maxZ];
+    final y = (mins[planeAxis] + maxs[planeAxis]) / 2 + planeOffset;
     final fill = planeFill;
     await runOp(
       'Plane Cut',
-      () => Isolate.run(
-        () => PlaneCut.cut(
-          mesh,
-          point: <double>[0, y, 0],
-          normal: <double>[0, 1, 0],
-          keepPositive: true,
-          fill: fill,
-        ),
-      ),
+      () => _work(planeCutWorker(mesh, y, fill, planeAxis, planeKeepPositive)),
     );
   }
 
@@ -521,15 +899,7 @@ class StudioState extends ChangeNotifier {
     final diag = mesh.bounds().diagonal;
     await runOp(
       'Mirror',
-      () => Isolate.run(
-        () => Mirror.mirror(
-          mesh,
-          point: <double>[offset, 0, 0],
-          normal: <double>[1, 0, 0],
-          keepOriginal: keep,
-          weldTolerance: weld ? diag * 1e-4 : 0,
-        ),
-      ),
+      () => _work(mirrorWorker(mesh, offset, keep, weld, diag)),
     );
   }
 
@@ -548,22 +918,18 @@ class StudioState extends ChangeNotifier {
     final smooth = extrudeSmooth;
     await runOp(
       'Extrude',
-      () => Isolate.run(
-        () => Extruder.extrude(
-          mesh,
-          faceMask: mask,
-          distance: distance,
-          smoothBoundary: smooth,
-        ),
-      ),
+      () => _work(extrudeWorker(mesh, mask, distance, smooth)),
     );
   }
 
-  Future<void> doSeparateShells() async {
+  Future<void> doSeparateShells() =>
+      _perform('doSeparateShells', () => _doSeparateShellsImpl());
+
+  Future<void> _doSeparateShellsImpl() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    final shells = await Isolate.run(() => ShellSeparator.separate(mesh));
+    final shells = await _work(separateWorker(mesh));
     if (shells.length <= 1) {
       status = 'Single shell, nothing to separate';
       notify();
@@ -572,7 +938,8 @@ class StudioState extends ChangeNotifier {
     doc.snapshot('Separate shells');
     obj.mesh = shells.first;
     for (var i = 1; i < shells.length; i++) {
-      doc.add(shells[i], name: '${obj.name} shell ${i + 1}');
+      doc.add(shells[i], name: '${obj.name} shell ${i + 1}').transform =
+          Float64List.fromList(obj.transform);
     }
     status = 'Separated into ${shells.length} shells';
     selection = null;
@@ -590,39 +957,7 @@ class StudioState extends ChangeNotifier {
     final height = stampHeight;
     await runOp(
       'Stamp',
-      () => Isolate.run(() {
-        var cx = 0.0, cy = 0.0, cz = 0.0;
-        var n = 0;
-        if (mask != null) {
-          for (var f = 0; f < mesh.faceCount; f++) {
-            if (f >= mask.length || mask[f] == 0) continue;
-            for (var k = 0; k < 3; k++) {
-              final v = mesh.indices[f * 3 + k];
-              cx += mesh.vx(v);
-              cy += mesh.vy(v);
-              cz += mesh.vz(v);
-              n++;
-            }
-          }
-        }
-        if (n == 0) {
-          var best = 0;
-          for (var v = 1; v < mesh.vertexCount; v++) {
-            if (mesh.vy(v) > mesh.vy(best)) best = v;
-          }
-          cx = mesh.vx(best);
-          cy = mesh.vy(best);
-          cz = mesh.vz(best);
-          n = 1;
-        }
-        return StampTool.apply(
-          mesh,
-          center: <double>[cx / n, cy / n, cz / n],
-          radius: radius,
-          height: height,
-          pattern: pattern,
-        );
-      }),
+      () => _work(stampWorker(mesh, mask, radius, height, pattern)),
     );
   }
 
@@ -631,47 +966,43 @@ class StudioState extends ChangeNotifier {
     if (obj == null) return;
     final mesh = obj.mesh;
     final mask = selection?.faceMask;
-    await runOp(
-      'Flip normals',
-      () => Isolate.run(() => Modify.flipNormals(mesh, faceMask: mask)),
-    );
+    await runOp('Flip normals', () => _work(flipWorker(mesh, mask)));
   }
 
   Future<void> doSmoothMesh() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp(
-      'Smooth',
-      () => Isolate.run(() => Modify.smooth(mesh, iterations: 8)),
-    );
+    await runOp('Smooth', () => _work(smoothWorker(mesh)));
   }
 
   Future<void> doDropToBed() async {
     final obj = selected;
     if (obj == null) return;
-    final mesh = obj.mesh;
-    await runOp('Drop to bed', () => Isolate.run(() => Modify.dropToBed(mesh)));
+    final mesh = obj.worldMesh();
+    await runOp('Drop to bed', () => _work(dropWorker(mesh)), worldSpace: true);
   }
 
   Future<void> doCenterOnBed() async {
     final obj = selected;
     if (obj == null) return;
-    final mesh = obj.mesh;
+    final mesh = obj.worldMesh();
     await runOp(
       'Center on bed',
-      () => Isolate.run(() => Modify.centerOnBed(mesh)),
+      () => _work(centerWorker(mesh)),
+      worldSpace: true,
     );
   }
 
-  Future<void> doDuplicate() async {
+  Future<void> doDuplicate() =>
+      _perform('doDuplicate', () => _doDuplicateImpl());
+
+  Future<void> _doDuplicateImpl() async {
     final obj = selected;
     if (obj == null) return;
-    final mesh = obj.mesh;
+    final mesh = obj.worldMesh();
     final offset = mesh.bounds().extentX + 2;
-    final copy = await Isolate.run(
-      () => Modify.duplicate(mesh, offset: <double>[offset, 0, 0]),
-    );
+    final copy = await _work(duplicateWorker(mesh, offset));
     doc.snapshot('Duplicate');
     final added = doc.add(copy, name: '${obj.name} copy');
     selectedObjectId = added.id;
@@ -680,7 +1011,10 @@ class StudioState extends ChangeNotifier {
     await render();
   }
 
-  Future<void> doCombineAll() async {
+  Future<void> doCombineAll() =>
+      _perform('doCombineAll', () => _doCombineAllImpl());
+
+  Future<void> _doCombineAllImpl() async {
     final obj = selected;
     if (obj == null || doc.objects.length < 2) {
       status = 'Combine needs at least two objects';
@@ -688,7 +1022,7 @@ class StudioState extends ChangeNotifier {
       return;
     }
     final sources = doc.objects.map((o) => o.worldMesh()).toList();
-    final combined = await Isolate.run(() => Modify.combine(sources));
+    final combined = await _work(combineWorker(sources));
     doc.snapshot('Combine');
     obj.mesh = combined;
     obj.transform = identity4();
@@ -708,12 +1042,7 @@ class StudioState extends ChangeNotifier {
     final cx = patternCountX;
     final cz = patternCountZ;
     final gap = patternGap;
-    await runOp(
-      'Pattern',
-      () => Isolate.run(
-        () => Modify.makePattern(mesh, countX: cx, countZ: cz, gap: gap),
-      ),
-    );
+    await runOp('Pattern', () => _work(patternWorker(mesh, cx, cz, gap)));
   }
 
   Future<void> doFitPrimitive() async {
@@ -721,43 +1050,36 @@ class StudioState extends ChangeNotifier {
     if (obj == null) return;
     final mesh = obj.mesh;
     final kind = primitiveKind;
-    await runOp(
-      'Fit primitive',
-      () => Isolate.run(() => Modify.fitPrimitive(mesh, kind)),
-    );
+    await runOp('Fit primitive', () => _work(primitiveWorker(mesh, kind)));
   }
 
   Future<void> doGenerateFaceGroups() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp(
-      'Generate face groups',
-      () => Isolate.run(() {
-        final m = mesh.clone();
-        m.faceGroups = FaceGroups.generate(m);
-        return m;
-      }),
-    );
+    await runOp('Generate face groups', () => _work(groupsWorker(mesh)));
   }
 
-  Future<void> doMeasure() async {
+  Future<void> doMeasure() => _perform('doMeasure', () => _doMeasureImpl());
+
+  Future<void> _doMeasureImpl() async {
     final obj = selected;
     if (obj == null) return;
-    busy = true;
     notify();
-    final mesh = obj.mesh;
-    final r = await Isolate.run(() => Modify.measure(mesh));
+    final mesh = obj.worldMesh();
+    final r = await _work(measureWorker(mesh));
     final d = r.dimensions.map((v) => v.toStringAsFixed(2)).join(' x ');
     status =
         'Measure: $d | area ${r.surfaceArea.toStringAsFixed(1)} | '
         'volume ${r.volume.toStringAsFixed(1)} | ${r.shellCount} shell(s) | '
         '${r.watertight ? "watertight" : "${r.boundaryEdgeCount} boundary edges"}';
-    busy = false;
     notify();
   }
 
-  Future<void> doClearance() async {
+  Future<void> doClearance() =>
+      _perform('doClearance', () => _doClearanceImpl());
+
+  Future<void> _doClearanceImpl() async {
     final obj = selected;
     if (obj == null) return;
     SceneObject? other;
@@ -772,15 +1094,13 @@ class StudioState extends ChangeNotifier {
       notify();
       return;
     }
-    busy = true;
     notify();
     final a = obj.worldMesh();
     final b = other.worldMesh();
-    final gap = await Isolate.run(() => Modify.clearance(a, b));
+    final gap = await _work(clearanceWorker(a, b));
     status = gap.isFinite
         ? 'Clearance ${obj.name} / ${other.name}: ${gap.toStringAsFixed(2)}'
         : 'Clearance: no surface found';
-    busy = false;
     notify();
   }
 
@@ -788,13 +1108,13 @@ class StudioState extends ChangeNotifier {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp(
-      'Stitch cracks',
-      () => Isolate.run(() => Bridge.stitchNearest(mesh)),
-    );
+    await runOp('Stitch cracks', () => _work(stitchWorker(mesh)));
   }
 
-  Future<void> doAlignToTarget() async {
+  Future<void> doAlignToTarget() =>
+      _perform('doAlignToTarget', () => _doAlignToTargetImpl());
+
+  Future<void> _doAlignToTargetImpl() async {
     final obj = selected;
     if (obj == null) return;
     SceneObject? target;
@@ -809,44 +1129,32 @@ class StudioState extends ChangeNotifier {
       notify();
       return;
     }
-    busy = true;
     notify();
     final source = obj.worldMesh();
     final targetMesh = target.worldMesh();
-    final t = await Isolate.run(
-      () => AlignTool.solve(source, targetMesh, iterations: 40),
-    );
+    final t = await _work(alignWorker(source, targetMesh));
     final aligned = obj.worldMesh();
     aligned.transform(t);
     doc.snapshot('Align to target');
     obj.mesh = aligned;
     obj.transform = identity4();
-    final rms = await Isolate.run(
-      () => AlignTool.rmsDistance(obj.mesh, targetMesh),
-    );
+    final rms = await _work(rmsWorker(obj.mesh, targetMesh));
     selection = null;
-    busy = false;
     status =
         'Aligned ${obj.name} to ${target.name} '
         '(RMS ${rms.toStringAsFixed(2)} mm)';
     await render();
   }
 
-  Future<void> doSupports() async {
+  Future<void> doSupports() => _perform('doSupports', () => _doSupportsImpl());
+
+  Future<void> _doSupportsImpl() async {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.worldMesh();
     final angle = supportAngle;
     final density = supportDensity;
-    final result = await Isolate.run(
-      () => SupportGenerator.generate(
-        mesh,
-        settings: SupportSettings(
-          overhangAngleDegrees: angle,
-          density: density,
-        ),
-      ),
-    );
+    final result = await _work(supportsWorker(mesh, angle, density));
     if (result.supports.faceCount == 0) {
       status = 'No overhangs above ${angle.toStringAsFixed(0)}°';
       notify();
@@ -859,21 +1167,21 @@ class StudioState extends ChangeNotifier {
     await render();
   }
 
-  Future<void> doAnalysis(AnalysisOverlay mode) async {
+  Future<void> doAnalysis(AnalysisOverlay mode) =>
+      _perform('doAnalysis', () => _doAnalysisImpl(mode));
+
+  Future<void> _doAnalysisImpl(AnalysisOverlay mode) async {
     final obj = selected;
     if (obj == null) return;
-    busy = true;
     status = 'Analysing...';
     notify();
-    final mesh = obj.mesh;
+    final mesh = obj.worldMesh();
     Uint8List colors;
     String summary;
     switch (mode) {
       case AnalysisOverlay.thickness:
         final th = thicknessThreshold;
-        final r = await Isolate.run(
-          () => ThicknessAnalysis.run(mesh, threshold: th),
-        );
+        final r = await _work(thicknessWorker(mesh, th));
         colors = _normalizeToBytes(r.perVertex, th * 2);
         summary =
             'min ${r.minThickness.toStringAsFixed(2)}, '
@@ -881,23 +1189,35 @@ class StudioState extends ChangeNotifier {
             '${r.belowThresholdCount} verts below $th';
       case AnalysisOverlay.overhang:
         final angle = overhangAngle;
-        final r = await Isolate.run(
-          () => OverhangAnalysis.run(mesh, angleDegrees: angle),
-        );
+        final r = await _work(overhangWorker(mesh, angle));
         colors = _normalizeToBytes(r.perVertexSeverity, 1.0);
         summary =
             '${r.faceCount} overhang faces, '
             '${(100 * r.overhangArea / (r.totalArea == 0 ? 1 : r.totalArea)).toStringAsFixed(1)}% of area';
       case AnalysisOverlay.stability:
-        final r = await Isolate.run(() => StabilityAnalysis.run(mesh));
+        final r = await _work(stabilityWorker(mesh));
         colors = Uint8List(mesh.vertexCount);
         summary =
             'COM (${r.centerOfMass.map((v) => v.toStringAsFixed(1)).join(', ')}) '
             '${r.centerInsideSupport ? "inside" : "OUTSIDE"} base, '
             'tip ${r.minTipAngleDegrees.toStringAsFixed(1)}°';
       case AnalysisOverlay.deviation:
-        colors = Uint8List(mesh.vertexCount);
-        summary = 'Deviation requires a reference object';
+        final reference =
+            doc.objects
+                .where((o) => o.id != obj.id && o.isTarget)
+                .firstOrNull ??
+            doc.objects.where((o) => o.id != obj.id).firstOrNull;
+        if (reference == null) {
+          throw const FormatException('Deviation needs a reference object');
+        }
+        final referenceMesh = reference.worldMesh();
+        final result = await _work(deviationWorker(mesh, referenceMesh));
+        colors = _normalizeToBytes(
+          result.perVertexDistance,
+          result.maxDistance,
+        );
+        summary =
+            'Deviation from ${reference.name}: max ${result.maxDistance.toStringAsFixed(3)} mm';
       case AnalysisOverlay.none:
         colors = Uint8List(mesh.vertexCount);
         summary = 'No overlay';
@@ -905,7 +1225,6 @@ class StudioState extends ChangeNotifier {
     overlayColors = colors;
     overlay = mode;
     status = summary;
-    busy = false;
     await render();
   }
 
@@ -924,19 +1243,20 @@ class StudioState extends ChangeNotifier {
   }
 
   // ------------------------------------------------------------ inspection
-  Future<void> inspectMesh() async {
+  Future<void> inspectMesh() =>
+      _perform('inspectMesh', () => _inspectMeshImpl());
+
+  Future<void> _inspectMeshImpl() async {
     final obj = selected;
     if (obj == null) return;
-    busy = true;
     notify();
     final mesh = obj.mesh;
-    final defects = await Isolate.run(() => MeshInspector.scan(mesh));
+    final defects = await _work(inspectWorker(mesh));
     final counts = <String, int>{};
     for (final d in defects) {
       counts[d.kind.name] = (counts[d.kind.name] ?? 0) + 1;
     }
     status = 'Inspector: ${counts.isEmpty ? "clean" : counts.toString()}';
-    busy = false;
     await render();
   }
 
@@ -944,18 +1264,14 @@ class StudioState extends ChangeNotifier {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.mesh;
-    await runOp('Auto Repair', () async {
-      var m = mesh;
-      m = Weld.weldVertices(m, tolerance: m.bounds().diagonal * 1e-5);
-      Weld.removeDuplicateFaces(m);
-      m = MeshInspector.splitNonManifold(m);
-      m = HoleFiller.fill(m, mode: HoleFillMode.smooth);
-      return m;
-    });
+    await runOp('Auto Repair', () => _work(repairWorker(mesh)));
   }
 
   // ----------------------------------------------------------------- scene
-  Future<void> addObject(TriMesh mesh, String name) async {
+  Future<void> addObject(TriMesh mesh, String name) =>
+      _perform('addObject', () => _addObjectImpl(mesh, name));
+
+  Future<void> _addObjectImpl(TriMesh mesh, String name) async {
     doc.snapshot('Add $name');
     final obj = doc.add(mesh, name: name);
     selectedObjectId = obj.id;
@@ -964,20 +1280,43 @@ class StudioState extends ChangeNotifier {
     await render();
   }
 
-  Future<void> importPath(String path) async {
+  Future<void> importPath(String path, {double unitScale = 1}) =>
+      _perform('importPath', () => _importPathImpl(path, unitScale));
+
+  Future<void> _importPathImpl(String path, double unitScale) async {
+    if (!unitScale.isFinite || unitScale <= 0) {
+      throw const FormatException('Invalid import units');
+    }
     final f = File(path);
     if (!f.existsSync()) {
       status = 'Missing: $path';
       notify();
       return;
     }
-    final bytes = f.readAsBytesSync();
+    if (await f.length() > MeshIO.maxFileBytes) {
+      throw const FormatException('File exceeds 256 MiB');
+    }
+    final bytes = await f.readAsBytes();
     if (path.toLowerCase().endsWith('.mix')) {
-      final objects = MixIO.read(bytes);
+      final objects = await _work(readMixWorker(bytes));
+      for (final o in objects) {
+        if (o.mesh.validate().isNotEmpty) {
+          throw const FormatException('Invalid mesh');
+        }
+      }
       if (objects.isEmpty) {
         status = 'No mesh found in $path';
         notify();
         return;
+      }
+      if (sourceAttachments.fold<int>(
+            bytes.length,
+            (n, source) => n + source.bytes.length,
+          ) >
+          MeshIO.maxFileBytes) {
+        throw const FormatException(
+          'Original source attachments exceed 256 MiB',
+        );
       }
       doc.snapshot('Import $path');
       SceneObject? first;
@@ -985,36 +1324,58 @@ class StudioState extends ChangeNotifier {
         final obj = doc.add(o.mesh, name: o.name);
         first ??= obj;
       }
+      sourceAttachments.add(
+        ProjectSourceAttachment(
+          name: path.split(RegExp(r'[/\\]')).last,
+          bytes: bytes,
+        ),
+      );
       selectedObjectId = first!.id;
       selection = null;
       _frameObject(first);
       status =
-          'Imported ${objects.length} object(s) from ${path.split('/').last}';
+          'Imported ${objects.length} object(s) from ${path.split(RegExp(r'[/\\]')).last}';
       await render();
       return;
     }
-    final mesh = MeshIO.readBytes(path, bytes);
-    await addObject(mesh, path.split('/').last);
+    final mesh = await _work(readMeshWorker(path, bytes));
+    if (!path.toLowerCase().endsWith('.3mf') && unitScale != 1) {
+      mesh.transform(scale4(unitScale));
+    }
+    if (mesh.validate().isNotEmpty) {
+      throw const FormatException('Import unit conversion overflow');
+    }
+    await _addObjectImpl(mesh, path.split(RegExp(r'[/\\]')).last);
   }
 
-  Future<void> exportSelected(String path) async {
+  Future<void> exportSelected(String path) =>
+      _perform('exportSelected', () => _exportSelectedImpl(path));
+
+  Future<void> _exportSelectedImpl(String path) async {
     final obj = selected;
     if (obj == null) return;
-    final bytes = MeshIO.writeBytes(path, obj.worldMesh());
-    await File(path).writeAsBytes(bytes);
+    final mesh = obj.worldMesh();
+    final bytes = await _work(writeMeshWorker(path, mesh));
+    await writeFileAtomically(path, bytes);
     status = 'Exported $path';
     notify();
   }
 
   Future<void> undo() async {
+    if (interactionLocked || _disposed) return;
     if (doc.undo()) {
+      dirty = true;
+      _invalidateGeometry();
       status = 'Undo';
       await render();
     }
   }
 
   Future<void> redo() async {
+    if (interactionLocked || _disposed) return;
     if (doc.redo()) {
+      dirty = true;
+      _invalidateGeometry();
       status = 'Redo';
       await render();
     }
@@ -1023,8 +1384,10 @@ class StudioState extends ChangeNotifier {
   /// Counts shells on demand; building topology on every panel rebuild would
   /// be wasteful for large meshes.
   void refreshShellCount() {
-    final mesh = activeMesh;
-    shellCount = mesh == null ? 0 : MeshTopology(mesh).components().$2;
+    final object = selected;
+    shellCount = object == null
+        ? 0
+        : _spatialCache.topology(object, doc.revision).components().$2;
   }
 
   void notify() {
@@ -1034,11 +1397,15 @@ class StudioState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(cancelInteraction());
+    final work = _activeWork;
+    if (work != null) cancelWorker(work);
     frame?.dispose();
     super.dispose();
   }
 
   void setTool(StudioTool t) {
+    if (interactionLocked) return;
     tool = t;
     if (t == StudioTool.separate) refreshShellCount();
     status = 'Tool: ${t.name}';
@@ -1057,10 +1424,15 @@ class StudioState extends ChangeNotifier {
 
   void setFrameSize(int w, int h) {
     if (w == frameWidth && h == frameHeight) return;
-    frameWidth = w;
-    frameHeight = h;
+    frameWidth = w.clamp(1, 4096);
+    frameHeight = h.clamp(1, 4096);
     _scheduleRender();
   }
 }
 
 int mathMax(int a, int b) => a > b ? a : b;
+
+class _OperationCancelled implements Exception {
+  final bool stale;
+  const _OperationCancelled({this.stale = false});
+}

@@ -6,6 +6,7 @@ import '../tools/modify.dart';
 import 'mix.dart';
 import 'obj.dart';
 import 'ply.dart';
+import 'polygon_triangulation.dart';
 import 'stl.dart';
 import 'threemf.dart';
 
@@ -18,19 +19,42 @@ class MeshIO {
     'stl',
     'off',
     '3mf',
-    'amf',
     'mix'
   ];
 
+  static const exportExtensions = <String>['stl', 'obj', 'ply', '3mf', 'mix'];
+  static const maxFileBytes = 256 * 1024 * 1024;
+
   static TriMesh readBytes(String filename, Uint8List bytes) {
+    if (bytes.length > maxFileBytes) {
+      throw const FormatException('File exceeds 256 MiB limit');
+    }
+    try {
+      final mesh = _readBytes(filename, bytes);
+      final errors = mesh.validate();
+      if (errors.isNotEmpty) throw FormatException(errors.join(', '));
+      return mesh;
+    } on RangeError {
+      throw const FormatException('Truncated or invalid mesh data');
+    }
+  }
+
+  static TriMesh _readBytes(String filename, Uint8List bytes) {
     final ext = filename.toLowerCase().split('.').last;
     switch (ext) {
       case 'stl':
+        if (bytes.length >= 84 &&
+            ByteData.sublistView(bytes).getUint32(80, Endian.little) * 50 +
+                    84 ==
+                bytes.length) {
+          return StlIO.readBinary(bytes);
+        }
         // ASCII STL starts with "solid" and contains "facet".
         final head = String.fromCharCodes(
             bytes.sublist(0, bytes.length < 512 ? bytes.length : 512));
         if (head.trimLeft().toLowerCase().startsWith('solid') &&
-            head.toLowerCase().contains('facet')) {
+            (head.toLowerCase().contains('facet') ||
+                head.toLowerCase().contains('endsolid'))) {
           return StlIO.readAscii(utf8.decode(bytes, allowMalformed: true));
         }
         return StlIO.readBinary(bytes);
@@ -48,50 +72,61 @@ class MeshIO {
         if (objects.length == 1) return objects.first.mesh;
         return Modify.combine(objects.map((o) => o.mesh).toList());
       default:
-        // Fall back on content sniffing.
-        if (bytes.length > 84 &&
-            bytes[0] == 0x70 &&
-            bytes[1] == 0x6C &&
-            bytes[2] == 0x79) {
-          return PlyIO.read(bytes);
-        }
-        return ObjIO.read(utf8.decode(bytes, allowMalformed: true));
+        throw FormatException('Unsupported import format: $ext');
     }
   }
 
   static TriMesh readOff(String text) {
-    final tokens = text
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty && !t.startsWith('#'))
-        .toList();
-    if (tokens.isEmpty || tokens[0] != 'OFF') return TriMesh.empty();
-    var i = 1;
-    if (tokens[i] == 'OFF') i++;
-    final nv = int.parse(tokens[i]);
-    final nf = int.parse(tokens[i + 1]);
-    i += 3;
-    final builder = MeshBuilder();
-    for (var v = 0; v < nv; v++) {
-      builder.addVertex(double.parse(tokens[i]), double.parse(tokens[i + 1]),
-          double.parse(tokens[i + 2]));
-      i += 3;
+    if (text.length > maxFileBytes) {
+      throw const FormatException('OFF exceeds size limit');
     }
+    final matches = RegExp(r'\S+')
+        .allMatches(text.replaceAll(RegExp(r'#[^\r\n]*'), ''))
+        .iterator;
+    String token() {
+      if (!matches.moveNext()) throw const FormatException('Truncated OFF');
+      return matches.current.group(0)!;
+    }
+
+    if (token() != 'OFF') throw const FormatException('Invalid OFF header');
+    final nv = int.parse(token()),
+        nf = int.parse(token()),
+        edges = int.parse(token());
+    if (nv < 0 ||
+        nv > 2000000 ||
+        nf < 0 ||
+        nf > 4000000 ||
+        edges < 0 ||
+        nv * 3 + nf * 4 > text.length) {
+      throw const FormatException('Invalid OFF counts');
+    }
+    final positions = Float32List(nv * 3);
+    for (var i = 0; i < positions.length; i++) {
+      positions[i] = double.parse(token());
+      if (!positions[i].isFinite) {
+        throw const FormatException('Non-finite OFF coordinate');
+      }
+    }
+    final indices = <int>[];
     for (var f = 0; f < nf; f++) {
-      final n = int.parse(tokens[i]);
-      final ids = <int>[];
-      for (var k = 0; k < n; k++) {
-        ids.add(int.parse(tokens[i + 1 + k]));
+      final n = int.parse(token());
+      if (n < 3 || n > 4096) {
+        throw const FormatException('Invalid OFF polygon size');
       }
-      i += n + 1;
-      for (var k = 2; k < ids.length; k++) {
-        builder.addTriangle(ids[0], ids[k - 1], ids[k]);
+      final polygon = List<int>.generate(n, (_) => int.parse(token()));
+      final triangles = triangulatePolygon(positions, polygon);
+      if (indices.length + triangles.length > 12000000) {
+        throw const FormatException('OFF triangle limit exceeded');
       }
+      indices.addAll(triangles);
     }
-    return builder.build();
+    return TriMesh(positions, Uint32List.fromList(indices));
   }
 
   static Uint8List writeBytes(String filename, TriMesh mesh,
       {bool binaryStl = true}) {
+    final errors = mesh.validate();
+    if (errors.isNotEmpty) throw FormatException(errors.join(', '));
     final ext = filename.toLowerCase().split('.').last;
     switch (ext) {
       case 'stl':
@@ -108,7 +143,7 @@ class MeshIO {
         final name = filename.split('/').last.split('\\').last;
         return MixIO.write(<MixObject>[MixObject(name: name, mesh: mesh)]);
       default:
-        return StlIO.writeBinary(mesh);
+        throw FormatException('Unsupported export format: $ext');
     }
   }
 }

@@ -55,8 +55,8 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | StitchBoundaryTool | `repair/bridge.dart` | Stitch cracks | implemented | Boundary-loop bridge/stitch. |
 | StrengthTool | none | none | out of scope | Material-strength simulation is not part of the core workflow. |
 | SurfaceBrushTool | `tools/sculpt.dart` | Sculpt | implemented | Draw/inflate/flatten/pinch/crease/twist/move. |
-| TransformTool | `scene/document.dart` transform | none | partial | Object transforms exist; no on-canvas manipulator. |
-| UnitsTool | none | none | out of scope | mmx is unit-agnostic; import/export preserves numeric units. |
+| TransformTool | `scene/document.dart` transform | Numeric controls and viewport handles | implemented | Translation/rotation/uniform scale around the local pivot; drag commits one undo entry. |
+| UnitsTool | import scaling, 3MF unit conversion | Import units selector | implemented | Scene units are millimeters; unitless formats offer explicit conversion. |
 | VolumeBrushTool | `tools/sculpt.dart` | Sculpt | partial | Volume-like inflate/draw; no separate volume brush UI. |
 
 ## Recovered action handlers
@@ -76,12 +76,12 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | Print | `fab/*` | Print | implemented |
 | Mirror | `tools/edits.dart` | Mirror | implemented |
 | Duplicate | document | Duplicate | implemented |
-| Transform | document transform | none | partial |
-| CreatePivot | `tools/pivot.dart` | Pivot | implemented (stored; no viewport gizmo) |
+| Transform | document transform | Numeric controls and viewport handles | implemented |
+| CreatePivot | `tools/pivot.dart` | Pivot and viewport handle | implemented (local pivot persists in projects) |
 | Align / AlignToTarget | `tools/align.dart` | Align to target | implemented |
 | PlaneCut | `tools/plane_cut.dart` | Plane Cut | implemented |
 | Combine | `ComplexTools.join` | Combine all | implemented |
-| Union / Intersection / Difference | `solid/mesh_boolean.dart` | none | kernel only |
+| Union / Intersection / Difference | `solid/mesh_boolean.dart` | Project → Boolean | implemented (precise/grid, explicit operands and fallback reporting) |
 | WeldCracks | `repair/bridge.dart` | Stitch cracks | implemented |
 | MakeSolid | `solid/solidifier.dart` | Make Solid | implemented |
 | CreateInteriorSurface | `solid/solidifier.dart` | Hollow | partial |
@@ -93,8 +93,8 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 
 ## Highest-value gaps
 
-1. Boolean UI (union/intersection/difference) and the remaining boolean modes.
-2. A transform/pivot manipulator and viewport gizmo.
+1. External Meshmixer fidelity comparisons; analytical empty/disjoint boolean cases now pass.
+2. Nonuniform-scale and face-deformation manipulators beyond the core object workflow.
 3. Image stamps and the stamp/texture semantics.
 4. UV storage and export, or an explicit "preview only" label for Unwrap.
 5. Selection-limited plane cuts and the remaining plane-cut attach modes.

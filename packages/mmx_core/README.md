@@ -9,8 +9,9 @@ Licensed under Apache-2.0. See the root [`LICENSE`](../../LICENSE),
 
 ## What is included
 
-- Mesh import/export: OBJ, PLY, STL, OFF, 3MF and native `.mix` (VFMesh 1.2/1.3,
-  face groups, lossless rewrite of unknown records).
+- Mesh import/export: OBJ, ASCII/binary PLY, STL, OFF, 3MF and native `.mix`
+  (VFMesh 1.2/1.3, face groups, lossless rewrite of unknown records). `.mmx`
+  projects persist scene metadata and original `.mix` source attachments.
 - Topology: CSR adjacency, edge incidence, boundary loops, components and
   manifold checks.
 - Repair: weld, crack closing, hole filling, non-manifold splitting, inspector.
@@ -55,9 +56,10 @@ dart test
 ```
 
 The test models are vendored under `test/fixtures/models`; no Meshmixer
-installation is required. Current baseline: 106 tests.
+installation is required. See [`docs/TESTING.md`](../../docs/TESTING.md) for
+coverage gates and the analytical/reference corpus.
 
 ## Status
 
 Pre-1.0. The remaining project work is tracked in
-[`docs/FINISH-PLAN.md`](../../docs/FINISH-PLAN.md).
+[`docs/PRODUCTION-READINESS.md`](../../docs/PRODUCTION-READINESS.md).

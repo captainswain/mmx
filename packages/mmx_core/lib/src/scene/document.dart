@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../geom/bbox.dart';
@@ -23,7 +24,11 @@ class SceneObject {
       transform: Float64List.fromList(transform))
     ..visible = visible
     ..isTarget = isTarget
-    ..pivot = pivot;
+    ..pivot = pivot == null
+        ? null
+        : Pivot(
+            position: List<double>.from(pivot!.position),
+            normal: List<double>.from(pivot!.normal));
 
   BBox worldBounds() {
     final m = mesh.clone();
@@ -43,6 +48,61 @@ class SceneObject {
 class Document {
   final List<SceneObject> objects = <SceneObject>[];
   int _nextId = 1;
+  int revision = 0;
+
+  void replaceObjects(List<SceneObject> replacement) {
+    objects
+      ..clear()
+      ..addAll(replacement.map((o) => o.clone()));
+    _nextId = objects.fold<int>(0, (n, o) => math.max(n, o.id)) + 1;
+    _undo.clear();
+    _redo.clear();
+    revision++;
+  }
+
+  /// Capture a rollback point, including both history stacks.
+  void Function() checkpoint() {
+    final saved = objects.map((o) => o.clone()).toList();
+    final undo = List<_Snapshot>.from(_undo),
+        redo = List<_Snapshot>.from(_redo);
+    final next = _nextId;
+    return () {
+      objects
+        ..clear()
+        ..addAll(saved);
+      _undo
+        ..clear()
+        ..addAll(undo);
+      _redo
+        ..clear()
+        ..addAll(redo);
+      _nextId = next;
+      revision++;
+    };
+  }
+
+  static int objectBytes(SceneObject o) =>
+      o.mesh.positions.lengthInBytes +
+      o.mesh.indices.lengthInBytes +
+      (o.mesh.faceGroups?.lengthInBytes ?? 0) +
+      (o.mesh.vertexColors?.lengthInBytes ?? 0) +
+      o.transform.lengthInBytes +
+      (o.pivot == null ? 0 : 48);
+
+  int get historyBytes => [..._undo, ..._redo].fold(
+      0, (n, s) => n + s.objects.fold<int>(0, (n, o) => n + objectBytes(o)));
+
+  void _trimHistory() {
+    while (
+        historyBytes > maxUndoBytes && (_undo.isNotEmpty || _redo.isNotEmpty)) {
+      if (_undo.isNotEmpty) {
+        _undo.removeAt(0);
+      } else {
+        _redo.removeAt(0);
+      }
+    }
+  }
+
   int maxUndoBytes;
   final List<_Snapshot> _undo = <_Snapshot>[];
   final List<_Snapshot> _redo = <_Snapshot>[];
@@ -53,11 +113,13 @@ class Document {
     final obj =
         SceneObject(_nextId++, name ?? 'Object ${objects.length + 1}', mesh);
     objects.add(obj);
+    revision++;
     return obj;
   }
 
   void remove(int id) {
     objects.removeWhere((o) => o.id == id);
+    revision++;
   }
 
   SceneObject? byId(int id) {
@@ -70,7 +132,7 @@ class Document {
   int get memoryBytes {
     var total = 0;
     for (final o in objects) {
-      total += o.mesh.positions.lengthInBytes + o.mesh.indices.lengthInBytes;
+      total += objectBytes(o);
     }
     return total;
   }
@@ -79,19 +141,8 @@ class Document {
     final snap = _Snapshot(label, objects.map((o) => o.clone()).toList());
     _undo.add(snap);
     _redo.clear();
-    while (_undo.isNotEmpty && _undoBytes() > maxUndoBytes) {
-      _undo.removeAt(0);
-    }
-  }
-
-  int _undoBytes() {
-    var total = 0;
-    for (final s in _undo) {
-      for (final o in s.objects) {
-        total += o.mesh.positions.lengthInBytes + o.mesh.indices.lengthInBytes;
-      }
-    }
-    return total;
+    revision++;
+    _trimHistory();
   }
 
   bool get canUndo => _undo.isNotEmpty;
@@ -104,6 +155,8 @@ class Document {
     final snap = _undo.removeLast();
     _redo.add(_Snapshot(snap.label, objects.map((o) => o.clone()).toList()));
     _restore(snap);
+    revision++;
+    _trimHistory();
     return true;
   }
 
@@ -112,6 +165,8 @@ class Document {
     final snap = _redo.removeLast();
     _undo.add(_Snapshot(snap.label, objects.map((o) => o.clone()).toList()));
     _restore(snap);
+    revision++;
+    _trimHistory();
     return true;
   }
 
@@ -196,9 +251,9 @@ Float64List scale4(double s) => Float64List.fromList(<double>[
 Float64List rotation4(double ax, double ay, double az, double radians) {
   final l = ax * ax + ay * ay + az * az;
   if (l < 1e-20) return identity4();
-  final n = 1.0 / (l > 0 ? _sqrt(l) : 1);
+  final n = 1.0 / (l > 0 ? math.sqrt(l) : 1);
   final x = ax * n, y = ay * n, z = az * n;
-  final c = _cos(radians), s = _sin(radians), t = 1 - c;
+  final c = math.cos(radians), s = math.sin(radians), t = 1 - c;
   return Float64List.fromList(<double>[
     t * x * x + c,
     t * x * y - s * z,
@@ -232,35 +287,4 @@ Float64List multiply4(Float64List a, Float64List b) {
     }
   }
   return out;
-}
-
-double _sqrt(double v) {
-  var x = v;
-  for (var i = 0; i < 20; i++) {
-    x = 0.5 * (x + v / x);
-  }
-  return x;
-}
-
-double _cos(double v) {
-  // Range reduction then Taylor series; avoids importing dart:math here.
-  var x = v % 6.283185307179586;
-  if (x > 3.141592653589793) x -= 6.283185307179586;
-  var term = 1.0, sum = 1.0;
-  for (var i = 1; i < 12; i++) {
-    term *= -x * x / ((2 * i - 1) * (2 * i));
-    sum += term;
-  }
-  return sum;
-}
-
-double _sin(double v) {
-  var x = v % 6.283185307179586;
-  if (x > 3.141592653589793) x -= 6.283185307179586;
-  var term = x, sum = x;
-  for (var i = 1; i < 12; i++) {
-    term *= -x * x / ((2 * i) * (2 * i + 1));
-    sum += term;
-  }
-  return sum;
 }

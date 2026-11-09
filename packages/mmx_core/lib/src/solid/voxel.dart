@@ -25,8 +25,25 @@ class VoxelGrid {
 
   VoxelGrid(this.nx, this.ny, this.nz, this.cellSize, this.originX,
       this.originY, this.originZ)
-      : values = Float32List(nx * ny * nz),
+      : values = Float32List(
+            _checkedCells(nx, ny, nz, cellSize, originX, originY, originZ)),
         state = Uint8List(nx * ny * nz);
+
+  static int _checkedCells(
+      int x, int y, int z, double cell, double ox, double oy, double oz) {
+    if (x <= 0 ||
+        y <= 0 ||
+        z <= 0 ||
+        x * y * z > 32 * 1024 * 1024 ||
+        !cell.isFinite ||
+        cell <= 0 ||
+        !ox.isFinite ||
+        !oy.isFinite ||
+        !oz.isFinite) {
+      throw ArgumentError('Invalid grid or more than 32 million voxel cells');
+    }
+    return x * y * z;
+  }
 
   int index(int i, int j, int k) => (i * ny + j) * nz + k;
 
@@ -106,8 +123,26 @@ class VoxelGrid {
           final pz = originZ + k * cellSize;
           final hits =
               bvh.raycastAll(<double>[px, py, pz], <double>[1.0, 1e-4, 1e-4]);
-          final inside = hits.length.isOdd;
-          values[idx] = inside ? -values[idx] : values[idx];
+          // A ray through a shared edge can hit two triangles at the same
+          // surface crossing. Count that crossing once for parity.
+          var crossings = 0;
+          double? previous;
+          for (final hit in hits) {
+            if (previous == null ||
+                (hit - previous).abs() > 1e-7 * math.max(cellSize, hit.abs())) {
+              crossings++;
+              previous = hit;
+            }
+          }
+          final inside = crossings.isOdd;
+          // Treat roundoff at a lattice-aligned surface as exactly zero.
+          // Mixed +/- sub-ulp distances create alternating signs and spurious
+          // non-manifold cells along otherwise planar boundaries.
+          values[idx] = values[idx] <= cellSize * 1e-7
+              ? 0
+              : inside
+                  ? -values[idx]
+                  : values[idx];
           state[idx] = inside ? 2 : 1;
         }
       }
