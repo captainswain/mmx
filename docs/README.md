@@ -16,6 +16,7 @@ Start here:
 - [`TESTING.md`](TESTING.md) - test commands, coverage and known gaps.
 - [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) - current implementation, evidence and outstanding release gates.
 - [`RELEASE.md`](RELEASE.md) - native installers, signing, acceptance and rollback.
+- [`release/ACCEPTANCE.md`](release/ACCEPTANCE.md) - release evidence, native checks and required external inputs.
 - [`PERFORMANCE.md`](PERFORMANCE.md) - repeatable latency and peak-memory measurements.
 - [`REMEDIATION-PLAN.md`](REMEDIATION-PLAN.md) - historical correctness and coverage work.
 - [`FINISH-PLAN.md`](FINISH-PLAN.md) - historical plan for broader parity:

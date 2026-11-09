@@ -82,6 +82,59 @@ cancellation on a procedural 100k-face scene. Its separate
 measurements. Representative interactive hardware and repeated samples are
 still required for UI performance budgets.
 
+## Cross-platform observational workflow
+
+[Performance evidence](../.github/workflows/performance.yml) runs on
+`ubuntu-24.04`, `windows-2022`, and `macos-15`. Start it with `workflow_dispatch`
+for a selected revision and 1, 3, or 5 UI captures (default 3). Pull requests
+changing the workflow, collector, or harness also run it to validate those tools
+and bootstrap the workflow before it exists on the default branch.
+
+```sh
+gh workflow run performance.yml --ref YOUR_BRANCH -f ui_samples=3
+```
+
+Each job compiles the kernel benchmark once, captures it twice, then launches
+independent native **profile** processes for the UI probe. The UI workload
+records every heartbeat and framework post-frame interval. The second kernel
+capture uses the same job/machine, executable, inputs, and configuration.
+Host labels include the run ID, attempt, and platform; they are deliberately
+unsuitable for comparing unrelated hosted VMs across workflow runs.
+
+Artifacts named `performance-PLATFORM-RUN-ATTEMPT` contain:
+
+- `capture-context.json`: actual checkout revision/status, runner image/label,
+  platform, capture timestamps, and explicit pending release acceptance.
+- `kernel-1.json`, `kernel-2.json`, and `kernel-comparison.json`: both full AOT
+  reports, raw operator samples, topology checks, and observed median changes.
+- `ui-profile-NN.json`: independent cold-process profile captures, raw UI
+  interval samples, source/host metadata, operation completion, and cancellation.
+- `flutter-toolchain.json`, command logs, `summary.md`, and
+  `artifact-sha256.json` for reproducibility and failure investigation.
+
+A hosted median shift over the existing 20% comparison threshold is reported
+in the artifact and job summary, **not adopted as a release budget**. Invalid or
+incompatible reports, failed native execution, and failed topology/UI-progress/
+cancellation checks fail the job. Capture failures retain logs and allow the
+other capture phase to run. The collector refuses to overwrite previous evidence.
+
+The same collector runs locally with Python 3, Dart, and Flutter on PATH:
+
+```sh
+python3 tool/performance_evidence.py --platform linux \
+  --host-id=workstation-a --ui-samples=3 --output=/absolute/new/evidence-directory
+```
+
+Use `--platform windows` or `--platform macos` on those hosts (`python` is the
+usual Windows launcher). Linux uses the current display, or `xvfb-run` if
+`DISPLAY` is unset. `--phase kernel` or `--phase ui` supports focused diagnostics.
+These runs remain observational; no option silently grants release acceptance.
+Designated release hosts, representative interactive workloads, repeated
+measurements, and approved latency/memory budgets are still required to close
+the sustained-performance gate. Hosted VM evidence establishes platform execution
+and captures useful observations, rather than certifying physical display FPS
+or a product SLA.
+
 ## Observed local evidence
 
 The original [schema-1 report](performance/2026-11-09-legacy.json) is preserved.

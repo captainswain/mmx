@@ -29,6 +29,7 @@ flutter build linux --release
 # From packages/mmx_core:
 dart compile exe bin/mmx.dart -o mmx-linux.exe
 # From repository root:
+python3 tool/package_release.py linux --record-build
 python3 tool/collect_licenses.py
 python3 tool/package_release.py linux --native
 ```
@@ -37,6 +38,14 @@ Windows packaging requires the Inno Setup compiler in `ISCC_PATH`. macOS uses
 `pkgbuild`; Linux uses `dpkg-deb`. Each platform also gets a portable archive.
 Outputs and SHA-256 files live in `bin/releases/`. Inspect the workflow artifacts
 for native `.deb`, `.pkg`, or Windows installer `.exe` files.
+
+Immediately after building the CLI and desktop app, record their source and
+binary hashes with `python tool/package_release.py PLATFORM --record-build`.
+Packaging requires that receipt and rejects changed source or build outputs.
+Signing additionally requires a clean checkout and clean build receipt. Retain
+`bin/build-receipts/PLATFORM.json` with the exact build inputs when transferring
+them to a signing host. This records the build association; it does not prove
+compiler reproducibility or independently establish that a build was trustworthy.
 
 macOS packages include only the application bundle and explicitly disable bundle
 relocation, so an existing build-tree copy cannot redirect installation away
@@ -77,13 +86,20 @@ Unsigned artifacts are for review. Distribution requires these external inputs:
 `tool/release/sign_macos.sh` requires `MMX_APP_IDENTITY`,
 `MMX_INSTALLER_IDENTITY`, and `MMX_NOTARY_PROFILE`. It signs nested code and the
 app/CLI, builds a signed installer, submits it for notarization and staples the
-ticket. Run on a trusted macOS signing host after verification. This command
+ticket. It requires an accepted notarization response, validates the ticket,
+checks signatures and Gatekeeper assessment, then exposes the package and final
+checksum. The notarization response and log accompany the package. Run on a
+trusted macOS signing host after verification. This command
 contacts Apple's notarization service; never run it with unreviewed binaries.
 
-`tool/release/sign_windows.ps1 -Paths ...` requires `MMX_CERT_THUMBPRINT` and
-`MMX_TIMESTAMP_URL`. Sign application executables and the CLI before packaging,
-then sign the completed installer. Verify with `signtool verify /pa`; recompute
-checksums after signing. Never store certificates/passwords in this repository.
+On Windows, set `MMX_CERT_THUMBPRINT` and `MMX_TIMESTAMP_URL`, then run
+`python tool/package_release.py windows --native --sign-windows` after recording
+the build receipt. This signs staged application executables and the CLI before
+hashing them, and configures Inno Setup to sign the installer, uninstaller and
+temporary installer copies. The helper uses SignTool verification and updates
+standalone checksum sidecars after signing. Signing only the finished installer
+does not cover the uninstaller. Never store certificates/passwords in this
+repository.
 
 Reference: [Apple signing guidance](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html),
 [Apple notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow),
@@ -97,6 +113,9 @@ permission failures, exit prompts, recovery after forced termination, keyboard
 navigation and scale/units on clean user accounts. Automated integration uses
 injected paths so it cannot certify OS dialog interaction or accessibility.
 Record the exact artifact checksums, OS versions and observed outcomes.
+Use the [acceptance record and checklist](release/ACCEPTANCE.md) to track native,
+performance, signing and reference evidence. Mocked signing tests exercise the
+workflow's rejection behavior; they are not verified publisher signatures.
 
 Archive the previous signed release. Projects declare their schema version;
 unsupported versions must fail without replacing the document. Keep a project

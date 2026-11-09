@@ -248,26 +248,29 @@ class _MeshViewportState extends State<MeshViewport> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text('Gizmo: ', style: TextStyle(fontSize: 12)),
-                        DropdownButton<ManipulatorMode>(
-                          key: const ValueKey('gizmo-mode'),
-                          value: state.manipulatorMode,
-                          items: ManipulatorMode.values
-                              .map(
-                                (mode) => DropdownMenuItem(
-                                  value: mode,
-                                  child: Text(switch (mode) {
-                                    ManipulatorMode.none => 'Off',
-                                    ManipulatorMode.translate => 'Move',
-                                    ManipulatorMode.rotate => 'Rotate',
-                                    ManipulatorMode.scale => 'Scale',
-                                    ManipulatorMode.pivot => 'Move pivot',
-                                  }),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: state.interactionLocked
-                              ? null
-                              : (mode) => state.setManipulatorMode(mode!),
+                        Semantics(
+                          label: 'Gizmo mode',
+                          child: DropdownButton<ManipulatorMode>(
+                            key: const ValueKey('gizmo-mode'),
+                            value: state.manipulatorMode,
+                            items: ManipulatorMode.values
+                                .map(
+                                  (mode) => DropdownMenuItem(
+                                    value: mode,
+                                    child: Text(switch (mode) {
+                                      ManipulatorMode.none => 'Off',
+                                      ManipulatorMode.translate => 'Move',
+                                      ManipulatorMode.rotate => 'Rotate',
+                                      ManipulatorMode.scale => 'Scale',
+                                      ManipulatorMode.pivot => 'Move pivot',
+                                    }),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: state.interactionLocked
+                                ? null
+                                : (mode) => state.setManipulatorMode(mode!),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         const Tooltip(

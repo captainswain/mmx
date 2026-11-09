@@ -16,6 +16,11 @@ binary or Oracle result is bundled or downloaded by this tool. Wine is installed
 on the development host, but a usable Meshmixer installation was not found at the
 previous `/data/re/meshmixer` location.
 
+Acquire the application through [Autodesk's official listing](https://marketplace.autodesk.com/apps/2e40e347-0369-4603-b83f-ecab324aed0f).
+The [official remote API](https://github.com/meshmixer/mm-api#what-is-mm-api)
+controls a running Meshmixer application; the API headers alone do not provide
+an independent geometry implementation or measured reference outputs.
+
 Invoke `dart run tool/validate_corpus.dart --reference path/to/manifest.json`.
 Paths resolve relative to the manifest. Example structure (replace the example
 paths and provenance with actual measured fixtures):
@@ -41,3 +46,10 @@ Supported operations are `solid`, `reduce` (`percentage`), `remesh` (`edgeLength
 nonnegative values. Comparison reports actual and reference metrics and a
 symmetric vertex-to-surface distance; this sampled-vertex metric is not the
 continuous Hausdorff distance. Topology/component mismatches always fail.
+
+Every comparison records the manifest and consumed input/reference/operand
+SHA-256 hashes, operation and parameters. Keep that report with the actual
+fixtures, application version and reproduction record: a filename alone cannot
+identify external evidence. Hashes establish which bytes were compared; they do
+not establish that an external application produced them. Synthetic runner tests
+remain explicitly labelled as synthetic.

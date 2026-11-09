@@ -19,6 +19,7 @@ import 'package:mmx_studio/ui/screen.dart';
 const _hostId = String.fromEnvironment('MMX_PERF_HOST_ID');
 const _toolchain = String.fromEnvironment('MMX_PERF_TOOLCHAIN');
 const _reportPath = String.fromEnvironment('MMX_PERF_REPORT');
+const _revision = String.fromEnvironment('MMX_PERF_REVISION');
 
 // A closed, outward-oriented periodic torus: 50,176 vertices, 100,352 faces.
 // No external assets or kernel refinement are needed to reproduce this input.
@@ -60,12 +61,13 @@ String _fingerprint(TriMesh mesh) {
 }
 
 Map<String, Object?> _distribution(List<int> samples) {
-  if (samples.isEmpty) return {'samples': 0};
+  if (samples.isEmpty) return {'samples': 0, 'samplesMicroseconds': <int>[]};
   final ordered = [...samples]..sort();
   double percentile(double p) =>
       ordered[((ordered.length - 1) * p).ceil()] / 1000;
   return {
     'samples': samples.length,
+    'samplesMicroseconds': List<int>.of(samples),
     'medianMs': percentile(.5),
     'p95Ms': percentile(.95),
     'maxMs': ordered.last / 1000,
@@ -255,7 +257,9 @@ void main() {
           : (cancel.workerEndUs! - cancelRequestedUs!) / 1000;
 
       final report = <String, Object?>{
-        'schemaVersion': 1,
+        'schemaVersion': 2,
+        'recordedAtUtc': DateTime.now().toUtc().toIso8601String(),
+        'provenance': {'gitRevision': _revision, 'harnessVersion': 2},
         'host': {
           'id': _hostId,
           'os': Platform.operatingSystem,

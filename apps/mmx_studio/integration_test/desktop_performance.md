@@ -30,6 +30,14 @@ xvfb-run -a flutter drive --profile -d linux \
   --dart-define=MMX_PERF_REPORT=/tmp/mmx-ui-performance-profile.json
 ```
 
+For repeatable captures and source/run metadata, use the repository's
+[portable collector](../../../tool/performance_evidence.py) or
+[performance workflow](../../../.github/workflows/performance.yml). The collector
+adds `MMX_PERF_REVISION` from the actual checkout and records the installed Flutter
+version. Schema 2 reports retain raw microsecond interval arrays alongside each
+distribution so medians and percentiles can be independently checked. Earlier
+schema 1 captures retain their original provenance and are not rewritten.
+
 The deterministic 100,352-face torus exercises one cold 50% Reduce through
 `StudioState`, then undo and cancellation of a second Reduce. Preparation and
 initial rendering are excluded from operation latency. Input/output meshes must

@@ -1,0 +1,360 @@
+[
+  {
+    "name": "main",
+    "role": "desktop frame",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "xdg-desktop-portal-gtk",
+    "role": "application",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "com.mmx.mmx_studio",
+    "role": "application",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "mmx_studio",
+    "role": "frame",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "NAVIGATE   Starter sphere\n482 verts  960 faces   render 7ms\nGizmo: ",
+    "role": "panel",
+    "description": "",
+    "actions": [
+      ""
+    ]
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "MESH STUDIO\nLoaded Starter sphere: 960 faces",
+    "role": "heading",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Project",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Undo",
+    "role": "button",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Redo",
+    "role": "button",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Import mesh",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Export selected",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": [
+      ""
+    ]
+  },
+  {
+    "name": "Navigate",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Select",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Sculpt",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Stamp",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Plane Cut",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Mirror",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Extrude",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Separate Shells",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Remesh",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Reduce",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Make Solid",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Hollow",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Analysis",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Supports",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Modify",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Print / Layout",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Wireframe",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Print bed",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Frame selection",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Gizmo mode\nOff",
+    "role": "button",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "OBJECTS\nStarter sphere\n960",
+    "role": "panel",
+    "description": "",
+    "actions": [
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "VIEW",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Camera\norbit / shift-drag pan / scroll zoom",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Objects\n1",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Undo depth\n0",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  },
+  {
+    "name": "Memory\n0.0 MB",
+    "role": "panel",
+    "description": "",
+    "actions": []
+  }
+]

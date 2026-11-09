@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:mmx_core/mmx_core.dart';
 import 'package:test/test.dart';
 import '../tool/corpus/analytic_meshes.dart';
@@ -345,9 +346,26 @@ void main() {
       ],
     };
     manifest.writeAsStringSync(jsonEncode(document));
-    expect(corpus.validateReferenceCorpus(manifest).single['passed'], isTrue);
+    final initial = corpus.validateReferenceCorpus(manifest).single;
+    expect(initial['passed'], isTrue);
+    expect(initial['manifestSha256'],
+        sha256.convert(manifest.readAsBytesSync()).toString());
+    expect(initial['operation'], 'boolean');
+    expect(initial['parameters'], {'op': 'union', 'resolution': 32});
+    for (final name in ['input', 'operand', 'reference']) {
+      expect(initial[name], '$name.obj');
+      expect(
+          initial['${name}Sha256'],
+          sha256
+              .convert(File('${directory.path}/$name.obj').readAsBytesSync())
+              .toString());
+    }
     writeMesh('reference.obj', analyticCube(scale: .5));
-    expect(corpus.validateReferenceCorpus(manifest).single['passed'], isFalse);
+    final changed = corpus.validateReferenceCorpus(manifest).single;
+    expect(changed['passed'], isFalse);
+    expect(changed['referenceSha256'], isNot(initial['referenceSha256']));
+    expect(changed['manifestSha256'], initial['manifestSha256']);
+    expect(changed['inputSha256'], initial['inputSha256']);
     document['source'] = '';
     manifest.writeAsStringSync(jsonEncode(document));
     expect(

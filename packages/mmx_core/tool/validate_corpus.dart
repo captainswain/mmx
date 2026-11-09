@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:crypto/crypto.dart';
 import 'package:mmx_core/mmx_core.dart';
 import 'corpus/analytic_meshes.dart';
 
@@ -112,17 +113,25 @@ List<Map<String, Object>> validateAnalyticalCorpus() {
 /// supplied explicitly by the fixture owner; no accepted differences are hidden.
 List<Map<String, Object>> validateReferenceCorpus(File manifest) {
   final root = manifest.absolute.parent;
+  final manifestBytes = manifest.readAsBytesSync();
+  final manifestHash = sha256.convert(manifestBytes).toString();
   final document =
-      jsonDecode(manifest.readAsStringSync()) as Map<String, dynamic>;
+      jsonDecode(utf8.decode(manifestBytes)) as Map<String, dynamic>;
   if (document['schema'] != 1 ||
       document['source'] is! String ||
       (document['source'] as String).trim().isEmpty) {
     throw const FormatException('Reference source provenance is required');
   }
   final rows = <Map<String, Object>>[];
+  final fileHashes = <String, String>{};
   TriMesh load(String name) {
     final file = File.fromUri(root.uri.resolve(name));
-    return MeshIO.readBytes(name, file.readAsBytesSync());
+    if (file.lengthSync() > MeshIO.maxFileBytes) {
+      throw FormatException('Reference fixture exceeds 256 MiB: $name');
+    }
+    final bytes = file.readAsBytesSync();
+    fileHashes[name] = sha256.convert(bytes).toString();
+    return MeshIO.readBytes(name, bytes);
   }
 
   for (final c in document['cases'] as List) {
@@ -190,7 +199,17 @@ List<Map<String, Object>> validateReferenceCorpus(File manifest) {
     rows.add({
       'name': c['name'] as String,
       'source': document['source'] as String,
+      'manifestSha256': manifestHash,
+      'operation': c['operation'] as String,
+      'parameters': Map<String, dynamic>.of(p),
+      'input': c['input'] as String,
+      'inputSha256': fileHashes[c['input']]!,
       'reference': c['reference'] as String,
+      'referenceSha256': fileHashes[c['reference']]!,
+      if (c['operation'] == 'boolean') ...{
+        'operand': c['operand'] as String,
+        'operandSha256': fileHashes[c['operand']]!,
+      },
       'metrics': actual,
       'referenceMetrics': expected,
       'volumeError': volumeError,

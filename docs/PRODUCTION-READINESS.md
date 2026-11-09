@@ -33,6 +33,9 @@ finish/remediation plans; full Meshmixer parity is a separate target.
   that save successful and releases the operation lock.
 - Framing an empty Boolean result preserves the prior camera, so valid empty
   results remain saveable and reloadable.
+- Chosen existing Save As/export destinations require Replace confirmation;
+  cancellation preserves the original bytes. Toolbar/tool actions and adjustable
+  controls expose names through native accessibility APIs.
 - Procedural startup geometry replaces redistributed demo assets. Release
   packaging rejects accidental Autodesk fixture assets in the app bundle.
 
@@ -63,6 +66,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 - Seeded geometry acceptance and an analytical corpus check topology, winding,
   components and explicit volume tolerances. An external-reference manifest
   harness compares independently acquired outputs without inventing oracle data.
+  Reports retain consumed fixture/manifest hashes and operation settings.
 - Critical IO coverage has a >80% per-module gate. Desktop tests exercise
   cancellation, manipulation, recovery, metadata rollback and shortcuts; native
   integration covers Unicode import/edit/undo/save/reopen/export workflows.
@@ -72,13 +76,16 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 - Portable archives normalize metadata; artifacts include checksums, source and
   content provenance, dependency inventories and license texts. Signing scripts,
   manual acceptance and rollback steps are in [RELEASE.md](RELEASE.md).
+  Source/binary build receipts reject stale packaging inputs. Signing paths
+  verify their results before exposing final packages and hashes; real publisher
+  signatures still require the external identities below.
 - The AOT benchmark identifies exact inputs, host and toolchain, records raw
   latency samples and isolated-process peak RSS, and rejects incompatible
   baselines. See [PERFORMANCE.md](PERFORMANCE.md) for measured results and limits.
 
 ## Validation record
 
-`./tool/verify.sh` passes with 169 kernel tests, 54 Studio tests, both analyzers
+Verification passes with 169 kernel tests, 57 Studio tests, both analyzers
 clean and no formatting changes. Native Linux integration passes. The 22-case
 analytical corpus and fixed-host performance comparison pass. The optional
 native [profile UI probe](performance/UI-RESPONSIVENESS.md) verifies progress and
@@ -87,10 +94,20 @@ memory limits. A fresh Linux CLI and release build pass startup smoke testing;
 critical coverage passes at 96.4–100% per required module. Packaging regression
 tests and license collection pass.
 
+Release 0.2.0 additionally passes 14 [native Linux acceptance checks](release/LINUX-ACCEPTANCE.md)
+using actual GTK dialogs, AT-SPI actions, overwrite hash checks, permission
+failures and forced termination/recovery. The release/evidence tooling has 21
+regression tests; the local run passes with the PowerShell test skipped for the
+native platform job. The [performance workflow](https://github.com/palindsay/mmx/actions/workflows/performance.yml)
+collects AOT and native profile observations on all three platforms; these are
+not approved budgets on designated release machines.
+
 The authoritative three-platform build/integration/install/remove results are
 attached to the reviewed commit in [PR #4 checks](https://github.com/palindsay/mmx/pull/4/checks).
-See [TESTING.md](TESTING.md) for reproduction. Native integration injects paths,
-so it does not establish file-dialog accessibility or clean-account permissions.
+See [TESTING.md](TESTING.md) for reproduction. CI integration injects paths;
+the separate Linux acceptance run exercises real dialogs but does not establish
+human accessibility acceptance or clean-account behavior on the other systems.
+The [acceptance record](release/ACCEPTANCE.md) tracks the remaining external inputs.
 
 ## Release acceptance criteria
 

@@ -10,7 +10,13 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\studio\mmx_studio.exe
 OutputDir={#Output}
+#ifdef Signed
+OutputBaseFilename=mmx-{#Version}-windows-signed
+SignTool=mmx
+SignedUninstaller=yes
+#else
 OutputBaseFilename=mmx-{#Version}-windows-unsigned
+#endif
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

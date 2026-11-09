@@ -76,6 +76,8 @@ jobs:
       - name: Build desktop
         working-directory: apps/mmx_studio
         run: flutter build ${{ matrix.platform }} --release
+      - name: Record verified build inputs
+        run: python tool/package_release.py '${{ matrix.platform }}' --record-build
       - name: Find Windows installer compiler
         if: runner.os == 'Windows'
         shell: pwsh

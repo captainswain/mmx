@@ -49,6 +49,111 @@ def tree_manifest(directory):
     return result
 
 
+def validate_release_bundle(bundle):
+    if any(bundle.glob('**/flutter_assets/assets/models/*')):
+        raise RuntimeError('Repository-only model assets found in release bundle; clean and rebuild without demo assets')
+
+
+def source_provenance(system, version, *, root=None, code_signed=False):
+    """Describe the reviewed source; signatures are verified by platform tools."""
+    root = ROOT if root is None else root
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    source_files = subprocess.check_output(
+        ['git', 'ls-files', '-co', '--exclude-standard', '-z'], cwd=root).decode().split('\0')
+    source_hash = hashlib.sha256()
+    for name in sorted(set(source_files) - {'', 'toolchain.txt', 'dependencies.json', 'THIRD_PARTY_LICENSES.txt'}):
+        path = root / name
+        if path.is_file():
+            source_hash.update(name.encode() + b'\0' + digest_file(path).encode())
+    return {
+        'commit': commit, 'sourceDigest': source_hash.hexdigest(), 'version': version,
+        'platform': system, 'architecture': host_platform.machine(),
+        'signed': code_signed, 'codeSigned': code_signed,
+        'dirty': bool(subprocess.check_output(
+            ['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=root)),
+    }
+
+
+def build_receipt_path(system):
+    return ROOT / f'bin/build-receipts/{system}.json'
+
+
+def build_input_manifest(system):
+    bundle = ROOT / BUNDLES[system]
+    validate_release_bundle(bundle)
+    if system == 'macos':
+        apps = list(bundle.glob('*.app'))
+        if len(apps) != 1:
+            raise RuntimeError('Expected exactly one macOS application bundle')
+        bundle = apps[0]
+    cli = ROOT / f'packages/mmx_core/mmx-{system}.exe'
+    if not bundle.is_dir() or not cli.is_file():
+        raise RuntimeError('Build the desktop bundle and CLI before recording or packaging')
+    files = {f'{bundle.relative_to(ROOT).as_posix()}/{name}': item
+             for name, item in tree_manifest(bundle).items()}
+    files[cli.relative_to(ROOT).as_posix()] = {
+        'sha256': digest_file(cli), 'size': cli.stat().st_size,
+    }
+    return files
+
+
+def record_build_receipt(system, version):
+    """Run immediately after the verified build, before transferring to a signer."""
+    receipt = source_provenance(system, version)
+    receipt['files'] = build_input_manifest(system)
+    destination = build_receipt_path(system)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    return destination
+
+
+def validate_build_receipt(system, version, *, require_clean=False):
+    receipt_path = build_receipt_path(system)
+    if not receipt_path.is_file():
+        raise RuntimeError('Missing build receipt; rebuild and run --record-build immediately after the build')
+    receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+    source = source_provenance(system, version)
+    if require_clean and (source['dirty'] or receipt.get('dirty')):
+        raise RuntimeError('Signing requires a clean source tree and a clean build receipt')
+    for key in ('commit', 'sourceDigest', 'version', 'platform', 'architecture'):
+        if receipt.get(key) != source[key]:
+            raise RuntimeError(f'Build receipt does not match current source: {key}; rebuild')
+    if receipt.get('files') != build_input_manifest(system):
+        raise RuntimeError('Build outputs changed after receipt creation; rebuild before packaging')
+    return receipt
+
+
+def accepted_notary_id(path):
+    result = json.loads(Path(path).read_text(encoding='utf-8'))
+    if result.get('status') != 'Accepted' or not result.get('id'):
+        raise RuntimeError(f'Notarization was not accepted: {result}')
+    return result['id']
+
+
+def windows_sign_command():
+    if not os.environ.get('MMX_CERT_THUMBPRINT') or not os.environ.get('MMX_TIMESTAMP_URL'):
+        raise RuntimeError('Set MMX_CERT_THUMBPRINT and MMX_TIMESTAMP_URL on the signing host')
+    powershell = shutil.which('pwsh') or shutil.which('powershell')
+    if not powershell:
+        raise RuntimeError('PowerShell is required for Windows signing')
+    return [powershell, '-NoProfile', '-NonInteractive', '-File',
+            str(ROOT / 'tool/release/sign_windows.ps1'), '-NoChecksum']
+
+
+def sign_windows_payload(stage):
+    # The installer manifest covers the DLLs, including vendor-signed CRT files.
+    # Preserve vendor signatures rather than replacing them with our identity.
+    for path in (stage / 'mmx.exe', stage / 'studio/mmx_studio.exe'):
+        subprocess.run([*windows_sign_command(), '-Paths', str(path)], check=True)
+
+
+def inno_sign_command():
+    # Inno expands $q/$f; escape literal dollars in paths before adding them.
+    command = ' '.join('$q' + part.replace('$', '$$') + '$q'
+                       for part in windows_sign_command())
+    return command + ' -Paths $f'
+
+
 def portable(stage, destination, system, epoch):
     """Normalize archive metadata; identical staged content yields identical bytes."""
     if system == 'windows':
@@ -93,7 +198,9 @@ def macos_components(root, destination):
     destination.write_bytes(plistlib.dumps(components))
 
 
-def native_installer(stage, output, system, version, epoch):
+def native_installer(stage, output, system, version, epoch, *, sign_windows=False):
+    if sign_windows and system != 'windows':
+        raise ValueError('Windows signing requires the Windows platform')
     if system == 'linux':
         with tempfile.TemporaryDirectory(prefix='mmx-deb-') as scratch:
             root = Path(scratch)
@@ -126,7 +233,7 @@ def native_installer(stage, output, system, version, epoch):
             (root / 'usr/local/bin').mkdir(parents=True)
             shutil.copy2(stage / 'mmx', root / 'usr/local/bin/mmx')
             (root / 'usr/local/share/mmx').mkdir(parents=True)
-            for item in ('LICENSE', 'NOTICE', 'THIRD_PARTY_LICENSES.txt', 'toolchain.txt', 'dependencies.json'):
+            for item in ('LICENSE', 'NOTICE', 'THIRD_PARTY_LICENSES.txt', 'toolchain.txt', 'dependencies.json', 'build-receipt.json'):
                 if (stage / item).exists():
                     shutil.copy2(stage / item, root / 'usr/local/share/mmx' / item)
             provenance = json.loads((stage / 'provenance.json').read_text(encoding='utf-8'))
@@ -144,9 +251,11 @@ def native_installer(stage, output, system, version, epoch):
         compiler = os.environ.get('ISCC_PATH') or shutil.which('ISCC')
         if not compiler:
             raise RuntimeError('Set ISCC_PATH to the installed Inno Setup compiler')
-        destination = output / f'mmx-{version}-windows-unsigned.exe'
+        label = 'signed' if sign_windows else 'unsigned'
+        destination = output / f'mmx-{version}-windows-{label}.exe'
+        signing = ['/DSigned', '/Smmx=' + inno_sign_command()] if sign_windows else []
         subprocess.run([compiler, f'/DStage={stage}', f'/DOutput={output}', f'/DVersion={version}',
-                        str(ROOT / 'tool/release/windows.iss')], check=True)
+                        *signing, str(ROOT / 'tool/release/windows.iss')], check=True)
     checksum(destination)
     return destination
 
@@ -155,21 +264,35 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('platform', choices=BUNDLES)
     parser.add_argument('--native', action='store_true', help='Also compile a native installer')
+    parser.add_argument('--sign-windows', action='store_true',
+                        help='Sign Windows payload and installer with configured credentials')
+    parser.add_argument('--record-build', action='store_true',
+                        help='Record source and binary hashes immediately after a verified build')
     args = parser.parse_args()
+    if args.sign_windows and (args.platform != 'windows' or not args.native):
+        parser.error('--sign-windows requires windows --native')
+    if args.sign_windows:
+        windows_sign_command()  # Fail before staging if signing is unavailable.
     bundle = ROOT / BUNDLES[args.platform]
     cli = ROOT / f'packages/mmx_core/mmx-{args.platform}.exe'
     if not bundle.is_dir() or not cli.is_file():
         raise SystemExit('Build the desktop bundle and CLI before packaging')
-    if any(bundle.glob('**/flutter_assets/assets/models/*')):
-        raise SystemExit('Repository-only model assets found in release bundle; clean and rebuild without demo assets')
+    validate_release_bundle(bundle)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     epoch = int(os.environ.get('SOURCE_DATE_EPOCH') or subprocess.check_output(
         ['git', 'show', '-s', '--format=%ct', 'HEAD'], cwd=ROOT, text=True).strip())
     version = re.search(r'^version:\s*(\d+\.\d+\.\d+)',
                         (ROOT / 'apps/mmx_studio/pubspec.yaml').read_text(), re.M).group(1)
+    if args.record_build:
+        if args.native or args.sign_windows:
+            parser.error('--record-build cannot package or sign artifacts')
+        print(record_build_receipt(args.platform, version))
+        return
+    validate_build_receipt(args.platform, version, require_clean=args.sign_windows)
     output = ROOT / 'bin/releases'
     output.mkdir(parents=True, exist_ok=True)
-    name = f'mmx-{args.platform}-{host_platform.machine()}-{commit[:12]}-unsigned'
+    label = 'signed' if args.sign_windows else 'unsigned'
+    name = f'mmx-{args.platform}-{host_platform.machine()}-{commit[:12]}-{label}'
     with tempfile.TemporaryDirectory(prefix='mmx-package-') as scratch:
         stage = Path(scratch) / name
         stage.mkdir()
@@ -202,23 +325,19 @@ def main():
         for item in ('toolchain.txt', 'dependencies.json', 'THIRD_PARTY_LICENSES.txt'):
             if (ROOT / item).is_file():
                 shutil.copy2(ROOT / item, stage / item)
-        source_files = subprocess.check_output(['git', 'ls-files', '-co', '--exclude-standard', '-z'], cwd=ROOT).decode().split('\0')
-        source_hash = hashlib.sha256()
-        for name in sorted(set(source_files) - {'', 'toolchain.txt', 'dependencies.json', 'THIRD_PARTY_LICENSES.txt'}):
-            path = ROOT / name
-            if path.is_file():
-                source_hash.update(name.encode() + b'\0' + digest_file(path).encode())
-        manifest = tree_manifest(stage)
-        (stage / 'provenance.json').write_text(json.dumps({
-            'commit': commit, 'sourceDigest': source_hash.hexdigest(), 'version': version,
-            'platform': args.platform, 'architecture': host_platform.machine(), 'signed': False,
-            'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=ROOT)),
-            'files': manifest,
-        }, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+        shutil.copy2(build_receipt_path(args.platform), stage / 'build-receipt.json')
+        if args.sign_windows:
+            sign_windows_payload(stage)
+        provenance = source_provenance(args.platform, version, code_signed=args.sign_windows)
+        provenance['buildReceiptSha256'] = digest_file(build_receipt_path(args.platform))
+        provenance['files'] = tree_manifest(stage)
+        (stage / 'provenance.json').write_text(
+            json.dumps(provenance, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         archive = portable(stage, output / stage.name, args.platform, epoch)
         print(archive)
         if args.native:
-            print(native_installer(stage, output, args.platform, version, epoch))
+            print(native_installer(stage, output, args.platform, version, epoch,
+                                   sign_windows=args.sign_windows))
 
 
 if __name__ == '__main__':

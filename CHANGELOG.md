@@ -13,6 +13,8 @@ semantic versioning once it reaches 1.0.
 - Desktop integration tests, parser/geometry regression suites and analytical corpus.
 - Native installer jobs, deterministic portable archives, checksums and source provenance.
 - Exact-input AOT performance comparisons with latency samples and peak memory.
+- Native Linux acceptance automation and cross-platform AOT/profile evidence collection.
+- Build receipts and verified signing orchestration for release artifacts.
 - Tool matrix and finish plan for closing the reverse-engineering project.
 - Studio actions for Extract, Make Part and Pivot.
 - `BooleanResult` and `RemeshResult` fallback reporting.
@@ -34,6 +36,8 @@ semantic versioning once it reaches 1.0.
 - Concave import triangulation, PLY schemas/byte order, strict STL parsing and `.mix` metadata rewrites.
 - Recovery write ordering, failed-import metadata rollback and keyboard shortcut focus.
 - Per-session recovery ownership, operation completion races, invalid project cameras and macOS installer placement/provenance.
+- Save As/export overwrite confirmation and native accessibility names for desktop controls.
+- Stale build provenance, signing checksums, Windows uninstaller signing and macOS notarization failure handling.
 - Plane Cut honours `keepPositive` on both sides and supports a negative-side
   slice group.
 - Smooth hole filling relaxes only the filled patch.

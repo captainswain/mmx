@@ -6,7 +6,7 @@ Run `./tool/verify.sh` from the repository root. It resolves dependencies, check
 Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
-Observed on 2026-11-09: 169 kernel tests and 54 Studio tests pass; both analyzers
+Observed on 2026-11-09: 169 kernel tests and 57 Studio tests pass; both analyzers
 and formatting checks are clean. The analytical corpus passes all 22 cases.
 
 For focused work:
@@ -73,6 +73,9 @@ The [analytical corpus](../packages/mmx_core/tool/corpus/README.md) reports expl
 volume tolerances and topology requirements. Its reference-manifest mode accepts
 independently acquired Meshmixer output and records comparison failures. No such
 external output has been supplied, so analytical success proves no parity claim.
+Reports retain hashes of the manifest and every consumed fixture alongside
+operation parameters, so replacing a reference file cannot silently reuse its
+identity in evidence.
 
 [Performance instructions](PERFORMANCE.md) describe host identity, exact input
 hashes, AOT samples, peak RSS and regression budgets. Run measurements on an idle,

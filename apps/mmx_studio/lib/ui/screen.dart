@@ -339,11 +339,15 @@ class _StudioScreenState extends State<StudioScreen> {
                   if (state.busy)
                     IconButton(
                       tooltip: 'Cancel operation',
-                      icon: const Icon(Icons.cancel_outlined),
+                      icon: const Icon(
+                        Icons.cancel_outlined,
+                        semanticLabel: 'Cancel operation',
+                      ),
                       onPressed: state.cancelInteraction,
                     ),
                   PopupMenuButton<String>(
                     tooltip: 'Project',
+                    icon: const Icon(Icons.more_vert, semanticLabel: 'Project'),
                     enabled: !state.interactionLocked,
                     onSelected: (action) async {
                       if (action == 'save') await _saveProject();
@@ -371,28 +375,44 @@ class _StudioScreenState extends State<StudioScreen> {
                   ),
                   IconButton(
                     tooltip: 'Undo',
-                    icon: const Icon(Icons.undo, size: 18),
+                    icon: const Icon(
+                      Icons.undo,
+                      size: 18,
+                      semanticLabel: 'Undo',
+                    ),
                     onPressed: !state.interactionLocked && state.doc.canUndo
                         ? () => state.undo()
                         : null,
                   ),
                   IconButton(
                     tooltip: 'Redo',
-                    icon: const Icon(Icons.redo, size: 18),
+                    icon: const Icon(
+                      Icons.redo,
+                      size: 18,
+                      semanticLabel: 'Redo',
+                    ),
                     onPressed: !state.interactionLocked && state.doc.canRedo
                         ? () => state.redo()
                         : null,
                   ),
                   IconButton(
                     tooltip: 'Import mesh',
-                    icon: const Icon(Icons.file_open_outlined, size: 18),
+                    icon: const Icon(
+                      Icons.file_open_outlined,
+                      size: 18,
+                      semanticLabel: 'Import mesh',
+                    ),
                     onPressed: state.interactionLocked
                         ? null
                         : () => _showImport(context),
                   ),
                   IconButton(
                     tooltip: 'Export selected',
-                    icon: const Icon(Icons.save_outlined, size: 18),
+                    icon: const Icon(
+                      Icons.save_outlined,
+                      size: 18,
+                      semanticLabel: 'Export selected',
+                    ),
                     onPressed: state.interactionLocked
                         ? null
                         : () => _showExport(context),
@@ -400,7 +420,11 @@ class _StudioScreenState extends State<StudioScreen> {
                   if (narrow)
                     IconButton(
                       tooltip: 'Tool properties',
-                      icon: const Icon(Icons.tune, size: 18),
+                      icon: const Icon(
+                        Icons.tune,
+                        size: 18,
+                        semanticLabel: 'Tool properties',
+                      ),
                       onPressed: () =>
                           _scaffoldKey.currentState?.openEndDrawer(),
                     ),
@@ -491,6 +515,31 @@ class _StudioScreenState extends State<StudioScreen> {
     }
   }
 
+  Future<bool> _confirmReplace(String path) async {
+    if (!await File(path).exists()) return true;
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Replace existing file?'),
+            content: Text(
+              'The file at $path already exists. Replacing it cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Replace'),
+              ),
+            ],
+          ),
+        ) ==
+        true;
+  }
+
   Future<void> _showExport(BuildContext context) async {
     if (state.interactionLocked || state.selected == null) return;
     try {
@@ -502,6 +551,7 @@ class _StudioScreenState extends State<StudioScreen> {
         ],
       );
       if (file == null) return;
+      if (!await _confirmReplace(file.path)) return;
       if (file.path.toLowerCase().endsWith('.mix')) {
         if (!context.mounted) return;
         final proceed = await showDialog<bool>(
@@ -537,6 +587,7 @@ class _StudioScreenState extends State<StudioScreen> {
     if (state.interactionLocked) return false;
     try {
       var path = saveAs ? null : state.projectPath;
+      final choosingPath = path == null;
       path ??= (await getSaveLocation(
         initialDirectory: _lastDirectory,
         suggestedName: 'project.mmx',
@@ -545,6 +596,7 @@ class _StudioScreenState extends State<StudioScreen> {
         ],
       ))?.path;
       if (path == null) return false;
+      if (choosingPath && !await _confirmReplace(path)) return false;
       final savedRevision = state.doc.revision;
       final saved = await state.saveProject(path);
       if (saved) {

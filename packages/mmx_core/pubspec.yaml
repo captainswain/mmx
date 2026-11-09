@@ -2,7 +2,7 @@ name: mmx_core
 description: >-
   Cross-platform triangle-mesh kernel: topology, BVH, repair, remeshing,
   decimation, SDF/voxel CSG, fabrication analysis, supports, packing, slicing.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/palindsay/mmx
 issue_tracker: https://github.com/palindsay/mmx/issues
 topics:

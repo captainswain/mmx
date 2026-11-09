@@ -48,25 +48,31 @@ class LeftRail extends StatelessWidget {
                       vertical: 2,
                       horizontal: 6,
                     ),
-                    child: Tooltip(
-                      message: item.$3,
-                      child: Material(
-                        color: state.tool == item.$1
-                            ? Theme.of(context).colorScheme.primary
-                                  .withValues(alpha: 0.25)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        child: InkWell(
+                    child: Semantics(
+                      label: item.$3,
+                      button: true,
+                      selected: state.tool == item.$1,
+                      child: Tooltip(
+                        excludeFromSemantics: true,
+                        message: item.$3,
+                        child: Material(
+                          color: state.tool == item.$1
+                              ? Theme.of(context).colorScheme.primary
+                                    .withValues(alpha: 0.25)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          onTap: () => state.setTool(item.$1),
-                          child: SizedBox(
-                            height: 40,
-                            child: Icon(
-                              item.$2,
-                              size: 21,
-                              color: state.tool == item.$1
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.white70,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => state.setTool(item.$1),
+                            child: SizedBox(
+                              height: 40,
+                              child: Icon(
+                                item.$2,
+                                size: 21,
+                                color: state.tool == item.$1
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.white70,
+                              ),
                             ),
                           ),
                         ),
@@ -80,6 +86,7 @@ class LeftRail extends StatelessWidget {
             tooltip: 'Wireframe',
             icon: Icon(
               Icons.grid_4x4,
+              semanticLabel: 'Wireframe',
               color: state.wireframe ? Colors.tealAccent : Colors.white38,
             ),
             onPressed: state.toggleWireframe,
@@ -88,13 +95,18 @@ class LeftRail extends StatelessWidget {
             tooltip: 'Print bed',
             icon: Icon(
               Icons.crop_free,
+              semanticLabel: 'Print bed',
               color: state.showBed ? Colors.tealAccent : Colors.white38,
             ),
             onPressed: state.toggleBed,
           ),
           IconButton(
             tooltip: 'Frame selection',
-            icon: const Icon(Icons.center_focus_strong, color: Colors.white54),
+            icon: const Icon(
+              Icons.center_focus_strong,
+              color: Colors.white54,
+              semanticLabel: 'Frame selection',
+            ),
             onPressed: state.frameSelection,
           ),
           const SizedBox(height: 6),
@@ -738,14 +750,19 @@ class PropertiesPanel extends StatelessWidget {
             ),
           ],
         ),
-        Slider(
-          value: value.clamp(min, max),
-          min: min,
-          max: max,
-          onChanged: (v) {
-            onChanged(v);
-            state.notify();
-          },
+        MergeSemantics(
+          child: Semantics(
+            label: label,
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              onChanged: (v) {
+                onChanged(v);
+                state.notify();
+              },
+            ),
+          ),
         ),
       ],
     );

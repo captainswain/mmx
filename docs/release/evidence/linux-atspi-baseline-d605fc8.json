@@ -1,0 +1,976 @@
+[
+  {
+    "path": [
+      1,
+      0
+    ],
+    "role": "frame",
+    "name": "mmx_studio",
+    "children": 1
+  },
+  {
+    "path": [
+      1,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0
+    ],
+    "role": "filler",
+    "name": "",
+    "children": 1
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "NAVIGATE   Starter sphere\n482 verts  960 faces   render 7ms\nGizmo: ",
+    "children": 7,
+    "actions": [
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 6,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "role": "heading",
+    "name": "MESH STUDIO\nLoaded Starter sphere: 960 faces",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 16,
+    "actions": [
+      "ScrollUp"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      2
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      3
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      4
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      5
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      6
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      7
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      8
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      9
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      10
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      11
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      12
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      13
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      14
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      15
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4
+    ],
+    "role": "button",
+    "name": "",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5
+    ],
+    "role": "button",
+    "name": "Off",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 1,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 7,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      0
+    ],
+    "role": "panel",
+    "name": "OBJECTS\nStarter sphere\n960",
+    "children": 0,
+    "actions": [
+      "Tap",
+      "Focus"
+    ]
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      1
+    ],
+    "role": "panel",
+    "name": "",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      2
+    ],
+    "role": "panel",
+    "name": "VIEW",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      3
+    ],
+    "role": "panel",
+    "name": "Camera\norbit / shift-drag pan / scroll zoom",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      4
+    ],
+    "role": "panel",
+    "name": "Objects\n1",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      5
+    ],
+    "role": "panel",
+    "name": "Undo depth\n0",
+    "children": 0,
+    "actions": []
+  },
+  {
+    "path": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      6
+    ],
+    "role": "panel",
+    "name": "Memory\n0.0 MB",
+    "children": 0,
+    "actions": []
+  }
+]
