@@ -41,6 +41,13 @@ meshes, with an explicitly reported voxel fallback. SDF operations use bounded
 grids and distance bands covering requested offsets. These are documented
 approximations, not proprietary Meshmixer implementations.
 
+Optional minimum-wall operations verify continuous inward-normal opposing-surface
+clearance on the final mesh. Reconstruction attempts and growth are bounded;
+ambiguous surface-net topology can use a reported marching-tetrahedra fallback
+on the same grid before verification. Invalid, unsupported or exhausted cases
+fail transactionally. The [metric and assumptions](WALL-THICKNESS.md) explicitly
+exclude general self-intersection, strength and manufacturing certification.
+
 ## Transactions and history
 
 Workers receive plain Dart data through owned isolates. Cancellation terminates

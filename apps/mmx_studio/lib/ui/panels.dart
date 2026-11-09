@@ -486,6 +486,18 @@ class PropertiesPanel extends StatelessWidget {
             8,
             (v) => state.solidSmoothing = v.round(),
           ),
+          _slider(
+            'Minimum wall check (mm; 0 = off)',
+            state.solidMinThickness,
+            0,
+            20,
+            (v) => state.solidMinThickness = v,
+          ),
+          const Text(
+            'Checks inward-normal clearance and may grow the model. '
+            'Use Accurate or Blocky; verified edits bake object transforms.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
           const SizedBox(height: 8),
           _button(context, 'Make Solid', state.doMakeSolid),
         ];
@@ -512,6 +524,18 @@ class PropertiesPanel extends StatelessWidget {
             32,
             256,
             (v) => state.solidResolution = v,
+          ),
+          _slider(
+            'Minimum wall check (mm; 0 = off)',
+            state.hollowMinThickness,
+            0,
+            20,
+            (v) => state.hollowMinThickness = v,
+          ),
+          const Text(
+            'Checks inward-normal clearance for enclosed shells only '
+            '(zero escape holes). May thicken the wall and bake transforms.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
           ),
           const SizedBox(height: 8),
           _button(context, 'Hollow', state.doHollow),

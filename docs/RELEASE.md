@@ -27,7 +27,9 @@ From a matching build host:
 ```sh
 ./tool/verify.sh
 # From apps/mmx_studio; use -d windows or -d macos on those hosts:
-xvfb-run -a flutter test integration_test -d linux
+for test_file in integration_test/*_test.dart; do
+  xvfb-run -a flutter test "$test_file" -d linux || exit 1
+done
 flutter build linux --release
 # From packages/mmx_core:
 dart compile exe bin/mmx.dart -o mmx-linux.exe

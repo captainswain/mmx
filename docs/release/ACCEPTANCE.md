@@ -1,6 +1,7 @@
 # Release acceptance record
 
-Target: the Linux x64, Windows x64 and macOS arm64 core desktop release.
+Target: the Linux x64, Windows x64 and macOS arm64 desktop release, including
+the optional features in [PR #5](https://github.com/palindsay/mmx/pull/5).
 The next package version is 0.2.0. GitHub Releases in `palindsay/mmx` is the
 publication destination. The `v0.2.0` tag and signed release remain unpublished
 while acceptance is incomplete.
@@ -9,7 +10,7 @@ while acceptance is incomplete.
 
 | Area | Evidence | Remaining requirement |
 |---|---|---|
-| Automated correctness and installation | [PR #4 checks](https://github.com/palindsay/mmx/pull/4/checks) | All checks must pass for the final reviewed commit. |
+| Automated correctness and installation | [PR #5 checks](https://github.com/palindsay/mmx/pull/5/checks); [PR #4](https://github.com/palindsay/mmx/pull/4/checks) is the historical core checkpoint | All checks must pass for the final reviewed commit. |
 | Linux native interaction | [Linux acceptance](LINUX-ACCEPTANCE.md) | Human acceptance on a clean supported desktop, including assistive technology. |
 | Windows/macOS native interaction | Native integration and installer CI | Interactive clean-account checks below on both operating systems. |
 | Performance | [Performance procedure](../PERFORMANCE.md) and hosted measurement artifacts | Designated machines, representative workloads and an agreed latency/frame/memory budget. |
@@ -20,9 +21,9 @@ The development environment currently has Linux, Wine and hosted CI access.
 Workspace inspection found no configured signing environment variables or
 repository signing secrets, release environments, variables or self-hosted
 runners, and located no usable Meshmixer installation.
-Release hosts and external output locations have not been supplied. Resource
-locations can be supplied without sending private keys, passwords or certificate
-contents.
+The user explicitly deferred Windows/macOS signing hosts, identities and licensed
+reference outputs on 2026-11-09. These inputs are future release work; their
+deferral does not establish signature, fidelity or human-acceptance evidence.
 
 ## Native acceptance checklist
 

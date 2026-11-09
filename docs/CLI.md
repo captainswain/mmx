@@ -60,3 +60,16 @@ dart run bin/mmx.dart convert scene.mix scene.obj
 
 The CLI exits non-zero on a missing input file or an unsupported command.
 Geometry operations are deterministic for the same input and parameters.
+
+## Verified minimum wall clearance
+
+`solid` and enclosed `hollow` accept `--min-thickness`, `--max-growth` and
+`--attempts` (1–12, default 6). A positive minimum requests continuous inward-normal
+opposing-surface clearance on the final output; failed verification leaves an
+existing output untouched. Solid requires Accurate/Blocky, and Hollow requires
+`--holes 0`. Successful commands emit a `wallClearance` JSON record with the actual
+offset/shell thickness, numerical margin, attempt count and reconstruction method.
+An explicit diagnostic reports a marching-tetrahedra fallback when surface-net
+topology is ambiguous. See
+[the metric, assumptions and examples](WALL-THICKNESS.md) before treating a
+clearance result as a requirement for fabrication.

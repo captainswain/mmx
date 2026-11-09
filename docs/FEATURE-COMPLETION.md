@@ -5,6 +5,12 @@ hardening checkpoint. The user requested the optional backlog on 2026-11-09.
 Windows/macOS signing hosts and licensed Meshmixer reference outputs are
 explicitly deferred; they remain release acceptance requirements.
 
+The implementation is delivered through [PR #5](https://github.com/palindsay/mmx/pull/5).
+Its checks and artifacts identify the reviewed source, native adapter capability,
+installer manifests and performance samples. The rows below define the delivered
+behavior and its acceptance evidence; signing and human/reference acceptance
+remain external release gates.
+
 ## Implementation and acceptance plan
 
 | Workstream | Required behavior | Acceptance evidence |

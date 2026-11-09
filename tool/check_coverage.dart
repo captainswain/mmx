@@ -21,6 +21,8 @@ void main(List<String> args) {
     'io/threemf_materials.dart',
     'mesh/material.dart',
     'scene/document.dart',
+    'analysis/wall_thickness.dart',
+    'solid/marching_tetrahedra.dart',
     'mesh/attributes.dart',
     'mesh/limits.dart',
   ];

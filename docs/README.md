@@ -21,6 +21,7 @@ Start here:
 - [`FEATURE-COMPLETION.md`](FEATURE-COMPLETION.md) - optional desktop implementation and acceptance plan.
 - [`MANIPULATORS.md`](MANIPULATORS.md) - local/world axes, snapping and numeric transforms.
 - [`MATERIALS.md`](MATERIALS.md) - supported textures, UVs, formats and editing limits.
+- [`WALL-THICKNESS.md`](WALL-THICKNESS.md) - verified directional clearance, bounded growth and assumptions.
 - [Native renderer](../apps/mmx_studio/native_renderer/README.md) - build requirements, fallback and graphics validation.
 - [`REMEDIATION-PLAN.md`](REMEDIATION-PLAN.md) - historical correctness and coverage work.
 - [`FINISH-PLAN.md`](FINISH-PLAN.md) - historical plan for broader parity:

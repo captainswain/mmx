@@ -6,8 +6,11 @@ Run `./tool/verify.sh` from the repository root. It resolves dependencies, check
 Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
-Core checkpoint PR #4, observed on 2026-11-09: 169 kernel tests and 57 Studio tests pass; both analyzers
-and formatting checks are clean. The analytical corpus passes all 22 cases.
+Optional-feature checkpoint PR #5, observed on 2026-11-09: 214 kernel tests and
+84 Studio tests pass; both analyzers and formatting checks are clean. The ordinary
+Studio suite skips three native capability tests, which run explicitly against
+the built library in the five-test renderer suite. The analytical corpus has
+22 cases and runs on each native CI platform.
 
 For focused work:
 
@@ -82,7 +85,8 @@ fail the gate. This is a targeted line-coverage requirement; it does not establi
 exhaustive parser fuzzing, branch coverage or whole-project coverage.
 
 The optional-feature gate also covers mesh file dispatch, companion paths, MTL,
-image decoding, 3MF materials, immutable material data and incremental history.
+image decoding, 3MF materials, immutable material data, incremental history and
+continuous directional wall-clearance verification.
 Run `test/material_fidelity_test.dart` and `test/incremental_history_test.dart`
 for their focused regression suites. Mutation tests have fixed seeds and finite
 case counts; they exercise actual parsers rather than a mock grammar.
@@ -93,9 +97,11 @@ Native renderer tests require the built library. See the
 Flutter unit tests explicitly skip unavailable native capability tests; CI runs
 them after the platform build. Software adapters are labeled as such.
 
-The fresh local run measured 100% for OBJ, PLY, STL, 3MF, atomic writes and mesh
-allocation guards; 99.5% for project IO, 99.3% for ZIP, 98.8% for triangulation
-and 96.4% for attribute transfer.
+The optional-feature coverage run passes all 19 required modules at 92.6–100%.
+Wall verification, its tetrahedral fallback, PLY, STL, 3MF, image decoding, companion paths, atomic writes,
+3MF materials and allocation guards reach 100%; OBJ measures 94.9%, project IO
+99.6%, ZIP 99.3%, triangulation 98.8% and attribute transfer 96.4%. These are
+line-coverage observations, not exhaustive correctness claims.
 
 ## Geometry references and performance
 
@@ -114,9 +120,11 @@ fixed host; never gate kernel latency using unrelated shared-runner baselines.
 ## Algorithm limits
 
 Adaptive density is a heuristic. Precise boolean and adaptive-remesh fallbacks
-are reported explicitly. Hollow thickness is approximate within voxel error;
-Make Solid rejects positive `minThickness` because a global minimum-wall solver
-is unimplemented. Grid reconstruction has no material-region correspondence
+are reported explicitly. Ordinary Hollow thickness is approximate within voxel
+error. Optional bounded minimum-wall reconstruction verifies the final mesh's
+[directional clearance](WALL-THICKNESS.md), under documented embedded-shell
+assumptions; it is not a general manufacturing or self-intersection certificate.
+Grid reconstruction has no material-region correspondence
 guarantee; unsupported topology edits reject surface attributes. Planar unwrap
 persists per-corner UVs, while diffuse materials/textures use an explicit supported
 format subset. Imported unknown `.mix`

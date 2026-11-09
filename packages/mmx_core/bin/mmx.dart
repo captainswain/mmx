@@ -12,9 +12,9 @@ mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
   mmx repair <in> <out> [--weld 1e-5]
   mmx remesh <in> <out> --edge <len> [--iters 6] [--adaptive 0-1]
   mmx reduce <in> <out> --percent <0-1> | --faces <n> [--uniform] [--max-dev <d>]
-  mmx solid <in> <out> [--mode fast|accurate|blocky] [--res 128] [--offset 0] [--smooth 0]
+  mmx solid <in> <out> [--mode fast|accurate|blocky] [--res 128] [--offset 0] [--smooth 0] [--min-thickness 0] [--max-growth <d>] [--attempts 6]
   mmx boolean <a> <b> <out> --op union|intersection|difference [--precise] [--edge <len>]
-  mmx hollow <in> <out> --thickness <t> [--holes 3] [--hole-radius <r>]
+  mmx hollow <in> <out> --thickness <t> [--holes 3] [--hole-radius <r>] [--min-thickness 0] [--max-growth <d>] [--attempts 6]
   mmx offset <in> <out> --distance <d>
   mmx supports <in> <out> [--angle 45] [--density 0.5] [--bed 0]
   mmx pack <out> <in...> [--bed 200] [--quality 1]
@@ -42,6 +42,25 @@ class UsageError implements Exception {
   String toString() => message;
 }
 
+void reportWallCertificate(SolidResult result) {
+  final certificate = result.wallCertificate;
+  if (certificate == null) return;
+  stdout.writeln(jsonEncode({
+    'wallClearance': {
+      'metric': WallThicknessCertificate.metric,
+      'status': certificate.status.name,
+      'verifiedLowerBound': certificate.verifiedLowerBound,
+      'numericalMargin': certificate.numericalMargin,
+      'candidatePairs': certificate.candidatePairs,
+      'appliedOffset': result.appliedOffset,
+      'appliedShellThickness': result.appliedShellThickness,
+      'attempts': result.thicknessAttempts,
+      'reconstruction': result.reconstruction,
+      'reconstructionDiagnostic': result.reconstructionDiagnostic,
+    }
+  }));
+}
+
 Future<void> main(List<String> args) async {
   try {
     await run(args);
@@ -64,9 +83,12 @@ Future<void> run(List<String> args) async {
     'repair': (2, 'weld'),
     'remesh': (2, 'edge iters adaptive debug-topology'),
     'reduce': (2, 'percent faces uniform max-dev'),
-    'solid': (2, 'mode res offset smooth'),
+    'solid': (2, 'mode res offset smooth min-thickness max-growth attempts'),
     'boolean': (3, 'op precise edge res'),
-    'hollow': (2, 'thickness holes hole-radius res'),
+    'hollow': (
+      2,
+      'thickness holes hole-radius res min-thickness max-growth attempts'
+    ),
     'offset': (2, 'distance res'),
     'supports': (2, 'angle density post base bed'),
     'pack': (2, 'bed quality'),
@@ -135,6 +157,7 @@ Future<void> run(List<String> args) async {
     'kind': ['box', 'cylinder', 'sphere']
   };
   const integers = {
+    'attempts',
     'faces',
     'iters',
     'res',
@@ -197,6 +220,9 @@ Future<void> run(List<String> args) async {
     }
     if (e.key == 'res' && (n < 8 || n > 256)) {
       throw UsageError('--res must be in [8,256]');
+    }
+    if (e.key == 'attempts' && (n < 1 || n > 12)) {
+      throw UsageError('--attempts must be in [1,12]');
     }
     if ({'width', 'height'}.contains(e.key) && n > 4096) {
       throw UsageError('--${e.key} exceeds 4096');
@@ -318,11 +344,16 @@ Future<void> run(List<String> args) async {
             mode: mode,
             resolution: flag('res', 128).toInt(),
             offset: flag('offset', 0),
-            smoothing: flag('smooth', 0).toInt());
+            smoothing: flag('smooth', 0).toInt(),
+            minThickness: flag('min-thickness', 0),
+            maxThicknessAttempts: flag('attempts', 6).toInt(),
+            maxAdditionalOffset:
+                flags.containsKey('max-growth') ? flag('max-growth', 0) : null);
         stdout.writeln(
             'grid ${r.gridResolution} cell ${r.cellSize.toStringAsFixed(4)} '
             '${r.elapsedMs}ms');
         await save(positional[1], r.mesh);
+        reportWallCertificate(r);
       }
     case 'boolean':
       {
@@ -353,8 +384,13 @@ Future<void> run(List<String> args) async {
             thickness: flag('thickness', mesh.bounds().diagonal * 0.03),
             holes: flag('holes', 3).toInt(),
             holeRadius: flag('hole-radius', mesh.bounds().diagonal * 0.02),
-            resolution: flag('res', 128).toInt());
+            resolution: flag('res', 128).toInt(),
+            minThickness: flag('min-thickness', 0),
+            maxThicknessAttempts: flag('attempts', 6).toInt(),
+            maxAdditionalThickness:
+                flags.containsKey('max-growth') ? flag('max-growth', 0) : null);
         await save(positional[1], r.mesh);
+        reportWallCertificate(r);
       }
     case 'offset':
       {

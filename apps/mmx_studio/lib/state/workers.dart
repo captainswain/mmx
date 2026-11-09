@@ -77,12 +77,13 @@ Future<TriMesh> makePartWorker(TriMesh mesh, Set<int> faces) => executeWorker(
   () => ComplexTools.makeSolidPart(mesh, faces, resolution: 64),
 );
 
-Future<TriMesh> makeSolidWorker(
+Future<SolidResult> makeSolidWorker(
   TriMesh mesh,
   SolidMode mode,
   int res,
   double offset,
   int smooth,
+  double minimumThickness,
 ) => executeWorker(
   () => Solidifier.makeSolid(
     mesh,
@@ -90,19 +91,26 @@ Future<TriMesh> makeSolidWorker(
     resolution: res,
     offset: offset,
     smoothing: smooth,
-  ).mesh,
+    minThickness: minimumThickness,
+  ),
 );
 
-Future<TriMesh> hollowWorker(TriMesh mesh, double t, int holes, int res) =>
-    executeWorker(
-      () => Solidifier.hollow(
-        mesh,
-        thickness: t,
-        holes: holes,
-        holeRadius: t * 1.2,
-        resolution: res,
-      ).mesh,
-    );
+Future<SolidResult> hollowWorker(
+  TriMesh mesh,
+  double t,
+  int holes,
+  int res,
+  double minimumThickness,
+) => executeWorker(
+  () => Solidifier.hollow(
+    mesh,
+    thickness: t,
+    holes: holes,
+    holeRadius: t * 1.2,
+    resolution: res,
+    minThickness: minimumThickness,
+  ),
+);
 
 Future<TriMesh> planeCutWorker(
   TriMesh mesh,

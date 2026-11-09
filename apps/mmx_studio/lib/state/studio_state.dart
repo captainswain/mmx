@@ -475,7 +475,9 @@ class StudioState extends ChangeNotifier {
   SolidMode solidMode = SolidMode.accurate;
   double solidOffset = 0;
   int solidSmoothing = 0;
+  double solidMinThickness = 0;
   double hollowThickness = 2;
+  double hollowMinThickness = 0;
   int hollowHoles = 3;
   double supportAngle = 45;
   double supportDensity = 0.5;
@@ -959,7 +961,35 @@ class StudioState extends ChangeNotifier {
     }
     doc.snapshot(label);
     obj.mesh = result;
-    if (worldSpace) obj.transform = identity4();
+    if (worldSpace) {
+      // Pivots are stored locally: baking geometry into world coordinates must
+      // preserve the user-selected world anchor and its normal.
+      final pivot = obj.pivot;
+      if (pivot != null) {
+        final linear = Float64List.fromList(obj.transform)
+          ..[12] = 0
+          ..[13] = 0
+          ..[14] = 0;
+        final normal = <double>[];
+        for (var axis = 0; axis < 3; axis++) {
+          final inverseColumn = inverseTransformPoint(
+            linear,
+            List<double>.generate(3, (i) => i == axis ? 1 : 0),
+          );
+          normal.add(
+            List<double>.generate(
+              3,
+              (i) => inverseColumn[i] * pivot.normal[i],
+            ).reduce((a, b) => a + b),
+          );
+        }
+        obj.pivot = Pivot.atPoint(
+          transformPoint(obj.transform, pivot.position),
+          normal: normal,
+        );
+      }
+      obj.transform = identity4();
+    }
     status = '$label done (${result.faceCount} faces)';
   });
 
@@ -1045,25 +1075,47 @@ class StudioState extends ChangeNotifier {
   Future<void> doMakeSolid() async {
     final obj = selected;
     if (obj == null) return;
-    final mesh = obj.mesh;
+    final minimum = solidMinThickness;
+    final mesh = minimum > 0 ? obj.worldMesh() : obj.mesh;
     final res = solidResolution.toInt();
     final mode = solidMode;
     final offset = solidOffset;
     final smooth = solidSmoothing;
-    await runOp(
-      'Make Solid',
-      () => _work(makeSolidWorker(mesh, mode, res, offset, smooth)),
-    );
+    await runOp('Make Solid', () async {
+      final result = await _work(
+        makeSolidWorker(mesh, mode, res, offset, smooth, minimum),
+      );
+      _reportWallVerification(result);
+      return result.mesh;
+    }, worldSpace: minimum > 0);
   }
 
   Future<void> doHollow() async {
     final obj = selected;
     if (obj == null) return;
-    final mesh = obj.mesh;
+    final minimum = hollowMinThickness;
+    final mesh = minimum > 0 ? obj.worldMesh() : obj.mesh;
     final t = hollowThickness;
     final holes = hollowHoles;
     final res = solidResolution.toInt();
-    await runOp('Hollow', () => _work(hollowWorker(mesh, t, holes, res)));
+    await runOp('Hollow', () async {
+      final result = await _work(hollowWorker(mesh, t, holes, res, minimum));
+      _reportWallVerification(result);
+      return result.mesh;
+    }, worldSpace: minimum > 0);
+  }
+
+  void _reportWallVerification(SolidResult result) {
+    final certificate = result.wallCertificate;
+    if (certificate == null) return;
+    final change = result.appliedShellThickness == null
+        ? 'offset ${result.appliedOffset.toStringAsFixed(3)} mm'
+        : 'shell ${result.appliedShellThickness!.toStringAsFixed(3)} mm';
+    operationWarning =
+        'Verified inward-normal clearance '
+        '${certificate.requestedThickness.toStringAsFixed(3)} mm; $change; '
+        '${result.thicknessAttempts} attempt(s)'
+        '${result.reconstructionDiagnostic == null ? '' : '; ${result.reconstructionDiagnostic}'}';
   }
 
   Future<void> doPlaneCut() async {

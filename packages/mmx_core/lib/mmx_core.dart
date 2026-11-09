@@ -7,6 +7,7 @@
 library;
 
 export 'src/analysis/analysis.dart';
+export 'src/analysis/wall_thickness.dart';
 export 'src/fab/packing.dart';
 export 'src/fab/slicer.dart';
 export 'src/fab/supports.dart';

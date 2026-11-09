@@ -12,6 +12,7 @@ semantic versioning once it reaches 1.0.
 - Diffuse materials, PNG/JPEG textures, seam-safe UVs, supported OBJ/MTL and 3MF material round trips.
 - Native Vulkan/Direct3D 12/Metal renderer with depth tests and explicit CPU fallback.
 - Bounded deterministic parser mutation tests and native renderer capability checks.
+- Continuous directional wall-clearance verification with bounded Solid/Hollow reconstruction and reported growth.
 - Native `.mmx` projects, recovery saves, unsaved-change prompts and native file dialogs.
 - Viewport manipulation, grouped sculpt undo, unit selection and cancelable workers.
 - Desktop integration tests, parser/geometry regression suites and analytical corpus.
@@ -29,7 +30,7 @@ semantic versioning once it reaches 1.0.
 ### Changed
 
 - Studio starts with procedural geometry; repository-only model assets are excluded from releases.
-- Unsupported 3MF materials and positive Make Solid minimum-wall requests now fail explicitly.
+- Unsupported 3MF layers and unverified/unsupported minimum-wall requests fail explicitly.
 - Extract in Studio now delegates to `ComplexTools.extract`.
 - Pivot state is preserved by document undo/redo snapshots.
 - CI runs on GitHub-hosted runners using the vendored fixtures.
@@ -37,6 +38,8 @@ semantic versioning once it reaches 1.0.
 ### Fixed
 
 - QEM candidate invalidation, remesh winding, surface-net lattice degeneracies and tiny-scale ray tolerances.
+- Positive-offset voxel seed distances that could create a phantom grid-boundary shell.
+- Material/UV export fidelity, encoded texture integrity, effective viewport sizing and native test launch isolation.
 - Concave import triangulation, PLY schemas/byte order, strict STL parsing and `.mix` metadata rewrites.
 - Recovery write ordering, failed-import metadata rollback and keyboard shortcut focus.
 - Per-session recovery ownership, operation completion races, invalid project cameras and macOS installer placement/provenance.
@@ -45,7 +48,7 @@ semantic versioning once it reaches 1.0.
 - Plane Cut honours `keepPositive` on both sides and supports a negative-side
   slice group.
 - Smooth hole filling relaxes only the filled patch.
-- Hollow uses the requested minimum thickness as an inner SDF offset, subject to voxel discretization error.
+- Hollow honors its requested SDF shell thickness; positive minimum-wall requests additionally verify final directional clearance.
 - Make Polygon uses ear clipping for concave loops.
 - Adaptive remesh fallback is explicit instead of silent.
 

@@ -1,10 +1,11 @@
 # Production readiness
 
 Target: reliable Linux, Windows and macOS core mesh workflows and CLI.
-**Status: the core hardening checkpoint is merged and validated on three platforms;
-optional desktop features are undergoing integration and review. Production
-distribution still requires the external acceptance below.** See the expanded
-[feature completion plan](FEATURE-COMPLETION.md). This supersedes the historical
+**Status: core hardening and optional desktop features are implemented. Automated
+acceptance for the reviewed implementation is tracked in
+[PR #5 checks](https://github.com/palindsay/mmx/pull/5/checks); production
+distribution still requires the external acceptance below.** See the
+[feature completion record](FEATURE-COMPLETION.md). This supersedes the historical
 finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Implemented plan
@@ -87,6 +88,21 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
+The optional-feature local run passes 214 kernel and 84 Studio tests with clean
+analyzers and formatting; the separate strict native renderer suite passes all
+five tests. The implementation adds material/texture round trips, immutable
+history, advanced manipulators, native depth/texture checks, parser mutations and
+continuous wall verification. Independent reviews cover data persistence,
+transaction rollback, growth bounds and reconstruction topology. Both new wall
+modules have 100% line coverage; all 19 required coverage modules pass. The native
+matrix builds and tests Vulkan, Direct3D 12 and Metal, records actual adapter
+capability, and packages unsigned installers. Use the exact commit and artifact
+checksums in [PR #5](https://github.com/palindsay/mmx/pull/5) for current evidence.
+Hosted profile measurements retain raw samples and software-adapter status;
+they do not establish release-host performance budgets.
+
+### Historical core checkpoint
+
 The merged core checkpoint passed with 169 kernel tests, 57 Studio tests, both analyzers
 clean and no formatting changes. Native Linux integration passes. The 22-case
 analytical corpus and fixed-host performance comparison pass. The optional
@@ -96,7 +112,7 @@ memory limits. A fresh Linux CLI and release build pass startup smoke testing;
 critical coverage passes at 96.4–100% per required module. Packaging regression
 tests and license collection pass.
 
-Release 0.2.0 additionally passes 14 [native Linux acceptance checks](release/LINUX-ACCEPTANCE.md)
+The prior 0.2.0 candidate additionally passed 14 [native Linux acceptance checks](release/LINUX-ACCEPTANCE.md)
 using actual GTK dialogs, AT-SPI actions, overwrite hash checks, permission
 failures and forced termination/recovery. The release/evidence tooling has 21
 regression tests; the local run passes with the PowerShell test skipped for the
@@ -132,8 +148,11 @@ from analytical tests. No release is published by this work.
   [Local measurements](performance/INCREMENTAL-UNDO.md) document the limits.
 - Manipulators support local/world axes, per-axis scale, snapping and numeric
   entry. Arbitrary face deformation remains separate from object manipulation.
-- Hollow thickness is an SDF approximation with voxel error. Make Solid rejects
-  positive `minThickness`; a guaranteed global wall-thickness solver is absent.
+- Optional [minimum-wall verification](WALL-THICKNESS.md) checks continuous
+  inward-normal opposing-surface clearance on the final mesh with bounded
+  reconstruction attempts. It assumes embedded shells and is not a medial-axis,
+  self-intersection or manufacturing certificate. Unverified SDF thickness still
+  has voxel error; Fast mode and open-shell minimum requests fail explicitly.
 - Grid reconstruction does not promise original material-region correspondence.
   Native source attachments preserve unknown `.mix` bytes without interpreting
   their semantics. [Materials](MATERIALS.md) support diffuse RGBA and PNG/JPEG
