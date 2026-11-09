@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Collect the resolved Rust dependency notices for the actual target platform."""
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json

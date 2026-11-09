@@ -246,11 +246,39 @@ void main() {
             [35, 61],
             [55, 58],
           ]) {
+            final actual = pixel(image.rgba, point[0], point[1]);
+            final expected = pixel(cpu, point[0], point[1]);
+            // Bilinear interpolation/UNORM rounding differs by one channel
+            // level between the Mesa and NVIDIA adapters and Dart doubles.
+            // Keep orientation, cutout alpha and depth assertions exact above.
+            for (var channel = 0; channel < 3; channel++) {
+              expect(
+                (actual[channel] - expected[channel]).abs(),
+                lessThanOrEqualTo(1),
+                reason: 'point $point channel $channel',
+              );
+            }
+            expect(actual[3], expected[3]);
+          }
+          mesh.materials = [
+            MeshMaterial(
+              baseColor: [.5, .75, 1, .8],
+              textureClamp: true,
+              texture: mesh.materials.single.texture,
+            ),
+          ];
+          final tinted = gpu.render(objects, camera, options);
+          final tintedCpu = Rasterizer.render(objects, camera, options);
+          final tintedPixel = pixel(tinted.rgba, 35, 35);
+          expect(tintedPixel[0], inInclusiveRange(100, 200));
+          final expectedTint = pixel(tintedCpu, 35, 35);
+          for (var channel = 0; channel < 3; channel++) {
             expect(
-              pixel(image.rgba, point[0], point[1]),
-              pixel(cpu, point[0], point[1]),
+              (tintedPixel[channel] - expectedTint[channel]).abs(),
+              lessThanOrEqualTo(1),
             );
           }
+          expect(tintedPixel[3], 255);
         },
       );
     },
