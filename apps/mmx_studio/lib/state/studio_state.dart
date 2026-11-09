@@ -1622,9 +1622,11 @@ class StudioState extends ChangeNotifier {
   }
 
   void setFrameSize(int w, int h) {
+    w = w.clamp(1, 4096);
+    h = h.clamp(1, 4096);
     if (w == frameWidth && h == frameHeight) return;
-    frameWidth = w.clamp(1, 4096);
-    frameHeight = h.clamp(1, 4096);
+    frameWidth = w;
+    frameHeight = h;
     _scheduleRender();
   }
 }

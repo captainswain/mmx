@@ -54,7 +54,7 @@ class ObjIO {
             throw const FormatException(
                 'OBJ references MTL companions; use MeshIO.readFile or supply readAsset');
           }
-          var path = parts.skip(1).join(' ');
+          var path = line.substring(parts[0].length).trim();
           if (path.startsWith('"') && path.endsWith('"')) {
             path = path.substring(1, path.length - 1);
           }
@@ -73,7 +73,9 @@ class ObjIO {
             library[entry.key] = entry.value;
           }
         case 'usemtl':
-          final name = parts.skip(1).join(' ');
+          // MTL material names preserve internal whitespace. Splitting and
+          // rejoining here would make our own exported names unresolvable.
+          final name = line.substring(parts[0].length).trim();
           final material = library[name];
           if (material == null) {
             throw FormatException('Missing OBJ material: $name');
@@ -282,6 +284,7 @@ class ObjIO {
       mtl.writeln(
           'newmtl ${labels[i]}\nKd ${c[0]} ${c[1]} ${c[2]}\nd ${c[3]}\nillum 1');
       if (m.texture != null) {
+        TextureIO.validateSource(m.texture!);
         final path =
             '${stem}_texture_$i.${m.texture!.mimeType == 'image/png' ? 'png' : 'jpg'}';
         out[path] = m.texture!.bytes;

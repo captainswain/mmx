@@ -5,6 +5,25 @@ import '../mesh/material.dart';
 /// Bounded PNG/JPEG decoding. Embedded metadata is preserved in the original
 /// bytes, but not executed or used as external resource references.
 class TextureIO {
+  static final _verifiedSources = Expando<bool>('verified texture source');
+
+  /// Persistence stores encoded source bytes, so caller-supplied pixels must
+  /// describe that same image. Immutable decoded textures need this check only
+  /// once per isolate; rendering never performs an additional image decode.
+  static void validateSource(MeshTexture texture) {
+    if (_verifiedSources[texture] == true) return;
+    final decoded = decode(texture.bytes, name: texture.name);
+    if (decoded.mimeType != texture.mimeType ||
+        decoded.width != texture.width ||
+        decoded.height != texture.height ||
+        Iterable<int>.generate(decoded.rgba.length)
+            .any((i) => decoded.rgba[i] != texture.rgba[i])) {
+      throw const FormatException(
+          'Texture pixels or metadata do not match encoded source');
+    }
+    _verifiedSources[texture] = true;
+  }
+
   static MeshTexture decode(Uint8List bytes,
       {String name = 'texture', int maxDecodedBytes = 192 * 1024 * 1024}) {
     if (bytes.isEmpty || bytes.length > MeshTexture.maxEncodedBytes) {
@@ -35,13 +54,15 @@ class TextureIO {
         throw const FormatException('Invalid texture pixels');
       }
       final image = decoded.convert(format: img.Format.uint8, numChannels: 4);
-      return MeshTexture(
+      final texture = MeshTexture(
           name: name,
           mimeType: png ? 'image/png' : 'image/jpeg',
           width: image.width,
           height: image.height,
           bytes: bytes,
           rgba: image.getBytes(order: img.ChannelOrder.rgba));
+      _verifiedSources[texture] = true;
+      return texture;
     } on FormatException {
       rethrow;
     } catch (_) {

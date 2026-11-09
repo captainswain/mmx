@@ -286,17 +286,21 @@ class ThreeMfSurfaceWriter {
       }
       resources.writeln('</m:colorgroup>');
     }
-    if (mesh.cornerUvs != null &&
-        mesh.materials.every((m) => m.texture == null)) {
-      throw const FormatException(
-          '3MF cannot store UVs without a texture; use OBJ/native');
-    }
     final corners = <int, List<int>>{};
     for (var f = 0; f < mesh.faceCount; f++) {
       final id = mesh.faceMaterials?[f];
       if (id != null && mesh.materials[id].texture != null) {
         (corners[id] ??= []).addAll([f * 3, f * 3 + 1, f * 3 + 2]);
+      } else if (mesh.cornerUvs != null &&
+          Iterable<int>.generate(6)
+              .any((k) => mesh.cornerUvs![f * 6 + k] != 0)) {
+        throw const FormatException(
+            '3MF cannot store UVs on untextured faces; use OBJ/native');
       }
+    }
+    if (mesh.cornerUvs != null && corners.isEmpty) {
+      throw const FormatException(
+          '3MF cannot store UVs without a textured face; use OBJ/native');
     }
     for (var i = 0; i < mesh.materials.length; i++) {
       final m = mesh.materials[i], id = i * 3 + 2;
@@ -310,6 +314,7 @@ class ThreeMfSurfaceWriter {
           throw const FormatException(
               '3MF tinted texture export is unsupported; use OBJ/native');
         }
+        TextureIO.validateSource(m.texture!);
         final path =
             '3D/Textures/material_$i.${m.texture!.mimeType == 'image/png' ? 'png' : 'jpg'}';
         textures.add(ZipEntry(path, m.texture!.bytes));

@@ -17,14 +17,32 @@ dart test test/geometry_acceptance_test.dart test/io_fidelity_test.dart
 dart run tool/validate_corpus.dart
 cd ../../apps/mmx_studio
 flutter test test/interaction_test.dart test/recovery_test.dart test/worker_runtime_test.dart
-xvfb-run -a flutter test integration_test -d linux
+# A fresh Flutter process is required for each desktop integration file.
+for test_file in integration_test/*_test.dart; do
+  xvfb-run -a flutter test "$test_file" -d linux || exit 1
+done
 ```
 
-Use `-d windows` or `-d macos` on those hosts, without Xvfb. The native integration
-workflow checks procedural startup, native plugin registration, non-ASCII paths,
-import units, reduction, undo/redo, project save/reopen, and watertight STL export.
-It injects file paths; native dialogs and clean-account accessibility still need
-manual acceptance. See [release procedures](RELEASE.md).
+Use `-d windows` or `-d macos` on those hosts, without Xvfb, still launching a
+separate `flutter test` process for each file.
+
+**Observed SDK limitation (Flutter 3.47.9):** a multi-file desktop invocation such
+as `flutter test integration_test -d linux` passes the first app, then fails to
+launch subsequent apps with “The log reader stopped unexpectedly, or never
+started.” The SDK's `flutter_tools/lib/src/desktop_device.dart` keeps one
+`DesktopLogReader` per device; its final stream controller closes after the first
+app exits and is reused by the next launch. This occurs before test assertions.
+Fresh per-file Flutter processes passed all three native workflows locally.
+Private D-Bus sessions do not fix this closed-stream problem and are not required
+for these tests; use them separately when isolating native desktop automation.
+
+The native workflows check procedural startup, native plugin registration,
+non-ASCII paths, import units, reduction, undo/redo, project save/reopen,
+watertight STL export, keyboard and pivot-aware manipulators, and material/texture
+OBJ companion-file round trips. They inject file paths; real GTK dialog automation
+has separate [Linux acceptance evidence](release/LINUX-ACCEPTANCE.md). Human and
+clean-account acceptance remain separate release checks. See
+[release procedures](RELEASE.md).
 
 ## Regression coverage
 

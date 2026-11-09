@@ -153,6 +153,52 @@ void main() {
     });
   });
   group('format round trips', () {
+    test('persistence rejects mismatched caller-supplied texture sources', () {
+      final decoded = TextureIO.decode(_png());
+      final mismatched = Uint8List.fromList(decoded.rgba)..[0] = 0;
+      for (final texture in [
+        MeshTexture(
+            name: 'invalid bytes',
+            mimeType: decoded.mimeType,
+            width: decoded.width,
+            height: decoded.height,
+            bytes: Uint8List.fromList([1]),
+            rgba: decoded.rgba),
+        MeshTexture(
+            name: 'different pixels',
+            mimeType: decoded.mimeType,
+            width: decoded.width,
+            height: decoded.height,
+            bytes: decoded.bytes,
+            rgba: mismatched),
+        MeshTexture(
+            name: 'different metadata',
+            mimeType: 'image/jpeg',
+            width: decoded.width,
+            height: decoded.height,
+            bytes: decoded.bytes,
+            rgba: decoded.rgba),
+      ]) {
+        final mesh = _mesh()..materials = [MeshMaterial(texture: texture)];
+        expect(() => ObjIO.writeBundle(mesh), throwsFormatException);
+        expect(() => ThreeMfIO.write(mesh), throwsFormatException);
+        expect(
+            () => ProjectIO.write(ProjectData([SceneObject(1, 'mesh', mesh)])),
+            throwsFormatException);
+      }
+      final valid = MeshTexture(
+          name: decoded.name,
+          mimeType: decoded.mimeType,
+          width: decoded.width,
+          height: decoded.height,
+          bytes: decoded.bytes,
+          rgba: decoded.rgba);
+      final mesh = _mesh()..materials = [MeshMaterial(texture: valid)];
+      final restored = ProjectIO.read(
+          ProjectIO.write(ProjectData([SceneObject(1, 'mesh', mesh)])));
+      expect(restored.objects.single.mesh.materials.single.texture!.rgba,
+          decoded.rgba);
+    });
     test(
         'standalone export commits without assets and failed OBJ commits clean staging',
         () async {
@@ -177,6 +223,22 @@ void main() {
         expect(dir.listSync().map((e) => e.path).toSet(), before);
       } finally {
         await dir.delete(recursive: true);
+      }
+    });
+    test('OBJ resolves material and library names with internal whitespace',
+        () {
+      for (final name in ['two  spaces', 'tab\tseparated']) {
+        final mesh = _mesh()
+          ..materials = [
+            MeshMaterial(name: name, texture: _mesh().materials.first.texture)
+          ];
+        final assets = ObjIO.writeBundle(mesh,
+            materialLibraryReference: 'material  library.mtl');
+        assets['material  library.mtl'] = assets.remove('mesh.mtl')!;
+        final back = ObjIO.read(utf8.decode(assets['mesh.obj']!),
+            readAsset: (path) => assets[path]!);
+        expect(back.materials.single.name, name);
+        expect(back.cornerUvs, mesh.cornerUvs);
       }
     });
     test('OBJ MTL PNG retains seams, negative UV indices and diffuse opacity',
@@ -334,6 +396,23 @@ void main() {
             closeTo((i - 1) / 100, 1e-6));
         expect(doc.objects.single.mesh.materials.single.texture, same(texture));
       }
+    });
+    test('3MF rejects UV loss on untextured faces in a mixed material mesh',
+        () {
+      final mesh = _mesh();
+      mesh.materials = [mesh.materials.single, MeshMaterial(name: 'plain')];
+      mesh.faceMaterials![1] = 1;
+      expect(() => ThreeMfIO.write(mesh), throwsFormatException);
+      // Imported mixed 3MF meshes use zero placeholders for plain faces. They
+      // remain round-trippable while actual untextured mappings reject above.
+      mesh.cornerUvs!.fillRange(6, 12, 0);
+      final restored = ThreeMfIO.read(ThreeMfIO.write(mesh));
+      expect(restored.cornerUvs, mesh.cornerUvs);
+      expect(restored.faceMaterials, mesh.faceMaterials);
+      mesh.faceMaterials!.fillRange(0, 2, 1);
+      mesh.cornerUvs!.fillRange(0, 12, 0);
+      // An unused textured material must not hide the lack of mapped faces.
+      expect(() => ThreeMfIO.write(mesh), throwsFormatException);
     });
     test('3MF base material and texture packages preserve supported appearance',
         () {

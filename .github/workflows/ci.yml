@@ -77,11 +77,15 @@ jobs:
       - name: Desktop integration workflows
         working-directory: apps/mmx_studio
         run: |
-          if [ '${{ runner.os }}' = Linux ]; then
-            xvfb-run -a flutter test integration_test -d linux
-          else
-            flutter test integration_test -d '${{ matrix.platform }}'
-          fi
+          # Flutter 3.47.9 reuses a closed desktop log reader across test files.
+          # A new Flutter invocation per file preserves every native test.
+          for test_file in integration_test/*_test.dart; do
+            if [ '${{ runner.os }}' = Linux ]; then
+              dbus-run-session -- xvfb-run -a flutter test "$test_file" -d linux
+            else
+              flutter test "$test_file" -d '${{ matrix.platform }}'
+            fi
+          done
       - name: Compile CLI
         working-directory: packages/mmx_core
         run: dart compile exe bin/mmx.dart -o mmx-${{ matrix.platform }}.exe

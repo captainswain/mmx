@@ -147,6 +147,7 @@ class ProjectIO {
               'texture': material.texture == null
                   ? null
                   : texturePaths.putIfAbsent(material.texture!, () {
+                      TextureIO.validateSource(material.texture!);
                       final path = 'textures/${texturePaths.length}.bin';
                       entries.add(ZipEntry(path, material.texture!.bytes));
                       return path;
