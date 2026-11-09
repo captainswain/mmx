@@ -11,6 +11,7 @@ class Bridge {
   /// Connects two ordered boundary loops. Returns the input unchanged when a
   /// loop has fewer than three vertices.
   static TriMesh bridgeLoops(TriMesh mesh, List<int> loopA, List<int> loopB) {
+    mesh.requireUntextured('Bridge');
     if (loopA.length < 3 || loopB.length < 3) return mesh.clone();
 
     // Start from the closest vertex pair, keeping the loops' own order.

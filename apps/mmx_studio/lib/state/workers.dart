@@ -6,6 +6,8 @@ import 'dart:typed_data';
 
 import 'package:mmx_core/mmx_core.dart';
 
+import '../render/desktop_renderer.dart';
+
 // Top-level dispatch keeps UI images, listeners and pending futures out of isolates.
 Future<Uint8List> encodeProjectWorker(ProjectData project) =>
     executeWorker(() => ProjectIO.write(project));
@@ -281,14 +283,23 @@ Future<TriMesh> repairWorker(TriMesh mesh) => executeWorker(() {
 Future<List<MixObject>> readMixWorker(Uint8List bytes) =>
     executeWorker(() => MixIO.read(bytes));
 
-Future<TriMesh> readMeshWorker(String path, Uint8List bytes) =>
-    executeWorker(() => MeshIO.readBytes(path, bytes));
+Future<TriMesh> readMeshWorker(String path, Uint8List bytes) => executeWorker(
+  () => path.toLowerCase().endsWith('.obj')
+      ? MeshIO.readFile(path)
+      : MeshIO.readBytes(path, bytes),
+);
 
 Future<Uint8List> writeMeshWorker(String path, TriMesh mesh) =>
     executeWorker(() => MeshIO.writeBytes(path, mesh));
 
-Future<Uint8List> renderWorker(
+Future<PreparedMeshExport> prepareMeshExportWorker(String path, TriMesh mesh) =>
+    executeWorker(() => MeshIO.prepareExport(path, mesh));
+
+Future<DesktopRenderFrame> renderWorker(
   List<RenderObject> objects,
   Camera camera,
-  RenderOptions options,
-) => executeWorker(() => Rasterizer.render(objects, camera, options));
+  RenderOptions options, {
+  RenderBackendPreference preference = RenderBackendPreference.auto,
+}) => executeWorker(
+  () => renderDesktopFrame(objects, camera, options, preference: preference),
+);

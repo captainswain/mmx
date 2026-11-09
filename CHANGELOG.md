@@ -8,6 +8,10 @@ semantic versioning once it reaches 1.0.
 
 ### Added
 
+- Incremental geometry history, world/local manipulators, snapping and numeric transforms.
+- Diffuse materials, PNG/JPEG textures, seam-safe UVs, supported OBJ/MTL and 3MF material round trips.
+- Native Vulkan/Direct3D 12/Metal renderer with depth tests and explicit CPU fallback.
+- Bounded deterministic parser mutation tests and native renderer capability checks.
 - Native `.mmx` projects, recovery saves, unsaved-change prompts and native file dialogs.
 - Viewport manipulation, grouped sculpt undo, unit selection and cancelable workers.
 - Desktop integration tests, parser/geometry regression suites and analytical corpus.

@@ -216,13 +216,17 @@ Future<void> run(List<String> args) async {
       stderr.writeln('missing file: $path');
       throw FileSystemException('Input file does not exist', path);
     }
-    return MeshIO.readBytes(path, f.readAsBytesSync());
+    return MeshIO.readFile(path);
   }
 
   Future<void> save(String path, TriMesh mesh) async {
-    await writeFileAtomically(path, MeshIO.writeBytes(path, mesh));
+    final companions =
+        await MeshIO.commitExport(path, MeshIO.prepareExport(path, mesh));
     stdout.writeln(
         'wrote $path (${mesh.vertexCount} verts, ${mesh.faceCount} faces)');
+    if (companions != null) {
+      stdout.writeln('Keep companion folder with OBJ: $companions');
+    }
   }
 
   double flag(String name, double fallback) =>

@@ -93,6 +93,7 @@ class MeshInspector {
   /// incident faces. This is a best-effort "Split Non-Manifold Surface":
   /// it makes the mesh manifold without inventing geometry.
   static TriMesh splitNonManifold(TriMesh mesh) {
+    mesh.requireUntextured('Non-manifold splitting');
     final topo = MeshTopology(mesh);
     final builder = MeshBuilder();
     // Map original vertex -> list of builder vertices, one per fan.

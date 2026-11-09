@@ -23,6 +23,7 @@ class Decimator {
     double? maxDeviation,
     void Function(int current, int target)? progress,
   }) {
+    input.requireUntextured('Decimation');
     final target = targetFaceCount ??
         (percentage == null
             ? (input.faceCount * 0.5).round()

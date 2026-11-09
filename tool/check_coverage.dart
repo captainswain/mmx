@@ -14,6 +14,13 @@ void main(List<String> args) {
     'io/obj.dart',
     'io/ply.dart',
     'io/stl.dart',
+    'io/mesh_io.dart',
+    'io/asset_path.dart',
+    'io/texture.dart',
+    'io/mtl.dart',
+    'io/threemf_materials.dart',
+    'mesh/material.dart',
+    'scene/document.dart',
     'mesh/attributes.dart',
     'mesh/limits.dart',
   ];

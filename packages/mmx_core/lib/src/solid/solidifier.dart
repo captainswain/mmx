@@ -60,6 +60,7 @@ class Solidifier {
     double minThickness = 0,
     bool closeHoles = true,
   }) {
+    mesh.requireUntextured('Make Solid');
     if (resolution < 8 ||
         resolution > 256 ||
         !offset.isFinite ||
@@ -137,6 +138,8 @@ class Solidifier {
     if (exact != null) {
       return SolidResult(exact, resolution, 0, sw.elapsedMilliseconds);
     }
+    a.requireUntextured('Grid Boolean');
+    b.requireUntextured('Grid Boolean');
     final bounds = BBox();
     bounds.addBox(a.bounds());
     bounds.addBox(b.bounds());
@@ -182,6 +185,7 @@ class Solidifier {
     bool openTop = false,
     double minThickness = 0.0,
   }) {
+    mesh.requireUntextured('Hollow');
     if (!thickness.isFinite ||
         thickness <= 0 ||
         !minThickness.isFinite ||

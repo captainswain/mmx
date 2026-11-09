@@ -18,6 +18,10 @@ Start here:
 - [`RELEASE.md`](RELEASE.md) - native installers, signing, acceptance and rollback.
 - [`release/ACCEPTANCE.md`](release/ACCEPTANCE.md) - release evidence, native checks and required external inputs.
 - [`PERFORMANCE.md`](PERFORMANCE.md) - repeatable latency and peak-memory measurements.
+- [`FEATURE-COMPLETION.md`](FEATURE-COMPLETION.md) - optional desktop implementation and acceptance plan.
+- [`MANIPULATORS.md`](MANIPULATORS.md) - local/world axes, snapping and numeric transforms.
+- [`MATERIALS.md`](MATERIALS.md) - supported textures, UVs, formats and editing limits.
+- [Native renderer](../apps/mmx_studio/native_renderer/README.md) - build requirements, fallback and graphics validation.
 - [`REMEDIATION-PLAN.md`](REMEDIATION-PLAN.md) - historical correctness and coverage work.
 - [`FINISH-PLAN.md`](FINISH-PLAN.md) - historical plan for broader parity:
   evidence closure, feature parity, oracle validation and release.

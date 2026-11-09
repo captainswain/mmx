@@ -6,6 +6,8 @@ import '../scene/document.dart';
 import '../tools/pivot.dart';
 import '../render/camera.dart';
 import 'zip.dart';
+import '../mesh/material.dart';
+import 'texture.dart';
 
 /// Original import data retained independently of editable geometry. In
 /// particular, opaque .mix records remain recoverable after project edits.
@@ -71,6 +73,7 @@ class ProjectIO {
     final entries = <ZipEntry>[];
     final objects = <Map<String, Object?>>[];
     final ids = <int>{};
+    final texturePaths = <MeshTexture, String>{};
     final c = project.camera;
     if (project.objects.length > 1024 ||
         project.sourceAttachments.length > 1024) {
@@ -129,10 +132,36 @@ class ProjectIO {
         'colors': o.mesh.vertexColors == null
             ? null
             : buffer('colors', o.mesh.vertexColors!, 4, true),
+        'uvs': o.mesh.cornerUvs == null
+            ? null
+            : buffer('uvs', o.mesh.cornerUvs!, 4, true),
+        'faceMaterials': o.mesh.faceMaterials == null
+            ? null
+            : buffer('faceMaterials', o.mesh.faceMaterials!, 2, false),
+        'materials': [
+          for (final material in o.mesh.materials)
+            {
+              'name': material.name,
+              'baseColor': material.baseColor,
+              'clamp': material.textureClamp,
+              'texture': material.texture == null
+                  ? null
+                  : texturePaths.putIfAbsent(material.texture!, () {
+                      final path = 'textures/${texturePaths.length}.bin';
+                      entries.add(ZipEntry(path, material.texture!.bytes));
+                      return path;
+                    }),
+              'textureName': material.texture?.name,
+            }
+        ],
       });
     }
     if (project.selectedId != null && !ids.contains(project.selectedId)) {
       throw const FormatException('Missing selected object');
+    }
+    if (texturePaths.keys.fold<int>(0, (n, t) => n + t.byteSize) >
+        192 * 1024 * 1024) {
+      throw const FormatException('Project texture budget exceeded');
     }
     final sources = <Map<String, String>>[];
     for (var i = 0; i < project.sourceAttachments.length; i++) {
@@ -149,7 +178,9 @@ class ProjectIO {
         ZipEntry(
             'manifest.json',
             Uint8List.fromList(utf8.encode(jsonEncode({
-              'version': 1,
+              'version': project.objects.any((o) => o.mesh.hasSurfaceAttributes)
+                  ? 2
+                  : 1,
               'units': 'millimeter',
               'objects': objects,
               'selectedId': project.selectedId,
@@ -180,7 +211,7 @@ class ProjectIO {
       final files = {for (final e in ZipArchive.read(bytes)) e.name: e.data};
       final m = jsonDecode(utf8.decode(files['manifest.json']!))
           as Map<String, dynamic>;
-      if (m['version'] != 1 || m['units'] != 'millimeter') {
+      if (![1, 2].contains(m['version']) || m['units'] != 'millimeter') {
         throw const FormatException('Unsupported project version or units');
       }
       final objectRecords = m['objects'] as List;
@@ -239,12 +270,42 @@ class ProjectIO {
         sources.add(ProjectSourceAttachment(name: name, bytes: files[path]!));
       }
       final ids = <int>{};
+      final textures = <String, MeshTexture>{};
+      var textureBudget = 0;
+      MeshTexture? texture(dynamic path, dynamic name) {
+        if (path == null) return null;
+        if (path is! String || !path.startsWith('textures/')) {
+          throw const FormatException('Invalid project texture path');
+        }
+        return textures.putIfAbsent(path, () {
+          final image = TextureIO.decode(files[path]!,
+              name: name as String,
+              maxDecodedBytes: 192 * 1024 * 1024 - textureBudget);
+          if ((textureBudget += image.byteSize) > 192 * 1024 * 1024) {
+            throw const FormatException('Project texture budget exceeded');
+          }
+          return image;
+        });
+      }
+
       final objects = <SceneObject>[];
       for (final o in objectRecords) {
         final id = o['id'] as int;
         final name = o['name'] as String;
         if (id <= 0 || !ids.add(id) || name.length > 1048576) {
           throw const FormatException('Invalid project object metadata');
+        }
+        final materials = <MeshMaterial>[];
+        final records = o['materials'] as List? ?? [];
+        if (records.length > 4096) {
+          throw const FormatException('Too many project materials');
+        }
+        for (final material in records) {
+          materials.add(MeshMaterial(
+              name: material['name'] as String,
+              baseColor: vector(material['baseColor'], 4),
+              textureClamp: material['clamp'] as bool,
+              texture: texture(material['texture'], material['textureName'])));
         }
         final mesh = TriMesh(
             Float32List.fromList(
@@ -257,7 +318,16 @@ class ProjectIO {
             vertexColors: o['colors'] == null
                 ? null
                 : Float32List.fromList(
-                    buffer(o['colors'], 4, true).cast<double>()));
+                    buffer(o['colors'], 4, true).cast<double>()),
+            cornerUvs: o['uvs'] == null
+                ? null
+                : Float32List.fromList(
+                    buffer(o['uvs'], 4, true).cast<double>()),
+            faceMaterials: o['faceMaterials'] == null
+                ? null
+                : Uint16List.fromList(
+                    buffer(o['faceMaterials'], 2, false).cast<int>()),
+            materials: materials);
         if (mesh.validate().isNotEmpty) {
           throw FormatException(mesh.validate().join(', '));
         }

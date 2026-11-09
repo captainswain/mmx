@@ -6,7 +6,7 @@ Run `./tool/verify.sh` from the repository root. It resolves dependencies, check
 Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
-Observed on 2026-11-09: 169 kernel tests and 57 Studio tests pass; both analyzers
+Core checkpoint PR #4, observed on 2026-11-09: 169 kernel tests and 57 Studio tests pass; both analyzers
 and formatting checks are clean. The analytical corpus passes all 22 cases.
 
 For focused work:
@@ -63,6 +63,18 @@ transfer and generated-mesh allocation guards. Missing records
 fail the gate. This is a targeted line-coverage requirement; it does not establish
 exhaustive parser fuzzing, branch coverage or whole-project coverage.
 
+The optional-feature gate also covers mesh file dispatch, companion paths, MTL,
+image decoding, 3MF materials, immutable material data and incremental history.
+Run `test/material_fidelity_test.dart` and `test/incremental_history_test.dart`
+for their focused regression suites. Mutation tests have fixed seeds and finite
+case counts; they exercise actual parsers rather than a mock grammar.
+
+Native renderer tests require the built library. See the
+[renderer guide](../apps/mmx_studio/native_renderer/README.md) for the strict
+`MMX_GPU_LIBRARY` command, Rust checks and adapter capability probe. Ordinary
+Flutter unit tests explicitly skip unavailable native capability tests; CI runs
+them after the platform build. Software adapters are labeled as such.
+
 The fresh local run measured 100% for OBJ, PLY, STL, 3MF, atomic writes and mesh
 allocation guards; 99.5% for project IO, 99.3% for ZIP, 98.8% for triangulation
 and 96.4% for attribute transfer.
@@ -87,6 +99,8 @@ Adaptive density is a heuristic. Precise boolean and adaptive-remesh fallbacks
 are reported explicitly. Hollow thickness is approximate within voxel error;
 Make Solid rejects positive `minThickness` because a global minimum-wall solver
 is unimplemented. Grid reconstruction has no material-region correspondence
-guarantee. Planar unwrap has no persisted UV layer. Imported unknown `.mix`
+guarantee; unsupported topology edits reject surface attributes. Planar unwrap
+persists per-corner UVs, while diffuse materials/textures use an explicit supported
+format subset. Imported unknown `.mix`
 records are retained as source attachments; they are not interpreted as editable
 scene objects. These limitations are tracked in [production readiness](PRODUCTION-READINESS.md).

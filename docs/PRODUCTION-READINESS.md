@@ -1,8 +1,10 @@
 # Production readiness
 
 Target: reliable Linux, Windows and macOS core mesh workflows and CLI.
-**Status: hardening and local automated validation complete; production
-distribution still requires the external acceptance below.** This supersedes the historical
+**Status: the core hardening checkpoint is merged and validated on three platforms;
+optional desktop features are undergoing integration and review. Production
+distribution still requires the external acceptance below.** See the expanded
+[feature completion plan](FEATURE-COMPLETION.md). This supersedes the historical
 finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Implemented plan
@@ -14,8 +16,8 @@ finish/remediation plans; full Meshmixer parity is a separate target.
   camera, project path and original-source metadata. Status reports operation
   phases rather than an invented completion percentage.
 - Rendering coalesces requests; spatial data caches key on document/object/mesh
-  and transform state. Viewport translation, rotation, uniform scale and local
-  pivot editing commit one undo entry. Sculpt drags group stamps into one entry
+  and transform state. World/local translation and rotation, per-axis/uniform
+  scale, snapping, numeric entry and pivot editing commit one undo entry. Sculpt drags group stamps into one entry
   and cancel rolls back the whole stroke.
 - Native `.mmx` projects preserve objects, IDs, transforms, colors/groups, pivots,
   visibility, targets, camera, selection and original imported `.mix` bytes.
@@ -85,7 +87,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
-Verification passes with 169 kernel tests, 57 Studio tests, both analyzers
+The merged core checkpoint passed with 169 kernel tests, 57 Studio tests, both analyzers
 clean and no formatting changes. Native Linux integration passes. The 22-case
 analytical corpus and fixed-host performance comparison pass. The optional
 native [profile UI probe](performance/UI-RESPONSIVENESS.md) verifies progress and
@@ -102,8 +104,9 @@ native platform job. The [performance workflow](https://github.com/palindsay/mmx
 collects AOT and native profile observations on all three platforms; these are
 not approved budgets on designated release machines.
 
-The authoritative three-platform build/integration/install/remove results are
-attached to the reviewed commit in [PR #4 checks](https://github.com/palindsay/mmx/pull/4/checks).
+The three-platform build/integration/install/remove results for that checkpoint
+are attached to [PR #4 checks](https://github.com/palindsay/mmx/pull/4/checks).
+These results do not certify subsequent optional-feature changes.
 See [TESTING.md](TESTING.md) for reproduction. CI integration injects paths;
 the separate Linux acceptance run exercises real dialogs but does not establish
 human accessibility acceptance or clean-account behavior on the other systems.
@@ -124,16 +127,24 @@ from analytical tests. No release is published by this work.
 
 ## Documented limits and future improvements
 
-- Whole-scene undo snapshots count mesh buffers and respect a byte budget but
-  are not incremental history. Large scenes can have transient snapshot memory.
-- Manipulators use world axes and uniform scale; snapping, nonuniform handles,
-  face deformation and local-axis modes are future interaction work.
+- Incremental undo shares immutable geometry blocks and counts unique payloads;
+  transient checkpoints, live restoration buffers and VM overhead are separate.
+  [Local measurements](performance/INCREMENTAL-UNDO.md) document the limits.
+- Manipulators support local/world axes, per-axis scale, snapping and numeric
+  entry. Arbitrary face deformation remains separate from object manipulation.
 - Hollow thickness is an SDF approximation with voxel error. Make Solid rejects
   positive `minThickness`; a guaranteed global wall-thickness solver is absent.
 - Grid reconstruction does not promise original material-region correspondence.
   Native source attachments preserve unknown `.mix` bytes without interpreting
-  their semantics. Unsupported 3MF materials/extensions are explicit errors.
-- Parser regression suites are bounded/adversarial examples, not exhaustive
-  fuzzing. Expand them when new real-world formats and failures are reported.
-- Full Meshmixer parity, mobile, UV/texture authoring, image stamps and GPU
-  rendering remain outside the desktop core release target. See [TOOL-MATRIX.md](TOOL-MATRIX.md).
+  their semantics. [Materials](MATERIALS.md) support diffuse RGBA and PNG/JPEG
+  textures with seam-safe UVs; unsupported 3MF layers/extensions fail explicitly.
+- Parser mutation tests use deterministic bounded cases and metamorphic round
+  trips. They are not exhaustive or a long-running fuzzing campaign.
+- Native wgpu rendering supports Vulkan, Direct3D 12 and Metal with explicit CPU
+  fallback. Alpha cutout is supported; sorted translucency, PBR and zero-copy
+  Flutter textures remain outside the renderer contract.
+- Full Meshmixer parity, mobile, advanced UV seam painting and image stamps
+  remain separate work. See [TOOL-MATRIX.md](TOOL-MATRIX.md).
+
+Signing hosts/identities and licensed reference outputs were explicitly deferred
+by the user on 2026-11-09. Their deferral does not waive production release gates.

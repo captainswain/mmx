@@ -4,8 +4,16 @@ import 'dart:typed_data';
 
 import 'workers.dart';
 import 'spatial_cache.dart';
+import '../render/desktop_renderer.dart';
+export '../render/desktop_renderer.dart' show RenderBackendPreference;
 import 'manipulator.dart';
-export 'manipulator.dart' show ManipulatorMode;
+import 'material_workers.dart';
+export 'manipulator.dart'
+    show
+        ManipulatorMode,
+        ManipulatorSpace,
+        ManipulatorScaleMode,
+        ManipulatorSnap;
 import 'worker_runtime.dart';
 
 import 'dart:ui' as ui;
@@ -60,7 +68,13 @@ class StudioState extends ChangeNotifier {
 
   final SceneSpatialCache _spatialCache = SceneSpatialCache();
   ManipulatorMode manipulatorMode = ManipulatorMode.none;
+  ManipulatorSpace manipulatorSpace = ManipulatorSpace.world;
+  ManipulatorScaleMode manipulatorScaleMode = ManipulatorScaleMode.axis;
+  ManipulatorSnap manipulatorSnap = const ManipulatorSnap();
   ManipulatorGesture? _manipulator;
+  bool _manipulatorEnding = false;
+  bool get manipulatorGestureActive => _manipulator != null;
+
   int? _sculptGesture;
   int _nextSculptGesture = 0;
   int? _sculptSnapshotGesture;
@@ -88,6 +102,25 @@ class StudioState extends ChangeNotifier {
     notify();
   }
 
+  void setManipulatorSpace(ManipulatorSpace space) {
+    if (interactionLocked) return;
+    manipulatorSpace = space;
+    notify();
+  }
+
+  void setManipulatorScaleMode(ManipulatorScaleMode mode) {
+    if (interactionLocked) return;
+    manipulatorScaleMode = mode;
+    notify();
+  }
+
+  bool setManipulatorSnap(ManipulatorSnap snap) {
+    if (interactionLocked || !snap.isValid) return false;
+    manipulatorSnap = snap;
+    notify();
+    return true;
+  }
+
   bool beginManipulator(int axis) {
     final obj = selected;
     if (_disposed ||
@@ -98,47 +131,97 @@ class StudioState extends ChangeNotifier {
         axis > 2) {
       return false;
     }
-    _manipulator = ManipulatorGesture(obj, manipulatorMode, axis);
-    notify();
-    return true;
-  }
-
-  void updateManipulator(double amount) {
-    final gesture = _manipulator;
-    if (gesture == null || doc.byId(gesture.object.id) != gesture.object) {
-      return;
-    }
     try {
-      gesture.preview(amount);
-      _spatialCache.clear();
-      status = '${gesture.mode.name}: ${amount.toStringAsFixed(2)}';
-      _scheduleRender();
+      _manipulator = ManipulatorGesture(
+        obj,
+        manipulatorMode,
+        axis,
+        space: manipulatorSpace,
+        scaleMode: manipulatorScaleMode,
+        snap: manipulatorSnap,
+      );
+      notify();
+      return true;
     } catch (e) {
       status = '$e';
       notify();
+      return false;
     }
+  }
+
+  bool updateManipulator(double amount) {
+    final gesture = _manipulator;
+    if (_manipulatorEnding ||
+        gesture == null ||
+        doc.byId(gesture.object.id) != gesture.object) {
+      return false;
+    }
+    try {
+      final applied = gesture.preview(amount);
+      _spatialCache.clear();
+      status = '${gesture.mode.name}: ${applied.toStringAsFixed(3)}';
+      _scheduleRender();
+      return true;
+    } catch (e) {
+      status = '$e';
+      notify();
+      return false;
+    }
+  }
+
+  /// Numeric edits use the identical captured-axis, snap, pivot and undo path.
+  /// Rotation amounts use radians, and scale amounts use positive factors.
+  Future<bool> applyManipulatorAmount(int axis, double amount) async {
+    if (!amount.isFinite ||
+        (manipulatorMode == ManipulatorMode.scale &&
+            (amount < .01 || amount > 100))) {
+      status =
+          'Enter a finite amount; scale factors must be between 0.01 and 100';
+      notify();
+      return false;
+    }
+    if (!beginManipulator(axis)) return false;
+    final accepted = updateManipulator(amount);
+    final failure = status;
+    await endManipulator(cancel: !accepted);
+    if (!accepted) {
+      status = failure;
+      notify();
+    }
+    return accepted;
   }
 
   Future<void> endManipulator({bool cancel = false}) async {
     final gesture = _manipulator;
-    if (gesture == null) return;
-    _manipulator = null;
-    if (doc.byId(gesture.object.id) != gesture.object) return;
-    final transform = Float64List.fromList(gesture.object.transform);
-    final pivot = gesture.object.pivot;
-    gesture.restore();
-    if (!cancel && gesture.changed) {
-      doc.snapshot(
-        gesture.mode == ManipulatorMode.pivot ? 'Move pivot' : 'Transform',
-      );
-      gesture.object.transform = transform;
-      gesture.object.pivot = pivot;
-      dirty = true;
-    }
-    _invalidateGeometry();
-    status = cancel ? 'Transform cancelled' : 'Ready';
-    if (!_disposed) {
-      await render();
+    if (gesture == null || _manipulatorEnding) return;
+    _manipulatorEnding = true;
+    try {
+      if (doc.byId(gesture.object.id) != gesture.object) return;
+      final transform = Float64List.fromList(gesture.object.transform);
+      final pivot = gesture.object.pivot;
+      gesture.restore();
+      if (!cancel && gesture.changed) {
+        doc.snapshot(
+          gesture.mode == ManipulatorMode.pivot ? 'Move pivot' : 'Transform',
+        );
+        gesture.object.transform = transform;
+        gesture.object.pivot = pivot;
+        dirty = true;
+      }
+      _invalidateGeometry();
+      status = cancel ? 'Transform cancelled' : 'Ready';
+      if (!_disposed) {
+        try {
+          await render();
+        } catch (e) {
+          // The edit/cancellation is complete; a failed preview must release
+          // the interaction lock and must not undo committed document data.
+          status = 'Preview failed: $e';
+        }
+      }
+    } finally {
+      _manipulator = null;
+      _manipulatorEnding = false;
       notify();
     }
   }
@@ -362,6 +445,22 @@ class StudioState extends ChangeNotifier {
   int frameHeight = 640;
   bool _renderQueued = false;
   int lastRenderMs = 0;
+  RenderBackendPreference renderBackendPreference =
+      RenderBackendPreference.auto;
+  String renderBackend = 'Starting renderer';
+  String renderDiagnostic = '';
+  bool hardwareAccelerated = false;
+
+  Future<void> setRenderBackend(RenderBackendPreference preference) async {
+    if (_disposed || interactionLocked) return;
+    renderBackendPreference = preference;
+    try {
+      await render();
+    } catch (e) {
+      status = 'Preview failed: $e';
+      notify();
+    }
+  }
 
   // Tool parameters (mirrors Meshmixer panel ranges).
   double brushRadius = 8;
@@ -508,6 +607,56 @@ class StudioState extends ChangeNotifier {
     }, worldSpace: true);
   }
 
+  /// Apply one whole-object material and optional UV projection atomically.
+  Future<bool> applySelectedMaterial({
+    required List<double> baseColor,
+    String? texturePath,
+    bool removeTexture = false,
+    int? planarAxis,
+    bool textureClamp = false,
+  }) async {
+    final object = selected;
+    if (object == null || interactionLocked || _disposed) return false;
+    final color = List<double>.from(baseColor);
+    return _perform('Apply material', () async {
+      final mesh = await _work(
+        applyMaterialWorker(
+          object.mesh,
+          color,
+          texturePath: texturePath,
+          removeTexture: removeTexture,
+          planarAxis: planarAxis,
+          textureClamp: textureClamp,
+        ),
+      );
+      if (doc.byId(object.id) != object) {
+        throw const _OperationCancelled(stale: true);
+      }
+      doc.snapshot('Apply material');
+      object.mesh = mesh;
+      status = 'Material applied to ${object.name}';
+    });
+  }
+
+  Future<bool> removeSelectedSurfaceAttributes() async {
+    final object = selected;
+    if (object == null ||
+        interactionLocked ||
+        _disposed ||
+        !object.mesh.hasSurfaceAttributes) {
+      return false;
+    }
+    return _perform('Remove materials and UVs', () async {
+      final mesh = await _work(removeSurfaceAttributesWorker(object.mesh));
+      if (doc.byId(object.id) != object) {
+        throw const _OperationCancelled(stale: true);
+      }
+      doc.snapshot('Remove materials and UVs');
+      object.mesh = mesh;
+      status = 'Removed materials and UVs from ${object.name}';
+    });
+  }
+
   Future<void> transformSelected(Float64List transform) =>
       _perform('Transform', () async {
         final obj = selected;
@@ -562,7 +711,14 @@ class StudioState extends ChangeNotifier {
     _renderQueued = true;
     Future<void>.microtask(() async {
       _renderQueued = false;
-      await render();
+      try {
+        await render();
+      } catch (e) {
+        if (!_disposed) {
+          status = 'Preview failed: $e';
+          notify();
+        }
+      }
     });
   }
 
@@ -615,16 +771,24 @@ class StudioState extends ChangeNotifier {
     );
     final sw = Stopwatch()..start();
     final cameraCopy = camera.clone();
-    final rgba = await renderWorker(objects, cameraCopy, opts);
+    final rendered = await renderWorker(
+      objects,
+      cameraCopy,
+      opts,
+      preference: renderBackendPreference,
+    );
     sw.stop();
-    lastRenderMs = sw.elapsedMilliseconds;
-    final img = await _decode(rgba, opts.width, opts.height);
+    final img = await _decode(rendered.rgba, opts.width, opts.height);
     if (_disposed || id != _renderId) {
       img.dispose();
       return;
     }
     frame?.dispose();
     frame = img;
+    lastRenderMs = sw.elapsedMilliseconds;
+    renderBackend = rendered.backend;
+    renderDiagnostic = rendered.diagnostic;
+    hardwareAccelerated = rendered.hardwareAccelerated;
     notify();
   }
 
@@ -1323,7 +1487,11 @@ class StudioState extends ChangeNotifier {
     if (await f.length() > MeshIO.maxFileBytes) {
       throw const FormatException('File exceeds 256 MiB');
     }
-    final bytes = await f.readAsBytes();
+    // OBJ reads its bounded companion graph inside the worker; avoid loading
+    // another full copy of the main text on the UI isolate.
+    final bytes = path.toLowerCase().endsWith('.obj')
+        ? Uint8List(0)
+        : await f.readAsBytes();
     if (path.toLowerCase().endsWith('.mix')) {
       final objects = await _work(readMixWorker(bytes));
       for (final o in objects) {
@@ -1382,9 +1550,13 @@ class StudioState extends ChangeNotifier {
     final obj = selected;
     if (obj == null) return;
     final mesh = obj.worldMesh();
-    final bytes = await _work(writeMeshWorker(path, mesh));
-    await writeFileAtomically(path, bytes);
-    status = 'Exported $path';
+    final prepared = await _work(prepareMeshExportWorker(path, mesh));
+    // Cancellation and revision checks finish before committing files. The
+    // asynchronous commit writes only already encoded bytes and is atomic.
+    final companions = await MeshIO.commitExport(path, prepared);
+    status = companions == null
+        ? 'Exported $path'
+        : 'Exported $path; keep companion folder $companions with the OBJ';
     notify();
   }
 

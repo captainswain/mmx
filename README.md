@@ -41,6 +41,7 @@ and tool semantics.
 - [Production readiness and remaining release gates](docs/PRODUCTION-READINESS.md)
 - [Installers, signing and rollback](docs/RELEASE.md)
 - [Performance measurement](docs/PERFORMANCE.md)
+- [Desktop feature completion](docs/FEATURE-COMPLETION.md)
 - [Finish plan](docs/FINISH-PLAN.md)
 - [Remediation plan](docs/REMEDIATION-PLAN.md)
 
@@ -51,7 +52,8 @@ Meshmixer `.mix` scenes. The `.mix` reader supports VFMesh 1.2 and 1.3, face
 groups and lossless rewrite of unknown records. Native `.mmx` projects preserve
 the whole editable scene and original imported `.mix` bytes. OBJ/OFF/PLY support
 concave polygons; PLY accepts ASCII and both binary byte orders. Unsupported
-3MF material/extension semantics fail explicitly.
+3MF material/extension semantics fail explicitly. Supported diffuse colors,
+PNG/JPEG textures and seam-safe UVs round-trip through OBJ/MTL, 3MF and projects.
 
 **Geometry:** CSR topology, BVH raycast/closest-point, weld, crack closing,
 hole filling, non-manifold splitting, defect inspection, isotropic and
@@ -65,14 +67,17 @@ mass properties, clearance, support forests, orientation search, 2D bed packing
 and layer slicing.
 
 **Studio:** object browser, tool panels, sculpt/select brushes, analysis heat
-maps, grouped sculpt undo, viewport transform/pivot handles, explicit import
-units, project recovery, native file dialogs, and touch orbit/pinch gestures.
+maps, incremental undo, world/local transform and pivot handles, snapping and
+numeric entry, material/texture editing, explicit import units, project recovery,
+native file dialogs, and touch orbit/pinch gestures. A wgpu renderer uses Vulkan,
+Direct3D 12 or Metal with a visible CPU fallback and explicit CPU option.
 Geometry and rendering run in workers; cancellation terminates active CPU work.
 Linux, Windows and macOS have build, integration and installer CI jobs.
 
 ## Build and test
 
-Requirements: Flutter 3.47+ and Dart 3.13+. No Meshmixer installation is needed
+Requirements: Flutter 3.47+ and Dart 3.13+; native desktop builds also require
+Rust 1.99.1 and Python 3 (see the [renderer build guide](apps/mmx_studio/native_renderer/README.md)). No Meshmixer installation is needed
 for tests; the sample models are vendored under
 `packages/mmx_core/test/fixtures/models`.
 

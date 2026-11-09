@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:mmx_core/mmx_core.dart';
 
 import '../state/studio_state.dart';
+import 'manipulator_controls.dart';
+import 'material_panel.dart';
+import 'renderer_controls.dart';
 
 /// Left tool rail, mirroring the shipped Meshmixer action bars
 /// (Meshmix / Import / Select / Sculpt / Stamp / Edits / Analysis / Shaders /
@@ -131,6 +134,12 @@ class PropertiesPanel extends StatelessWidget {
         children: [
           _SceneSection(state: state),
           const Divider(height: 26),
+          if (state.tool == StudioTool.navigate ||
+              state.tool == StudioTool.modify)
+            ManipulatorControls(state: state),
+          if (state.tool == StudioTool.navigate ||
+              state.tool == StudioTool.modify)
+            MaterialPanel(state: state),
           ..._toolSection(context),
         ],
       ),
@@ -142,6 +151,7 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.navigate:
         return <Widget>[
           _sectionTitle('View'),
+          RendererControls(state: state),
           _kv('Camera', 'orbit / shift-drag pan / scroll zoom'),
           _kv('Objects', '${state.doc.objects.length}'),
           _kv('Undo depth', '${state.doc.undoDepth}'),

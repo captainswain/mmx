@@ -18,6 +18,9 @@ The `CI` workflow runs formatting, analyzers, kernel/widget tests, a real deskto
 integration workflow, and native installer install/uninstall checks on each OS.
 Linux additionally enforces critical IO coverage. Test failures block packaging.
 Installer checks run on disposable CI runners, never on a contributor workstation.
+Native builds require pinned Rust 1.99.1 and Python 3; platform build hooks embed
+the wgpu library and transitive dependency license texts. See the
+[renderer build guide](../apps/mmx_studio/native_renderer/README.md).
 
 From a matching build host:
 
