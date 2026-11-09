@@ -430,6 +430,7 @@ class StudioState extends ChangeNotifier {
 
   void _frameObject(SceneObject obj) {
     final b = obj.worldBounds();
+    if (b.isEmpty) return;
     camera.frame(b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
   }
 

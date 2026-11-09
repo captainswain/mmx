@@ -6,7 +6,7 @@ Run `./tool/verify.sh` from the repository root. It resolves dependencies, check
 Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
-Observed on 2026-11-09: 169 kernel tests and 53 Studio tests pass; both analyzers
+Observed on 2026-11-09: 169 kernel tests and 54 Studio tests pass; both analyzers
 and formatting checks are clean. The analytical corpus passes all 22 cases.
 
 For focused work:

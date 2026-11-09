@@ -31,6 +31,8 @@ finish/remediation plans; full Meshmixer parity is a separate target.
   cannot have newer edits marked clean; invalid incoming cameras/previews roll
   back the prior scene. A preview failure after a successful disk save leaves
   that save successful and releases the operation lock.
+- Framing an empty Boolean result preserves the prior camera, so valid empty
+  results remain saveable and reloadable.
 - Procedural startup geometry replaces redistributed demo assets. Release
   packaging rejects accidental Autodesk fixture assets in the app bundle.
 
@@ -76,7 +78,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
-`./tool/verify.sh` passes with 169 kernel tests, 53 Studio tests, both analyzers
+`./tool/verify.sh` passes with 169 kernel tests, 54 Studio tests, both analyzers
 clean and no formatting changes. Native Linux integration passes. The 22-case
 analytical corpus and fixed-host performance comparison pass. The optional
 native [profile UI probe](performance/UI-RESPONSIVENESS.md) verifies progress and
