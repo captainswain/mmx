@@ -85,7 +85,12 @@ void main() {
       await legacy.writeAsString('unreadable legacy project');
       final first = await open(), second = await open();
       final candidate = await first.claimNext();
-      expect(candidate!.path, legacy.path);
+      // RecoveryStore canonicalizes directory aliases (Windows short names and
+      // macOS /var -> /private/var). Identity matters, not the input spelling.
+      expect(
+        await FileSystemEntity.identical(candidate!.path, legacy.path),
+        isTrue,
+      );
       await expectLater(
         candidate.withPath<void>((_) async {
           throw const FormatException('cannot decode recovery');
@@ -96,7 +101,10 @@ void main() {
       await candidate.release();
       expect(await legacy.readAsString(), 'unreadable legacy project');
       final retry = await second.claimNext();
-      expect(retry!.path, legacy.path);
+      expect(
+        await FileSystemEntity.identical(retry!.path, legacy.path),
+        isTrue,
+      );
       // Only an explicit discard or successful persisted recovery removes data.
       await retry.clear();
       expect(await legacy.exists(), isFalse);
@@ -170,8 +178,20 @@ void main() {
       await recent.setLastModified(DateTime.utc(2021));
       await unrelated.writeAsString('never recovery');
       final store = await open();
-      expect((await store.claimNext())!.path, recent.path);
-      expect((await store.claimNext())!.path, old.path);
+      expect(
+        await FileSystemEntity.identical(
+          (await store.claimNext())!.path,
+          recent.path,
+        ),
+        isTrue,
+      );
+      expect(
+        await FileSystemEntity.identical(
+          (await store.claimNext())!.path,
+          old.path,
+        ),
+        isTrue,
+      );
       expect(await store.claimNext(), isNull);
       await store.close();
       expect(await unrelated.readAsString(), 'never recovery');
