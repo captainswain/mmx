@@ -14,9 +14,12 @@ Start here:
   performance engineering.
 - [`CLI.md`](CLI.md) - command-line reference and examples.
 - [`TESTING.md`](TESTING.md) - test commands, coverage and known gaps.
-- [`REMEDIATION-PLAN.md`](REMEDIATION-PLAN.md) - the completed correctness and
-  coverage pass.
-- [`FINISH-PLAN.md`](FINISH-PLAN.md) - the remaining work to close the project:
+- [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) - current implementation, evidence and outstanding release gates.
+- [`RELEASE.md`](RELEASE.md) - native installers, signing, acceptance and rollback.
+- [`release/ACCEPTANCE.md`](release/ACCEPTANCE.md) - release evidence, native checks and required external inputs.
+- [`PERFORMANCE.md`](PERFORMANCE.md) - repeatable latency and peak-memory measurements.
+- [`REMEDIATION-PLAN.md`](REMEDIATION-PLAN.md) - historical correctness and coverage work.
+- [`FINISH-PLAN.md`](FINISH-PLAN.md) - historical plan for broader parity:
   evidence closure, feature parity, oracle validation and release.
 - [`reference/`](reference/) - public Autodesk API headers, help notes and the
   command parameter reference used as source evidence.

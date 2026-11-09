@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:xml/xml.dart';
+import '../scene/document.dart';
+import '../tools/modify.dart';
 
 import '../mesh/tri_mesh.dart';
 import 'zip.dart';
@@ -7,7 +10,8 @@ import 'zip.dart';
 /// 3MF (3D Manufacturing Format) import/export.
 ///
 /// The shipped Meshmixer binary imports 3MF through the bundled lib3mf; this is
-/// a dependency-free reader/writer for the core mesh payload of an OPC package.
+/// a reader/writer for the core mesh payload of an OPC package. Material and
+/// extension payloads are rejected explicitly rather than silently discarded.
 class ThreeMfIO {
   static const String _contentTypes = '''<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -23,6 +27,14 @@ class ThreeMfIO {
   /// [unit] is one of micron, millimeter, centimeter, inch, foot, meter.
   static Uint8List write(TriMesh mesh,
       {String unit = 'millimeter', String name = 'mmx'}) {
+    if (!_units.containsKey(unit)) {
+      throw const FormatException('Unsupported 3MF unit');
+    }
+    if (mesh.validate().isNotEmpty) {
+      throw const FormatException('Invalid 3MF geometry');
+    }
+    final coordinateScale = _units[unit]!;
+    name = XmlText(name).toXmlString();
     final sb = StringBuffer();
     sb.write('<?xml version="1.0" encoding="UTF-8"?>\n');
     sb.write('<model unit="$unit" xml:lang="en-US" '
@@ -32,8 +44,9 @@ class ThreeMfIO {
     sb.write('    <object id="1" type="model">\n');
     sb.write('      <mesh>\n        <vertices>\n');
     for (var i = 0; i < mesh.vertexCount; i++) {
-      sb.write('          <vertex x="${_f(mesh.vx(i))}" y="${_f(mesh.vy(i))}" '
-          'z="${_f(mesh.vz(i))}"/>\n');
+      sb.write(
+          '          <vertex x="${_f(mesh.vx(i) / coordinateScale)}" y="${_f(mesh.vy(i) / coordinateScale)}" '
+          'z="${_f(mesh.vz(i) / coordinateScale)}"/>\n');
     }
     sb.write('        </vertices>\n        <triangles>\n');
     for (var f = 0; f < mesh.faceCount; f++) {
@@ -53,60 +66,169 @@ class ThreeMfIO {
     ]);
   }
 
+  static const _units = <String, double>{
+    'micron': 0.001,
+    'millimeter': 1,
+    'centimeter': 10,
+    'inch': 25.4,
+    'foot': 304.8,
+    'meter': 1000
+  };
+
   static TriMesh read(Uint8List bytes) {
-    final entries = ZipArchive.read(bytes);
-    if (entries.isEmpty) return TriMesh.empty();
-    ZipEntry? model;
-    for (final e in entries) {
-      if (e.name.toLowerCase().endsWith('.model')) {
-        model = e;
-        break;
+    final files = {for (final e in ZipArchive.read(bytes)) e.name: e.data};
+    final relBytes = files['_rels/.rels'];
+    if (relBytes == null) {
+      throw const FormatException('Missing 3MF relationships');
+    }
+    final rels = XmlDocument.parse(utf8.decode(relBytes));
+    final rel = rels.descendants
+        .whereType<XmlElement>()
+        .where((e) =>
+            e.name.local == 'Relationship' &&
+            (e.getAttribute('Type') ?? '').endsWith('/3dmodel'))
+        .firstOrNull;
+    if (rel == null || rel.getAttribute('TargetMode') == 'External') {
+      throw const FormatException('Missing internal 3MF model');
+    }
+    final target = Uri.parse(rel.getAttribute('Target') ?? '')
+        .normalizePath()
+        .path
+        .replaceFirst(RegExp(r'^/'), '');
+    final payload = files[target];
+    if (payload == null) {
+      throw const FormatException('Missing 3MF model payload');
+    }
+    final root = XmlDocument.parse(utf8.decode(payload)).rootElement;
+    if (root.name.local != 'model' ||
+        (root.getAttribute('requiredextensions') ?? '').trim().isNotEmpty) {
+      throw const FormatException('Unsupported 3MF model');
+    }
+    final scale = _units[root.getAttribute('unit') ?? 'millimeter'];
+    if (scale == null) throw const FormatException('Unsupported 3MF units');
+    Iterable<XmlElement> children(XmlElement e, String name) =>
+        e.childElements.where((c) => c.name.local == name);
+    XmlElement child(XmlElement e, String name) => children(e, name).single;
+    int integer(XmlElement e, String key) {
+      final n = int.tryParse(e.getAttribute(key) ?? '');
+      if (n == null || n < 0) throw FormatException('Invalid 3MF $key');
+      return n;
+    }
+
+    double number(XmlElement e, String key) {
+      final n = double.tryParse(e.getAttribute(key) ?? '');
+      if (n == null || !n.isFinite) throw FormatException('Invalid 3MF $key');
+      return n;
+    }
+
+    Float64List transform(XmlElement e) {
+      final text = e.getAttribute('transform');
+      if (text == null) return identity4();
+      final v = text.trim().split(RegExp(r'\s+')).map(double.parse).toList();
+      if (v.length != 12 || v.any((n) => !n.isFinite)) {
+        throw const FormatException('Invalid 3MF transform');
       }
+      return Float64List.fromList([
+        v[0],
+        v[1],
+        v[2],
+        0,
+        v[3],
+        v[4],
+        v[5],
+        0,
+        v[6],
+        v[7],
+        v[8],
+        0,
+        v[9],
+        v[10],
+        v[11],
+        1
+      ]);
     }
-    if (model == null) return TriMesh.empty();
-    final xml = utf8.decode(model.data, allowMalformed: true);
-    return _parseModel(xml);
+
+    try {
+      final resources = <int, XmlElement>{};
+      for (final o in children(child(root, 'resources'), 'object')) {
+        final id = integer(o, 'id');
+        if (id == 0 || resources.containsKey(id)) {
+          throw const FormatException('Duplicate 3MF object');
+        }
+        resources[id] = o;
+      }
+      var totalVertices = 0, totalFaces = 0, totalInstances = 0;
+      TriMesh resolve(int id, Set<int> parents) {
+        if (++totalInstances > 16384 ||
+            parents.length > 64 ||
+            parents.contains(id) ||
+            !resources.containsKey(id)) {
+          throw const FormatException('Invalid 3MF component graph');
+        }
+        final o = resources[id]!;
+        if (o.getAttribute('pid') != null || o.getAttribute('pindex') != null) {
+          throw const FormatException(
+              '3MF material properties are unsupported');
+        }
+        final meshElement = children(o, 'mesh').firstOrNull;
+        if (meshElement != null) {
+          final builder = MeshBuilder();
+          for (final v in children(child(meshElement, 'vertices'), 'vertex')) {
+            if (++totalVertices > 2000000) {
+              throw const FormatException('3MF instance vertex limit exceeded');
+            }
+            builder.addVertex(number(v, 'x'), number(v, 'y'), number(v, 'z'));
+          }
+          for (final t
+              in children(child(meshElement, 'triangles'), 'triangle')) {
+            if (++totalFaces > 4000000) {
+              throw const FormatException('3MF face limit exceeded');
+            }
+            if (['pid', 'p1', 'p2', 'p3']
+                .any((name) => t.getAttribute(name) != null)) {
+              throw const FormatException(
+                  '3MF material properties are unsupported');
+            }
+            final a = integer(t, 'v1'),
+                b = integer(t, 'v2'),
+                c = integer(t, 'v3');
+            if (a >= builder.vertexCount ||
+                b >= builder.vertexCount ||
+                c >= builder.vertexCount) {
+              throw const FormatException('Invalid 3MF triangle index');
+            }
+            builder.addTriangle(a, b, c);
+          }
+          return builder.build();
+        }
+        return Modify.combine(
+            children(child(o, 'components'), 'component').map((c) {
+          final mesh = resolve(integer(c, 'objectid'), {...parents, id});
+          mesh.transform(transform(c));
+          return mesh;
+        }).toList());
+      }
+
+      final meshes = children(child(root, 'build'), 'item')
+          .where((i) => i.getAttribute('printable') != '0')
+          .map((i) {
+        final mesh = resolve(integer(i, 'objectid'), {});
+        mesh.transform(multiply4(scale4(scale), transform(i)));
+        return mesh;
+      }).toList();
+      final mesh = Modify.combine(meshes);
+      if (mesh.validate().isNotEmpty) {
+        throw const FormatException('Invalid 3MF geometry');
+      }
+      return mesh;
+    } on FormatException {
+      rethrow;
+    } catch (_) {
+      throw const FormatException('Malformed 3MF structure');
+    }
   }
 
-  static TriMesh _parseModel(String xml) {
-    final builder = MeshBuilder();
-    final vertexRe = RegExp(r'<vertex\b([^>]*)/?>', caseSensitive: false);
-    final triangleRe = RegExp(r'<triangle\b([^>]*)/?>', caseSensitive: false);
-    for (final m in vertexRe.allMatches(xml)) {
-      final attrs = _attrs(m.group(1) ?? '');
-      final x = double.tryParse(attrs['x'] ?? '');
-      final y = double.tryParse(attrs['y'] ?? '');
-      final z = double.tryParse(attrs['z'] ?? '');
-      if (x == null || y == null || z == null) continue;
-      builder.addVertex(x, y, z);
-    }
-    for (final m in triangleRe.allMatches(xml)) {
-      final attrs = _attrs(m.group(1) ?? '');
-      final a = int.tryParse(attrs['v1'] ?? '');
-      final b = int.tryParse(attrs['v2'] ?? '');
-      final c = int.tryParse(attrs['v3'] ?? '');
-      if (a == null || b == null || c == null) continue;
-      builder.addTriangle(a, b, c);
-    }
-    final mesh = builder.build();
-    mesh.removeDegenerateFaces();
-    return mesh;
-  }
-
-  static Map<String, String> _attrs(String source) {
-    final out = <String, String>{};
-    final re = RegExp(r'([A-Za-z_:][A-Za-z0-9_.:-]*)\s*=\s*"([^"]*)"');
-    for (final m in re.allMatches(source)) {
-      out[m.group(1)!] = m.group(2)!;
-    }
-    return out;
-  }
-
-  static String _f(double v) {
-    // 6 decimals is plenty for millimetre-scale geometry and keeps files small.
-    final s = v.toStringAsFixed(6);
-    return s.contains('.')
-        ? s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '')
-        : s;
-  }
+  // Double text round-trips the float32 source without a fixed six-decimal
+  // cutoff (which collapsed valid micron-scale geometry).
+  static String _f(double v) => v.toString();
 }

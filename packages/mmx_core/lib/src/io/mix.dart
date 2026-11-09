@@ -250,6 +250,9 @@ class MixIO {
     var off = 4 + tagLen;
     final surfLen = _u32(payload, off);
     off += 4 + surfLen;
+    if (off + 4 > payload.length) {
+      throw const FormatException('Truncated MMGS header');
+    }
     final meshLen = _u32(payload, off);
     if (off + 4 + meshLen > payload.length) return null;
     final meshTag =
@@ -302,7 +305,14 @@ class MixIO {
     int fGroupOffset,
   ) {
     if (nv <= 0 || nf <= 0) return null;
-    if (off + nv * vStride + nf * fStride > payload.length) return null;
+    if (nv > 2000000 ||
+        nf > 4000000 ||
+        vStride < vPosOffset + 12 ||
+        fStride < fIndexOffset + 12 ||
+        fStride < fGroupOffset + 4 ||
+        off + nv * vStride + nf * fStride > payload.length) {
+      throw const FormatException('Invalid or oversized MMGS records');
+    }
 
     final positions = Float32List(nv * 3);
     for (var i = 0; i < nv; i++) {
@@ -329,8 +339,11 @@ class MixIO {
       if (indices[i * 3] >= nv ||
           indices[i * 3 + 1] >= nv ||
           indices[i * 3 + 2] >= nv) {
-        return null;
+        throw const FormatException('Invalid MMGS triangle index');
       }
+    }
+    if (positions.any((v) => !v.isFinite)) {
+      throw const FormatException('Non-finite MMGS coordinate');
     }
     return MixObject(
         name: 'Mesh',
@@ -340,12 +353,14 @@ class MixIO {
 
   /// Rewrites mesh blocks in an existing scene while preserving every other
   /// record byte-for-byte: XML scene objects (including PivotSO/DecalSO),
-  /// semantic blocks and any unknown blocks. Falls back to [write] when the
-  /// object count differs or the XML cannot be mapped to the block table.
+  /// semantic blocks and any unknown blocks. Rejects unmappable input instead
+  /// of silently discarding metadata; use [write] explicitly for a new scene.
   static Uint8List rewrite(Uint8List original, List<MixObject> objects) {
     final usable = objects.where((o) => o.mesh.faceCount > 0).toList();
     final recs = _splitRecords(original);
-    if (recs.length < 4 || usable.isEmpty) return write(objects);
+    if (recs.length < 4 || usable.isEmpty) {
+      throw const FormatException('Cannot preserve records for this scene');
+    }
 
     final xml = utf8.decode(recs[0], allowMalformed: true);
     final ids = <int>[];
@@ -358,18 +373,34 @@ class MixIO {
           RegExp(r'<MeshBlockID>(\d+)</MeshBlockID>').firstMatch(body);
       if (block != null) ids.add(int.parse(block.group(1)!));
     }
-    if (ids.length != usable.length) return write(objects);
+    if (ids.length != usable.length || ids.toSet().length != ids.length) {
+      throw const FormatException(
+          'Cannot map rewritten objects to original records');
+    }
 
     final index = recs[1];
     var off = 0;
     final count = _u32(index, off);
     off += 4;
+    if (count > 4096 ||
+        count > recs.length - 2 ||
+        4 + count * 8 > index.length) {
+      throw const FormatException('Invalid MIX block index');
+    }
     final entries = <List<int>>[];
     for (var i = 0; i < count; i++) {
-      entries.add([_u32(index, off), _u32(index, off + 4)]);
+      final entry = [_u32(index, off), _u32(index, off + 4)];
+      if (entries.any((e) => e[0] == entry[0]) ||
+          entry[1] != recs[i + 2].length) {
+        throw const FormatException('MIX block index does not match records');
+      }
+      entries.add(entry);
       off += 8;
     }
 
+    if (ids.any((id) => !entries.any((e) => e[0] == id))) {
+      throw const FormatException('Missing MIX mesh record');
+    }
     final replacements = <int, Uint8List>{};
     for (var i = 0; i < ids.length; i++) {
       replacements[ids[i]] = _meshBlock(usable[i].mesh);
@@ -392,14 +423,8 @@ class MixIO {
     record(newIndex.toBytes());
     var pos = 2;
     for (final e in entries) {
-      final replacement = replacements[e[0]];
-      if (replacement != null) {
-        record(replacement);
-      } else if (pos < recs.length) {
-        record(recs[pos++]);
-      } else {
-        return write(objects);
-      }
+      record(replacements[e[0]] ?? recs[pos]);
+      pos++;
     }
     while (pos < recs.length) {
       record(recs[pos++]);
@@ -408,12 +433,20 @@ class MixIO {
   }
 
   static List<Uint8List> _splitRecords(Uint8List bytes) {
+    if (bytes.length > 256 * 1024 * 1024) {
+      throw const FormatException('MIX exceeds size limit');
+    }
     final out = <Uint8List>[];
     var off = 0;
-    while (off + 4 <= bytes.length) {
+    while (off < bytes.length) {
+      if (out.length >= 4096 || off + 4 > bytes.length) {
+        throw const FormatException('Invalid MIX records');
+      }
       final len = _u32(bytes, off);
-      if (len == 0 || off + 4 + len > bytes.length) break;
-      out.add(bytes.sublist(off + 4, off + 4 + len));
+      if (len == 0 || len > bytes.length - off - 4) {
+        throw const FormatException('Truncated MIX record');
+      }
+      out.add(Uint8List.sublistView(bytes, off + 4, off + 4 + len));
       off += 4 + len;
     }
     return out;
@@ -425,11 +458,7 @@ class MixIO {
     final meshes = <MixObject>[];
     final names = <int, String>{};
     var nextBlock = 1;
-    var off = 0;
-    while (off + 4 <= bytes.length) {
-      final len = _u32(bytes, off);
-      if (len == 0 || off + 4 + len > bytes.length) break;
-      final payload = bytes.sublist(off + 4, off + 4 + len);
+    for (final payload in _splitRecords(bytes)) {
       if (payload.length > 5 && payload[0] == 0x3c && payload[1] == 0x3f) {
         // XML record: pull names and visibility per mesh block id.
         final xml = utf8.decode(payload, allowMalformed: true);
@@ -454,7 +483,6 @@ class MixIO {
               .add(MixObject(name: names[id] ?? 'Object $id', mesh: obj.mesh));
         }
       }
-      off += 4 + len;
     }
     return meshes;
   }
@@ -546,6 +574,11 @@ class MixIO {
   }
 
   static Uint8List _meshBlock(TriMesh mesh) {
+    if (mesh.validate().isNotEmpty ||
+        mesh.vertexCount > 2000000 ||
+        mesh.faceCount > 4000000) {
+      throw const FormatException('Invalid or oversized MIX geometry');
+    }
     final nv = mesh.vertexCount;
     final nf = mesh.faceCount;
     final normals = Float32List(nv * 3);
@@ -648,9 +681,17 @@ class MixIO {
     out.add(b.buffer.asUint8List());
   }
 
-  static int _u32(Uint8List b, int o) =>
-      b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24);
+  static int _u32(Uint8List b, int o) {
+    if (o < 0 || o > b.length - 4) {
+      throw const FormatException('Truncated MIX value');
+    }
+    return b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24);
+  }
 
-  static double _f32(Uint8List b, int o) =>
-      ByteData.sublistView(b, o, o + 4).getFloat32(0, Endian.little);
+  static double _f32(Uint8List b, int o) {
+    if (o < 0 || o > b.length - 4) {
+      throw const FormatException('Truncated MIX coordinate');
+    }
+    return ByteData.sublistView(b, o, o + 4).getFloat32(0, Endian.little);
+  }
 }

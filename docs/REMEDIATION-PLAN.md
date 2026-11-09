@@ -1,5 +1,9 @@
 # Remediation plan
 
+> Historical plan. See [production readiness](PRODUCTION-READINESS.md) for
+> implemented hardening work, current validation, and outstanding release gates.
+
+
 Baseline: 106 kernel tests passing, `dart analyze` clean, 11 Studio widget tests
 passing. This plan prioritises correctness and user-visible gaps over cosmetic
 coverage numbers.

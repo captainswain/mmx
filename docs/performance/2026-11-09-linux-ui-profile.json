@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "host": {
+    "id": "local-linux-x64",
+    "os": "linux",
+    "osVersion": "Linux 7.0.0-42-generic #42-Ubuntu SMP PREEMPT_DYNAMIC Thu Oct 15 08:06:44 UTC 2026",
+    "abi": "linux_x64",
+    "cpu": "AMD Ryzen 9 7950X 16-Core Processor",
+    "logicalProcessors": 32,
+    "displayEnvironment": ":99"
+  },
+  "runtime": {
+    "declaredToolchain": "Flutter-3.47.9",
+    "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"linux_x64\"",
+    "buildMode": "profile",
+    "framePolicy": "fullyLive",
+    "viewportLogicalPixels": [
+      892,
+      674
+    ],
+    "devicePixelRatio": 1.0
+  },
+  "workload": {
+    "generator": "periodic torus 224x224, major radius 20, minor radius 5",
+    "vertices": 50176,
+    "faces": 100352,
+    "fnv1a32LittleEndianMeshBytes": "efae274e",
+    "operator": "StudioState.doReduce / Decimator.reduce",
+    "percentage": 0.5,
+    "outputFaces": 50176,
+    "samples": 1,
+    "operatorWarmups": 0
+  },
+  "idle500ms": {
+    "operationCompletionMs": 501.796,
+    "workerAwaitPhaseMs": null,
+    "heartbeatTargetMs": 16,
+    "heartbeatIntervals": {
+      "samples": 31,
+      "medianMs": 15.999,
+      "p95Ms": 16.128,
+      "maxMs": 18.539
+    },
+    "heartbeatIntervalsDuringWorker": {
+      "samples": 0
+    },
+    "postFrameIntervals": {
+      "samples": 30,
+      "medianMs": 16.979,
+      "p95Ms": 17.597,
+      "maxMs": 17.879
+    },
+    "postFrameIntervalsDuringWorker": {
+      "samples": 0
+    },
+    "finalHeartbeatTailMs": 4.006,
+    "finalPostFrameTailMs": 1.818,
+    "sampledPeakProcessRssBytes": 282144768,
+    "processHighWaterRssBytes": 296079360
+  },
+  "reduce": {
+    "operationCompletionMs": 741.463,
+    "workerAwaitPhaseMs": 667.35,
+    "heartbeatTargetMs": 16,
+    "heartbeatIntervals": {
+      "samples": 43,
+      "medianMs": 16.001,
+      "p95Ms": 20.565,
+      "maxMs": 54.552
+    },
+    "heartbeatIntervalsDuringWorker": {
+      "samples": 40,
+      "medianMs": 16.001,
+      "p95Ms": 20.565,
+      "maxMs": 34.133
+    },
+    "postFrameIntervals": {
+      "samples": 41,
+      "medianMs": 16.655,
+      "p95Ms": 20.928,
+      "maxMs": 59.495
+    },
+    "postFrameIntervalsDuringWorker": {
+      "samples": 39,
+      "medianMs": 16.655,
+      "p95Ms": 20.928,
+      "maxMs": 33.026
+    },
+    "finalHeartbeatTailMs": 3.36,
+    "finalPostFrameTailMs": 10.081,
+    "sampledPeakProcessRssBytes": 365019136,
+    "processHighWaterRssBytes": 368402432
+  },
+  "cancelReduceOnFirstWorkerHeartbeat": {
+    "operationCompletionMs": 161.288,
+    "workerAwaitPhaseMs": 16.768,
+    "heartbeatTargetMs": 16,
+    "heartbeatIntervals": {
+      "samples": 5,
+      "medianMs": 16.059,
+      "p95Ms": 89.275,
+      "maxMs": 89.275
+    },
+    "heartbeatIntervalsDuringWorker": {
+      "samples": 1,
+      "medianMs": 18.076,
+      "p95Ms": 18.076,
+      "maxMs": 18.076
+    },
+    "postFrameIntervals": {
+      "samples": 5,
+      "medianMs": 12.73,
+      "p95Ms": 105.449,
+      "maxMs": 105.449
+    },
+    "postFrameIntervalsDuringWorker": {
+      "samples": 2,
+      "medianMs": 12.73,
+      "p95Ms": 12.73,
+      "maxMs": 12.73
+    },
+    "finalHeartbeatTailMs": 16.025,
+    "finalPostFrameTailMs": 9.723,
+    "sampledPeakProcessRssBytes": 421027840,
+    "processHighWaterRssBytes": 422391808,
+    "requestToOperationCompletionMs": 143.197,
+    "requestToWorkerPhaseEndMs": 0.081
+  },
+  "processHighWaterRssBytes": 422391808,
+  "limits": [
+    "Heartbeat and framework post-frame intervals measure UI isolate progress; they are not kernel-only or GPU presentation timings.",
+    "Worker await phase includes isolate startup/result transfer; overall completion also includes checkpoint, validation and render.",
+    "Continuous framework frames are requested by this probe; scene rasterization still follows normal Studio scheduling.",
+    "Process RSS includes Flutter, all isolates, setup and validation; the process high-water mark cannot reset between samples.",
+    "A single headless capture cannot certify interactive presentation frame rates or establish timing regressions; compare recorded build modes separately."
+  ]
+}

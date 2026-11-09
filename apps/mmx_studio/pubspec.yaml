@@ -1,25 +1,27 @@
 name: mmx_studio
 description: "Cross-platform mesh studio (Meshmixer-class) built on mmx_core."
-repository: https://github.com/plindsay/mmx
-issue_tracker: https://github.com/plindsay/mmx/issues
+repository: https://github.com/palindsay/mmx
+issue_tracker: https://github.com/palindsay/mmx/issues
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+1
 
 environment:
   sdk: ^3.13.0
 
 dependencies:
+  file_selector: ^1.1.0
   flutter:
     sdk: flutter
   mmx_core:
     path: ../../packages/mmx_core
+  path_provider: ^2.1.6
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/models/

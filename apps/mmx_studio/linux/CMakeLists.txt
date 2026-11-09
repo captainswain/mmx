@@ -72,6 +72,9 @@ set_target_properties(${BINARY_NAME}
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+# JNI is an Android-only transitive dependency here. Keep the Linux bundle
+# independent of whichever JDK happens to be installed on the build host.
+set(CMAKE_DISABLE_FIND_PACKAGE_JNI TRUE)
 include(flutter/generated_plugins.cmake)
 
 

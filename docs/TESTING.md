@@ -1,71 +1,92 @@
 # Testing and coverage
 
-## Commands
+## Verification
+
+Run `./tool/verify.sh` from the repository root. It resolves dependencies, checks
+Dart formatting, runs both analyzers, then executes the kernel and Studio suites.
+Tests use checked-in fixtures; no Meshmixer installation is required.
+
+Observed on 2026-11-09: 169 kernel tests and 57 Studio tests pass; both analyzers
+and formatting checks are clean. The analytical corpus passes all 22 cases.
+
+For focused work:
 
 ```sh
 cd packages/mmx_core
-dart analyze
-dart test
-dart test --coverage=coverage
-dart pub global activate coverage
-dart pub global run coverage:format_coverage \
-  --lcov --in=coverage --out=coverage/lcov.info \
-  --packages=.dart_tool/package_config.json --report-on=lib
+dart test test/geometry_acceptance_test.dart test/io_fidelity_test.dart
+dart run tool/validate_corpus.dart
+cd ../../apps/mmx_studio
+flutter test test/interaction_test.dart test/recovery_test.dart test/worker_runtime_test.dart
+xvfb-run -a flutter test integration_test -d linux
 ```
 
-The kernel suite uses the vendored sample models under
-`packages/mmx_core/test/fixtures/models` (originally from the Meshmixer
-installer). No Meshmixer installation is required. The Studio app tests are run
-separately with `flutter test` under `apps/mmx_studio`.
+Use `-d windows` or `-d macos` on those hosts, without Xvfb. The native integration
+workflow checks procedural startup, native plugin registration, non-ASCII paths,
+import units, reduction, undo/redo, project save/reopen, and watertight STL export.
+It injects file paths; native dialogs and clean-account accessibility still need
+manual acceptance. See [release procedures](RELEASE.md).
 
-## Current status (2026-11-05)
+## Regression coverage
 
-- Kernel: 106 tests, all passing; `dart analyze` clean.
-- Studio: 11 widget/state tests passing; `flutter analyze` clean.
-- Measured line coverage for the newly added kernel modules:
+- Geometry tests assert closed/manifold/oriented topology and analytical volume,
+  exercise extreme scales, overlapping/disjoint/empty booleans, repeated edits,
+  attribute interpolation, and allocation limits. Randomized cases use fixed seeds.
+- Parser tests cover binary byte orders, reordered PLY properties, concave faces,
+  malformed indices, archive checksums/limits, 3MF instances/units, project metadata
+  and byte-preserved imported `.mix` source attachments.
+- Studio tests cover transform/pivot gestures, single-entry sculpt undo, spatial
+  cache invalidation, stale results, failed/canceled import rollback, recovery
+  write ordering, unreadable recovery preservation and keyboard save shortcuts.
+- Completion tests keep open/save/import locked through rendering, preserve new
+  edits from completion listeners, and roll back failed incoming previews.
+  Recovery leases isolate simultaneous sessions; a real child-process crash
+  test verifies exclusive ownership and subsequent recovery.
+- Worker tests terminate an active synchronous CPU loop, cancel during spawn,
+  propagate errors, and verify unexpected worker exit completes promptly.
+- Python packaging tests verify repeated archives are byte-identical and file
+  manifests/checksums reflect their contents.
 
-| Module | Line coverage |
-|---|---:|
-| `remesh/collapse_mesh.dart` | 99.5% |
-| `remesh/isotropic.dart` | 96.3% |
-| `remesh/decimate.dart` | 96.9% |
-| `tools/complex.dart` | 96.8% |
-| `tools/deform.dart` | 100% |
-| `tools/pivot.dart` | 100% |
-| `tools/polygon.dart` | 100% |
-| `tools/tube.dart` | 100% |
-| `tools/unwrap.dart` | 100% |
-| `repair/holes.dart` | 93.5% |
-| `io/mix.dart` | 99.3% |
-| `solid/mesh_boolean.dart` | 96.0% |
-| `solid/solidifier.dart` | 95.3% |
-| `tools/plane_cut.dart` | 76.8% |
+## Coverage gate
 
-`plane_cut.dart` is lower because the coverage tool does not attribute the
-nested `splitVertex` and degenerate on-plane branches cleanly; the normal,
-oblique, remeshed, fixed-fill, negative-side, slice and slice-group paths all
-have tests. Do not treat the 76.8% figure as an untested feature.
+```sh
+./tool/coverage.sh
+python3 -B -m unittest discover -s tool -p 'test_package_release.py'
+```
 
-## Coverage gaps worth closing
+The collector uses a fresh temporary directory for raw coverage on every run;
+merging stale records after source changes can produce incorrect line counts.
+The current report is `packages/mmx_core/coverage/lcov.info`.
 
-- `PreciseBoolean` both fallback branches are tested; `computeDetailed` exposes
-  `usedFallback` and the reason.
-- `CollapseMesh.tryCollapse` now has direct tests for sharp constraints and
-  boundary-to-interior rejection; duplicate-face rejection is exercised through
-  remesh but has no dedicated test.
-- Studio now covers `Extract`, `Make Part` and `Pivot` through app-state
-  widget tests. `MakePolygon`, `AddTube`, `Unwrap`, `SoftMove` and
-  `ComplexTools.generate` remain kernel-only until they get parameter UI.
-- `MakePolygon` uses ear clipping; concave loops are covered.
-- `Unwrap` is planar-only; there is no UV layer storage in `TriMesh` or `.mix`.
-- `.mix` unknown records are preserved by `MixIO.rewrite`; observed samples
-  do not contain `PivotSO`/`DecalSO`, so those schemas are not decoded yet.
+CI requires more than 80% line coverage separately for native project IO,
+atomic writes, ZIP, 3MF, polygon triangulation, OBJ, PLY, STL, mesh attribute
+transfer and generated-mesh allocation guards. Missing records
+fail the gate. This is a targeted line-coverage requirement; it does not establish
+exhaustive parser fuzzing, branch coverage or whole-project coverage.
 
-## Known product caveats
+The fresh local run measured 100% for OBJ, PLY, STL, 3MF, atomic writes and mesh
+allocation guards; 99.5% for project IO, 99.3% for ZIP, 98.8% for triangulation
+and 96.4% for attribute transfer.
 
-- Adaptive-density remeshing is a heuristic based on angle defect, not the
-  exact Meshmixer falloff. `remeshDetailed` reports `usedUniformFallback` when
-  the validated pass falls back to uniform remeshing.
-- `Solidifier._enforceMinThickness` is a simple erosion heuristic, not an exact
-  wall-thickness solver.
-- `PlaneCut.sliceGroups` supports an optional negative-side group.
+## Geometry references and performance
+
+The [analytical corpus](../packages/mmx_core/tool/corpus/README.md) reports explicit
+volume tolerances and topology requirements. Its reference-manifest mode accepts
+independently acquired Meshmixer output and records comparison failures. No such
+external output has been supplied, so analytical success proves no parity claim.
+Reports retain hashes of the manifest and every consumed fixture alongside
+operation parameters, so replacing a reference file cannot silently reuse its
+identity in evidence.
+
+[Performance instructions](PERFORMANCE.md) describe host identity, exact input
+hashes, AOT samples, peak RSS and regression budgets. Run measurements on an idle,
+fixed host; never gate kernel latency using unrelated shared-runner baselines.
+
+## Algorithm limits
+
+Adaptive density is a heuristic. Precise boolean and adaptive-remesh fallbacks
+are reported explicitly. Hollow thickness is approximate within voxel error;
+Make Solid rejects positive `minThickness` because a global minimum-wall solver
+is unimplemented. Grid reconstruction has no material-region correspondence
+guarantee. Planar unwrap has no persisted UV layer. Imported unknown `.mix`
+records are retained as source attachments; they are not interpreted as editable
+scene objects. These limitations are tracked in [production readiness](PRODUCTION-READINESS.md).

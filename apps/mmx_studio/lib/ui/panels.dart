@@ -48,25 +48,31 @@ class LeftRail extends StatelessWidget {
                       vertical: 2,
                       horizontal: 6,
                     ),
-                    child: Tooltip(
-                      message: item.$3,
-                      child: Material(
-                        color: state.tool == item.$1
-                            ? Theme.of(context).colorScheme.primary
-                                  .withValues(alpha: 0.25)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        child: InkWell(
+                    child: Semantics(
+                      label: item.$3,
+                      button: true,
+                      selected: state.tool == item.$1,
+                      child: Tooltip(
+                        excludeFromSemantics: true,
+                        message: item.$3,
+                        child: Material(
+                          color: state.tool == item.$1
+                              ? Theme.of(context).colorScheme.primary
+                                    .withValues(alpha: 0.25)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          onTap: () => state.setTool(item.$1),
-                          child: SizedBox(
-                            height: 40,
-                            child: Icon(
-                              item.$2,
-                              size: 21,
-                              color: state.tool == item.$1
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.white70,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => state.setTool(item.$1),
+                            child: SizedBox(
+                              height: 40,
+                              child: Icon(
+                                item.$2,
+                                size: 21,
+                                color: state.tool == item.$1
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.white70,
+                              ),
                             ),
                           ),
                         ),
@@ -80,6 +86,7 @@ class LeftRail extends StatelessWidget {
             tooltip: 'Wireframe',
             icon: Icon(
               Icons.grid_4x4,
+              semanticLabel: 'Wireframe',
               color: state.wireframe ? Colors.tealAccent : Colors.white38,
             ),
             onPressed: state.toggleWireframe,
@@ -88,13 +95,18 @@ class LeftRail extends StatelessWidget {
             tooltip: 'Print bed',
             icon: Icon(
               Icons.crop_free,
+              semanticLabel: 'Print bed',
               color: state.showBed ? Colors.tealAccent : Colors.white38,
             ),
             onPressed: state.toggleBed,
           ),
           IconButton(
             tooltip: 'Frame selection',
-            icon: const Icon(Icons.center_focus_strong, color: Colors.white54),
+            icon: const Icon(
+              Icons.center_focus_strong,
+              color: Colors.white54,
+              semanticLabel: 'Frame selection',
+            ),
             onPressed: state.frameSelection,
           ),
           const SizedBox(height: 6),
@@ -252,6 +264,25 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.planeCut:
         return <Widget>[
           _sectionTitle('Plane Cut'),
+          DropdownButton<int>(
+            value: state.planeAxis,
+            items: [
+              for (var i = 0; i < 3; i++)
+                DropdownMenuItem(value: i, child: Text(['X', 'Y', 'Z'][i])),
+            ],
+            onChanged: (v) {
+              state.planeAxis = v!;
+              state.notify();
+            },
+          ),
+          SwitchListTile(
+            title: const Text('Keep positive side'),
+            value: state.planeKeepPositive,
+            onChanged: (v) {
+              state.planeKeepPositive = v;
+              state.notify();
+            },
+          ),
           _slider(
             'Offset',
             state.planeOffset,
@@ -267,7 +298,7 @@ class PropertiesPanel extends StatelessWidget {
             onChanged: (v) => state.planeFill = v,
           ),
           const SizedBox(height: 6),
-          _button(context, 'Cut (discard top)', state.doPlaneCut),
+          _button(context, 'Apply cut', state.doPlaneCut),
         ];
       case StudioTool.mirror:
         return <Widget>[
@@ -719,14 +750,19 @@ class PropertiesPanel extends StatelessWidget {
             ),
           ],
         ),
-        Slider(
-          value: value.clamp(min, max),
-          min: min,
-          max: max,
-          onChanged: (v) {
-            onChanged(v);
-            state.notify();
-          },
+        MergeSemantics(
+          child: Semantics(
+            label: label,
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              onChanged: (v) {
+                onChanged(v);
+                state.notify();
+              },
+            ),
+          ),
         ),
       ],
     );
@@ -745,7 +781,7 @@ class PropertiesPanel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           textStyle: const TextStyle(fontSize: 11),
         ),
-        onPressed: state.busy ? null : () => fn(),
+        onPressed: state.interactionLocked ? null : () => fn(),
         child: Text(label),
       ),
     );
@@ -816,25 +852,7 @@ class PropertiesPanel extends StatelessWidget {
     });
   }
 
-  Future<void> _packAll() async {
-    final meshes = state.doc.objects.map((o) => o.worldMesh()).toList();
-    if (meshes.isEmpty) return;
-    final result = Packer.pack(
-      meshes,
-      bedWidth: 200,
-      bedDepth: 200,
-      quality: 1,
-    );
-    for (var i = 0; i < result.placed.length; i++) {
-      final p = result.placed[i];
-      final obj = state.doc.objects[p.index];
-      obj.transform = Float64List.fromList(p.transform);
-    }
-    state.status =
-        'Packed ${result.placed.length} objects '
-        '(${(result.bedUtilization * 100).toStringAsFixed(1)}% bed use)';
-    await state.render();
-  }
+  Future<void> _packAll() => state.packAll();
 
   Future<void> _sliceReport() async {
     final obj = state.selected;

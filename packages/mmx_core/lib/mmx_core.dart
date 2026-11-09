@@ -47,3 +47,6 @@ export 'src/tools/sculpt.dart';
 export 'src/tools/stamp.dart';
 export 'src/tools/tube.dart';
 export 'src/tools/unwrap.dart';
+
+export 'src/io/project.dart';
+export 'src/io/atomic_file.dart';

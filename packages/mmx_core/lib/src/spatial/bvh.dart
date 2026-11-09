@@ -173,7 +173,7 @@ class TriangleBVH {
     final o = node * 6;
     var t0 = 0.0, t1 = tMax;
     // X
-    if (dx.abs() < 1e-12) {
+    if (dx == 0) {
       if (ox < nodeBounds[o] || ox > nodeBounds[o + 3]) return double.infinity;
     } else {
       var a = (nodeBounds[o] - ox) / dx;
@@ -188,7 +188,7 @@ class TriangleBVH {
       if (t0 > t1) return double.infinity;
     }
     // Y
-    if (dy.abs() < 1e-12) {
+    if (dy == 0) {
       if (oy < nodeBounds[o + 1] || oy > nodeBounds[o + 4]) {
         return double.infinity;
       }
@@ -205,7 +205,7 @@ class TriangleBVH {
       if (t0 > t1) return double.infinity;
     }
     // Z
-    if (dz.abs() < 1e-12) {
+    if (dz == 0) {
       if (oz < nodeBounds[o + 2] || oz > nodeBounds[o + 5]) {
         return double.infinity;
       }
@@ -245,7 +245,12 @@ class TriangleBVH {
     final py = dz * e2x - dx * e2z;
     final pz = dx * e2y - dy * e2x;
     final det = e1x * px + e1y * py + e1z * pz;
-    if (det.abs() < 1e-12) return -1;
+    final e1Sq = e1x * e1x + e1y * e1y + e1z * e1z;
+    final e2Sq = e2x * e2x + e2y * e2y + e2z * e2z;
+    final dirSq = dx * dx + dy * dy + dz * dz;
+    // Relative angular tolerance: a world-unit determinant threshold misses
+    // every triangle in small models and depends on direction magnitude.
+    if (det * det <= 1e-24 * e1Sq * e2Sq * dirSq) return -1;
     final inv = 1.0 / det;
     final tx = ox - ax, ty = oy - ay, tz = oz - az;
     final u = (tx * px + ty * py + tz * pz) * inv;
@@ -256,7 +261,9 @@ class TriangleBVH {
     final v = (dx * qx + dy * qy + dz * qz) * inv;
     if (v < -1e-6 || u + v > 1 + 1e-6) return -1;
     final t = (e2x * qx + e2y * qy + e2z * qz) * inv;
-    if (t <= 1e-7 || t > tMax) return -1;
+    if (t <= 0 || t * t * dirSq <= 1e-14 * math.max(e1Sq, e2Sq) || t > tMax) {
+      return -1;
+    }
     return t;
   }
 

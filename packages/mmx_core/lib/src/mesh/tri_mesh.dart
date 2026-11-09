@@ -99,17 +99,70 @@ class TriMesh {
 
   /// Applies a column-major 4x4 affine transform in place.
   void transform(Float64List m) {
+    if (m.length != 16 ||
+        m.any((v) => !v.isFinite) ||
+        m[3] != 0 ||
+        m[7] != 0 ||
+        m[11] != 0 ||
+        m[15] != 1) {
+      throw ArgumentError('Expected a finite affine 4x4 transform');
+    }
+    final determinant =
+        _det(m[0], m[4], m[8], m[1], m[5], m[9], m[2], m[6], m[10]);
+    if (!determinant.isFinite || determinant == 0) {
+      throw ArgumentError('Singular transform');
+    }
+    final transformed = Float32List(positions.length);
     for (var i = 0; i < positions.length; i += 3) {
       final x = positions[i], y = positions[i + 1], z = positions[i + 2];
-      positions[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
-      positions[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-      positions[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+      transformed[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
+      transformed[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+      transformed[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
     }
+    if (transformed.any((v) => !v.isFinite)) {
+      throw ArgumentError('Transform exceeds float32 range');
+    }
+    positions = transformed;
+    // Reflections reverse handedness. Keep outward-facing winding.
+    if (determinant < 0) {
+      for (var f = 0; f < indices.length; f += 3) {
+        final tmp = indices[f + 1];
+        indices[f + 1] = indices[f + 2];
+        indices[f + 2] = tmp;
+      }
+    }
+  }
+
+  /// Extract faces while preserving per-face groups and per-vertex colors.
+  TriMesh extractFaces(Iterable<int> faces) {
+    final builder = MeshBuilder();
+    final remap = <int, int>{};
+    final groups = faceGroups == null ? null : <int>[];
+    final colors = vertexColors == null ? null : <double>[];
+    for (final face in faces) {
+      if (face < 0 || face >= faceCount) {
+        throw RangeError.index(face, indices, 'face');
+      }
+      final mapped = <int>[];
+      for (var k = 0; k < 3; k++) {
+        final v = indices[face * 3 + k];
+        mapped.add(remap.putIfAbsent(v, () {
+          colors?.addAll(vertexColors!.sublist(v * 3, v * 3 + 3));
+          return builder.addVertex(vx(v), vy(v), vz(v));
+        }));
+      }
+      builder.addTriangle(mapped[0], mapped[1], mapped[2]);
+      groups?.add(faceGroups![face]);
+    }
+    return builder.build()
+      ..faceGroups = groups == null ? null : Uint16List.fromList(groups)
+      ..vertexColors = colors == null ? null : Float32List.fromList(colors);
   }
 
   /// Drops faces with repeated indices or (near) zero area.
   int removeDegenerateFaces({double minArea = 1e-14}) {
     final keep = <int>[];
+    final groups = faceGroups == null ? null : <int>[];
     for (var f = 0; f < indices.length; f += 3) {
       final ia = indices[f], ib = indices[f + 1], ic = indices[f + 2];
       if (ia == ib || ib == ic || ia == ic) continue;
@@ -120,6 +173,7 @@ class TriMesh {
           ny = uz * wx - ux * wz,
           nz = ux * wy - uy * wx;
       if (0.5 * math.sqrt(nx * nx + ny * ny + nz * nz) <= minArea) continue;
+      groups?.add(faceGroups![f ~/ 3]);
       keep.add(ia);
       keep.add(ib);
       keep.add(ic);
@@ -127,9 +181,7 @@ class TriMesh {
     final removed = (indices.length - keep.length) ~/ 3;
     if (removed > 0) {
       indices = Uint32List.fromList(keep);
-      if (faceGroups != null && faceGroups!.length != keep.length ~/ 3) {
-        faceGroups = null;
-      }
+      if (groups != null) faceGroups = Uint16List.fromList(groups);
     }
     return removed;
   }
@@ -177,6 +229,14 @@ class TriMesh {
     final issues = <String>[];
     if (positions.length % 3 != 0) issues.add('positions not a multiple of 3');
     if (indices.length % 3 != 0) issues.add('indices not a multiple of 3');
+    if (faceGroups != null && faceGroups!.length != faceCount) {
+      issues.add('face group count mismatch');
+    }
+    if (vertexColors != null &&
+        (vertexColors!.length != positions.length ||
+            vertexColors!.any((v) => !v.isFinite))) {
+      issues.add('invalid vertex colors');
+    }
     final n = vertexCount;
     for (var i = 0; i < indices.length; i++) {
       if (indices[i] >= n) {

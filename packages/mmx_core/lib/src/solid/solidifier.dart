@@ -5,6 +5,7 @@ import '../geom/bbox.dart';
 import '../mesh/tri_mesh.dart';
 import '../repair/holes.dart';
 import '../spatial/bvh.dart';
+import '../tools/modify.dart';
 import 'surface_nets.dart';
 import 'voxel.dart';
 
@@ -28,6 +29,13 @@ class SolidResult {
 /// Mesh Resolution / Reduce Percentage controls exposed in the UI.
 class Solidifier {
   static VoxelGrid _gridFor(BBox bounds, int resolution, double padCells) {
+    if (resolution < 8 ||
+        resolution > 256 ||
+        !padCells.isFinite ||
+        padCells < 0) {
+      throw ArgumentError('Resolution must be 8–256 and padding finite');
+    }
+    if (bounds.isEmpty) return VoxelGrid(8, 8, 8, 1, -4, -4, -4);
     final extent =
         math.max(bounds.extentX, math.max(bounds.extentY, bounds.extentZ));
     if (extent <= 0) {
@@ -52,6 +60,19 @@ class Solidifier {
     double minThickness = 0,
     bool closeHoles = true,
   }) {
+    if (resolution < 8 ||
+        resolution > 256 ||
+        !offset.isFinite ||
+        smoothing < 0 ||
+        smoothing > 1000 ||
+        !minThickness.isFinite ||
+        minThickness < 0) {
+      throw ArgumentError('Invalid Make Solid parameters');
+    }
+    if (minThickness > 0) {
+      throw UnsupportedError('Make Solid cannot guarantee minimum thickness. '
+          'Use hollow thickness for an SDF shell, or measure the output independently.');
+    }
     final sw = Stopwatch()..start();
     var work = mesh;
     if (closeHoles) {
@@ -79,7 +100,6 @@ class Solidifier {
     // surface falls outside the exact-distance region and gets clipped.
     grid.rasterize(work, bandCells: offset.abs() / grid.cellSize + 2.5);
     if (offset != 0) grid.offset(offset);
-    if (minThickness > 0) _enforceMinThickness(grid, minThickness);
     if (effectiveSmoothing > 0) grid.smooth(effectiveSmoothing);
     var solid = SurfaceNets.polygonize(grid);
     if (solid.signedVolume() < 0) solid = _flip(solid);
@@ -109,7 +129,14 @@ class Solidifier {
 
   static SolidResult boolean(TriMesh a, TriMesh b, BooleanOp op,
       {int resolution = 160}) {
+    if (resolution < 8 || resolution > 256) {
+      throw ArgumentError('Resolution must be 8–256');
+    }
     final sw = Stopwatch()..start();
+    final exact = trivialBoolean(a, b, op);
+    if (exact != null) {
+      return SolidResult(exact, resolution, 0, sw.elapsedMilliseconds);
+    }
     final bounds = BBox();
     bounds.addBox(a.bounds());
     bounds.addBox(b.bounds());
@@ -155,6 +182,17 @@ class Solidifier {
     bool openTop = false,
     double minThickness = 0.0,
   }) {
+    if (!thickness.isFinite ||
+        thickness <= 0 ||
+        !minThickness.isFinite ||
+        minThickness < 0 ||
+        holes < 0 ||
+        holes > 1000 ||
+        !holeRadius.isFinite ||
+        holeRadius <= 0) {
+      throw ArgumentError('Invalid hollow parameters');
+    }
+    thickness = math.max(thickness, minThickness);
     final sw = Stopwatch()..start();
     final bounds = mesh.bounds();
     final grid = _gridFor(bounds, resolution, 3.0);
@@ -182,9 +220,6 @@ class Solidifier {
     }
     if (holes > 0) {
       _drillEscapeHoles(grid, bounds, holes, holeRadius, thickness);
-    }
-    if (minThickness > 0) {
-      _enforceMinThickness(grid, minThickness);
     }
     var out = SurfaceNets.polygonize(grid);
     if (out.signedVolume() < 0) out = _flip(out);
@@ -229,41 +264,6 @@ class Solidifier {
     }
   }
 
-  static void _enforceMinThickness(VoxelGrid grid, double minThickness) {
-    // Push the inner surface inward where the solid would be thinner than
-    // the requested minimum: a simple erosion of the field.
-    final cells = (minThickness / grid.cellSize).ceil();
-    for (var it = 0; it < cells; it++) {
-      final next = Float32List.fromList(grid.values);
-      for (var i = 1; i < grid.nx - 1; i++) {
-        for (var j = 1; j < grid.ny - 1; j++) {
-          for (var k = 1; k < grid.nz - 1; k++) {
-            final idx = grid.index(i, j, k);
-            if (grid.values[idx] >= 0) continue;
-            var best = double.infinity;
-            for (final d in <List<int>>[
-              <int>[1, 0, 0],
-              <int>[-1, 0, 0],
-              <int>[0, 1, 0],
-              <int>[0, -1, 0],
-              <int>[0, 0, 1],
-              <int>[0, 0, -1],
-            ]) {
-              final v = grid.values[grid.index(i + d[0], j + d[1], k + d[2])];
-              if (v > 0 && v < best) best = v;
-            }
-            if (best.isFinite && best < grid.cellSize * 1.5) {
-              next[idx] = math.max(grid.values[idx], -grid.cellSize);
-            }
-          }
-        }
-      }
-      for (var i = 0; i < grid.values.length; i++) {
-        grid.values[i] = next[i];
-      }
-    }
-  }
-
   static TriMesh _flip(TriMesh m) {
     final idx = Uint32List(m.indices.length);
     for (var f = 0; f < m.faceCount; f++) {
@@ -274,4 +274,43 @@ class Solidifier {
     return TriMesh(m.positions, idx,
         faceGroups: m.faceGroups, vertexColors: m.vertexColors);
   }
+}
+
+/// Exact empty, identical and strictly disjoint set operations. Returns null
+/// when surface classification or voxelization is required.
+TriMesh? trivialBoolean(TriMesh a, TriMesh b, BooleanOp op) {
+  if (a.validate().isNotEmpty || b.validate().isNotEmpty) {
+    throw ArgumentError('Invalid boolean operand');
+  }
+  if (a.faceCount == 0 || b.faceCount == 0) {
+    return switch (op) {
+      BooleanOp.union => (a.faceCount == 0 ? b : a).clone(),
+      BooleanOp.intersection => TriMesh.empty(),
+      BooleanOp.difference => a.clone(),
+    };
+  }
+  bool same(List<num> x, List<num> y) {
+    if (x.length != y.length) return false;
+    for (var i = 0; i < x.length; i++) {
+      if (x[i] != y[i]) return false;
+    }
+    return true;
+  }
+
+  if (same(a.positions, b.positions) && same(a.indices, b.indices)) {
+    return op == BooleanOp.difference ? TriMesh.empty() : a.clone();
+  }
+  final aa = a.bounds(), bb = b.bounds();
+  final disjoint = aa.maxX < bb.minX ||
+      bb.maxX < aa.minX ||
+      aa.maxY < bb.minY ||
+      bb.maxY < aa.minY ||
+      aa.maxZ < bb.minZ ||
+      bb.maxZ < aa.minZ;
+  if (!disjoint) return null;
+  return switch (op) {
+    BooleanOp.union => Modify.combine([a, b]),
+    BooleanOp.intersection => TriMesh.empty(),
+    BooleanOp.difference => a.clone(),
+  };
 }
