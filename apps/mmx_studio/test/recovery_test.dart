@@ -13,6 +13,7 @@ class RecoveryTestState extends StudioState {
   RecoveryTestState() : super(loadStartup: false);
   final finishAutosave = Completer<void>();
   int autosaveCount = 0;
+  int completedAutosaveCount = 0;
   String? autosavePath;
   int saveCount = 0;
   @override
@@ -25,6 +26,7 @@ class RecoveryTestState extends StudioState {
     autosavePath = path;
     await finishAutosave.future;
     await File(path).writeAsString('older unsaved scene');
+    completedAutosaveCount++;
   }
 
   @override
@@ -191,8 +193,27 @@ void main() {
       await tester.pump();
       expect(state.saveCount, 1);
       state.finishAutosave.complete();
-      await flushFilesystem(tester);
-      await tester.pump();
+      // A fixed filesystem delay can expire between the write and queued
+      // deletion on a busy runner. Require the write to finish before checking
+      // absence, otherwise an unwritten file could incorrectly pass this test.
+      final elapsed = Stopwatch()..start();
+      var cleared = false;
+      while (elapsed.elapsed < const Duration(seconds: 10)) {
+        await tester.pump();
+        cleared =
+            await tester.runAsync(
+              () async =>
+                  state.completedAutosaveCount == 1 &&
+                  !await File(state.autosavePath!).exists(),
+            ) ??
+            false;
+        if (cleared) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      expect(state.completedAutosaveCount, 1);
+      expect(cleared, isTrue, reason: 'Recovery cleanup: ${state.status}');
       expect(
         await tester.runAsync(() => File(state.autosavePath!).exists()),
         false,

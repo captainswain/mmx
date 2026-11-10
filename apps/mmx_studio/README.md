@@ -13,7 +13,7 @@ root [`LICENSE`](../../LICENSE) and [`NOTICE`](../../NOTICE).
   (multi-object import; export writes the selected object).
 - Repair: weld, hole fill, non-manifold split, inspector.
 - Remesh (isotropic, optional group-boundary preservation), reduce, Make Solid,
-  hollow, booleans (kernel only), offset.
+  hollow, booleans, offset.
 - Edit tools: plane cut, mirror, extrude, separate shells, flip normals, Taubin
   smoothing, drop/center on bed, duplicate, combine, pattern arrays, primitive
   fitting, boundary-loop stitching, rigid ICP alignment onto a reference object,
@@ -30,10 +30,22 @@ The tool matrix and the kernel-only/partial list are in
 
 ## Requirements
 
-- Flutter 3.47 or newer.
+- Flutter 3.47.9 with its bundled Dart SDK, matching CI.
+- Rust 1.99.1, Python 3, and your platform's native build tools.
 - Linux, macOS or Windows desktop target.
 
+Follow the root [quick start](../../QUICKSTART.md) for platform setup.
+
 ## Run
+
+From the repository root:
+
+```sh
+python3 start.py          # Windows: py -3 start.py
+python3 start.py --debug  # Development with hot reload
+```
+
+Or, from this directory:
 
 ```sh
 flutter pub get
@@ -43,8 +55,8 @@ flutter build linux --release
 
 On touch screens the viewport supports one-finger orbit and two-finger orbit +
 pinch zoom. The properties panel collapses into a drawer below 900 px so the
-same build works on a narrow desktop window or a tablet. Android and iOS
-targets are scaffolded; the Linux build is the one verified on this host.
+same build works on a narrow desktop window. Android and iOS targets are
+scaffolded; desktop CI covers Linux, Windows, and macOS.
 
 ## Tests
 
@@ -53,9 +65,9 @@ flutter analyze
 flutter test
 ```
 
-The widget suite covers the shell, operator plumbing (reduce, mirror,
-flip/measure), Extract/Make Part/Pivot, the narrow layout and the touch pinch
-gesture.
+The widget suite covers editing, transforms, materials, undo, recovery,
+keyboard controls, and narrow layouts. See [testing](../../docs/TESTING.md)
+for native integration and renderer checks.
 
 ## Contributing
 
