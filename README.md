@@ -32,6 +32,8 @@ and tool semantics.
 
 ## Documentation
 
+- [Quick start: build and run](QUICKSTART.md)
+- [Contributor guide](CONTRIBUTING.md)
 - [Documentation index](docs/README.md)
 - [Reverse-engineering report](docs/REVERSE-ENGINEERING.md)
 - [Tool and action coverage](docs/TOOL-MATRIX.md)
@@ -76,28 +78,37 @@ Linux, Windows and macOS have build, integration and installer CI jobs.
 
 ## Build and test
 
-Requirements: Flutter 3.47+ and Dart 3.13+; native desktop builds also require
-Rust 1.99.1 and Python 3 (see the [renderer build guide](apps/mmx_studio/native_renderer/README.md)). No Meshmixer installation is needed
-for tests; the sample models are vendored under
-`packages/mmx_core/test/fixtures/models`.
+Start with the [quick start](QUICKSTART.md) to install the tools. CI uses Flutter
+3.47.9 and its bundled Dart SDK. Desktop builds also require Rust 1.99.1,
+Python 3, and the native tools for your OS.
+
+From the repository root:
 
 ```sh
-# Full verification (kernel + Studio)
-./tool/verify.sh
+python3 start.py          # Build and run Studio; Windows: py -3 start.py
+python3 start.py --debug  # Development with hot reload
 
-# Kernel only
+# Full verification (kernel + Studio); use Git Bash on Windows
+./tool/verify.sh
+```
+
+For individual packages, run each block from the repository root:
+
+```sh
 cd packages/mmx_core
 dart pub get
 dart analyze
 dart test
+```
 
-# Studio
+```sh
 cd apps/mmx_studio
 flutter pub get
 flutter analyze
 flutter test
 ```
 
+Tests use vendored fixtures; no Meshmixer installation is needed.
 Verification includes kernel properties, parser fidelity, worker cancellation,
 desktop interactions and project recovery. Commands and coverage gates are in
 [`docs/TESTING.md`](docs/TESTING.md).
@@ -124,11 +135,11 @@ dart compile exe bin/mmx.dart -o mmx
 ## Desktop app
 
 ```sh
-cd apps/mmx_studio
-flutter pub get
-flutter run -d linux        # or windows / macos
-flutter build linux --release
+python3 start.py              # Windows: py -3 start.py
+python3 start.py --build-only  # Build a release bundle without launching
 ```
+
+See the [quick start](QUICKSTART.md) for platform setup, output paths, and manual commands.
 
 Use the Project menu to open/save `.mmx` projects, transform the selected object,
 and apply booleans. Native dialogs import/export mesh files; project saves preserve

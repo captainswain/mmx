@@ -2,6 +2,8 @@
 
 Start here:
 
+- [Quick start](../QUICKSTART.md) - install the tools, build, and run Studio or the CLI.
+- [Contributor guide](../CONTRIBUTING.md) - project layout, coding standards, tests, and pull requests.
 - [`REVERSE-ENGINEERING.md`](REVERSE-ENGINEERING.md) - the evidence-backed
   report on Meshmixer 3.5.0: artifact identity, `.mix` layout, tool semantics,
   RTTI, method names, and what remains unknown.
