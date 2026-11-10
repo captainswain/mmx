@@ -20,6 +20,56 @@ class _LayoutState extends StudioState {
 }
 
 void main() {
+  testWidgets(
+    'native macOS Tab uses the IME selector before Apply handles Enter',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      // Match integration_test: no mock IME is registered to translate the
+      // framework's synthetic Tab into Cocoa's insertTab: selector.
+      tester.testTextInput.unregister();
+      addTearDown(tester.testTextInput.register);
+      final state = _LayoutState();
+      addTearDown(state.dispose);
+      final mesh = Modify.fitPrimitive(
+        TriMesh(Float32List.fromList([-1, -1, -1, 1, 1, 1]), Uint32List(0)),
+        PrimitiveKind.box,
+      );
+      state.selectedObjectId = state.doc.add(mesh).id;
+      state.setManipulatorMode(ManipulatorMode.translate);
+      await tester.pumpWidget(
+        MaterialApp(home: StudioScreen(state: state, enableRecovery: false)),
+      );
+      await tester.pumpAndSettle();
+      await openPropertiesPanel(tester);
+      final amount = find.byKey(const ValueKey('manipulator-amount'));
+      await tester.ensureVisible(amount);
+      await tester.enterText(amount, '1.3');
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: amount, matching: find.byType(EditableText)),
+      );
+      expect(editable.controller.text, '1.3');
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.tab), isFalse);
+      await tester.pumpAndSettle();
+      expect(editable.focusNode.hasPrimaryFocus, isTrue);
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.enter), isFalse);
+      await tester.pumpAndSettle();
+      expect(state.doc.undoDepth, 0, reason: 'Raw synthetic keys omit the IME');
+      await tabFromFieldToButton(
+        tester,
+        field: amount,
+        button: find.byKey(const ValueKey('apply-manipulator')),
+      );
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.enter), isTrue);
+      await settleStudioInteraction(tester, state);
+      expect(state.doc.undoDepth, 1);
+      expect(state.selected!.transform[12], closeTo(1.3, 1e-8));
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
   for (final size in [const Size(800, 600), const Size(1280, 720)]) {
     testWidgets('properties workflows at $size logical pixels', (tester) async {
       tester.view.physicalSize = size;

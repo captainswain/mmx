@@ -56,11 +56,27 @@ void main() {
       final amount = find.byKey(const ValueKey('manipulator-amount'));
       await tester.ensureVisible(amount);
       await tester.enterText(amount, '1.3');
+      final amountEditable = tester.widget<EditableText>(
+        find.descendant(of: amount, matching: find.byType(EditableText)),
+      );
+      expect(amountEditable.controller.text, '1.3');
+      debugPrint(
+        'Before Apply: status=${state.status}; undo=${state.doc.undoDepth}',
+      );
       // A keyboard user can reach Apply immediately after the amount field.
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tabFromFieldToButton(
+        tester,
+        field: amount,
+        button: find.byKey(const ValueKey('apply-manipulator')),
+      );
+      final enterHandled = await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await settleStudioInteraction(tester, state);
+      debugPrint(
+        'After Enter: handled=$enterHandled; value=${amountEditable.controller.text}; '
+        'status=${state.status}; undo=${state.doc.undoDepth}; '
+        '${keyboardFocusDescription()}',
+      );
+      expect(enterHandled, isTrue, reason: 'Focused Apply must handle Enter');
       expect(state.doc.undoDepth, 1);
       expect(state.selected!.transform[12], closeTo(4, 1e-8));
       expect(state.selected!.transform[13], closeTo(4.5, 1e-8));

@@ -7,7 +7,7 @@ Dart formatting, runs both analyzers, then executes the kernel and Studio suites
 Tests use checked-in fixtures; no Meshmixer installation is required.
 
 Optional-feature checkpoint PR #5, observed on 2026-11-09: 214 kernel tests and
-86 Studio tests pass; both analyzers and formatting checks are clean. The ordinary
+87 Studio tests pass; both analyzers and formatting checks are clean. The ordinary
 Studio suite skips four native capability tests, which run explicitly against
 the built library in the six-test renderer suite. The analytical corpus has
 22 cases and runs on each native CI platform.
@@ -33,6 +33,14 @@ Native property workflows open **Tool properties** when the window is narrower
 than 900 logical pixels and dismiss the drawer before viewport gestures. Both
 800×600 (the macOS default) and 1280×720 layouts have widget regressions and
 passed native Linux checks; tests must not assume a permanently visible sidebar.
+
+On native macOS, synthetic text-field Tab also needs Cocoa's
+`TextInputClient.performSelectors` / `insertTab:` callback. Flutter 3.47.9 defers
+that key to the IME, while the integration binding leaves `TestTextInput`
+unregistered. The test helper supplies the missing platform message and asserts
+that Apply really has focus before Enter; it does not focus or invoke the button
+directly. A macOS-platform regression reproduces the raw-key failure. Human
+keyboard/accessibility acceptance remains a separate release check.
 
 **Observed SDK limitation (Flutter 3.47.9):** a multi-file desktop invocation such
 as `flutter test integration_test -d linux` passes the first app, then fails to

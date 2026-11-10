@@ -88,7 +88,7 @@ finish/remediation plans; full Meshmixer parity is a separate target.
 
 ## Validation record
 
-The optional-feature local run passes 214 kernel and 86 Studio tests with clean
+The optional-feature local run passes 214 kernel and 87 Studio tests with clean
 analyzers and formatting; the separate strict native renderer suite passes all
 six tests. The implementation adds material/texture round trips, immutable
 history, advanced manipulators, native depth/texture checks, parser mutations and
