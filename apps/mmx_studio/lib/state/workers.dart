@@ -6,6 +6,8 @@ import 'dart:typed_data';
 
 import 'package:mmx_core/mmx_core.dart';
 
+import '../render/desktop_renderer.dart';
+
 // Top-level dispatch keeps UI images, listeners and pending futures out of isolates.
 Future<Uint8List> encodeProjectWorker(ProjectData project) =>
     executeWorker(() => ProjectIO.write(project));
@@ -75,12 +77,13 @@ Future<TriMesh> makePartWorker(TriMesh mesh, Set<int> faces) => executeWorker(
   () => ComplexTools.makeSolidPart(mesh, faces, resolution: 64),
 );
 
-Future<TriMesh> makeSolidWorker(
+Future<SolidResult> makeSolidWorker(
   TriMesh mesh,
   SolidMode mode,
   int res,
   double offset,
   int smooth,
+  double minimumThickness,
 ) => executeWorker(
   () => Solidifier.makeSolid(
     mesh,
@@ -88,19 +91,26 @@ Future<TriMesh> makeSolidWorker(
     resolution: res,
     offset: offset,
     smoothing: smooth,
-  ).mesh,
+    minThickness: minimumThickness,
+  ),
 );
 
-Future<TriMesh> hollowWorker(TriMesh mesh, double t, int holes, int res) =>
-    executeWorker(
-      () => Solidifier.hollow(
-        mesh,
-        thickness: t,
-        holes: holes,
-        holeRadius: t * 1.2,
-        resolution: res,
-      ).mesh,
-    );
+Future<SolidResult> hollowWorker(
+  TriMesh mesh,
+  double t,
+  int holes,
+  int res,
+  double minimumThickness,
+) => executeWorker(
+  () => Solidifier.hollow(
+    mesh,
+    thickness: t,
+    holes: holes,
+    holeRadius: t * 1.2,
+    resolution: res,
+    minThickness: minimumThickness,
+  ),
+);
 
 Future<TriMesh> planeCutWorker(
   TriMesh mesh,
@@ -281,14 +291,23 @@ Future<TriMesh> repairWorker(TriMesh mesh) => executeWorker(() {
 Future<List<MixObject>> readMixWorker(Uint8List bytes) =>
     executeWorker(() => MixIO.read(bytes));
 
-Future<TriMesh> readMeshWorker(String path, Uint8List bytes) =>
-    executeWorker(() => MeshIO.readBytes(path, bytes));
+Future<TriMesh> readMeshWorker(String path, Uint8List bytes) => executeWorker(
+  () => path.toLowerCase().endsWith('.obj')
+      ? MeshIO.readFile(path)
+      : MeshIO.readBytes(path, bytes),
+);
 
 Future<Uint8List> writeMeshWorker(String path, TriMesh mesh) =>
     executeWorker(() => MeshIO.writeBytes(path, mesh));
 
-Future<Uint8List> renderWorker(
+Future<PreparedMeshExport> prepareMeshExportWorker(String path, TriMesh mesh) =>
+    executeWorker(() => MeshIO.prepareExport(path, mesh));
+
+Future<DesktopRenderFrame> renderWorker(
   List<RenderObject> objects,
   Camera camera,
-  RenderOptions options,
-) => executeWorker(() => Rasterizer.render(objects, camera, options));
+  RenderOptions options, {
+  RenderBackendPreference preference = RenderBackendPreference.auto,
+}) => executeWorker(
+  () => renderDesktopFrame(objects, camera, options, preference: preference),
+);

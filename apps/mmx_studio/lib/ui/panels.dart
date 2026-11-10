@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:mmx_core/mmx_core.dart';
 
 import '../state/studio_state.dart';
+import 'manipulator_controls.dart';
+import 'material_panel.dart';
+import 'renderer_controls.dart';
 
 /// Left tool rail, mirroring the shipped Meshmixer action bars
 /// (Meshmix / Import / Select / Sculpt / Stamp / Edits / Analysis / Shaders /
@@ -131,6 +134,12 @@ class PropertiesPanel extends StatelessWidget {
         children: [
           _SceneSection(state: state),
           const Divider(height: 26),
+          if (state.tool == StudioTool.navigate ||
+              state.tool == StudioTool.modify)
+            ManipulatorControls(state: state),
+          if (state.tool == StudioTool.navigate ||
+              state.tool == StudioTool.modify)
+            MaterialPanel(state: state),
           ..._toolSection(context),
         ],
       ),
@@ -142,6 +151,7 @@ class PropertiesPanel extends StatelessWidget {
       case StudioTool.navigate:
         return <Widget>[
           _sectionTitle('View'),
+          RendererControls(state: state),
           _kv('Camera', 'orbit / shift-drag pan / scroll zoom'),
           _kv('Objects', '${state.doc.objects.length}'),
           _kv('Undo depth', '${state.doc.undoDepth}'),
@@ -476,6 +486,18 @@ class PropertiesPanel extends StatelessWidget {
             8,
             (v) => state.solidSmoothing = v.round(),
           ),
+          _slider(
+            'Minimum wall check (mm; 0 = off)',
+            state.solidMinThickness,
+            0,
+            20,
+            (v) => state.solidMinThickness = v,
+          ),
+          const Text(
+            'Checks inward-normal clearance and may grow the model. '
+            'Use Accurate or Blocky; verified edits bake object transforms.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
           const SizedBox(height: 8),
           _button(context, 'Make Solid', state.doMakeSolid),
         ];
@@ -502,6 +524,18 @@ class PropertiesPanel extends StatelessWidget {
             32,
             256,
             (v) => state.solidResolution = v,
+          ),
+          _slider(
+            'Minimum wall check (mm; 0 = off)',
+            state.hollowMinThickness,
+            0,
+            20,
+            (v) => state.hollowMinThickness = v,
+          ),
+          const Text(
+            'Checks inward-normal clearance for enclosed shells only '
+            '(zero escape holes). May thicken the wall and bake transforms.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
           ),
           const SizedBox(height: 8),
           _button(context, 'Hollow', state.doHollow),

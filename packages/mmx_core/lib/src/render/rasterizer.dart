@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../mesh/tri_mesh.dart';
+import '../mesh/material.dart';
 import 'camera.dart';
 
 /// Per-object render input.
@@ -116,19 +117,22 @@ class Rasterizer {
         if (nx * vx + ny * vy + nz * vz <= 0) continue;
 
         // Base colour: analysis heatmap, selection tint or material.
-        var r = obj.color[0], g = obj.color[1], b = obj.color[2];
-        if (obj.faceColors != null && obj.faceColors!.length >= (f + 1) * 3) {
+        final material = mesh.faceMaterials == null
+            ? null
+            : mesh.materials[mesh.faceMaterials![f]];
+        var r = material?.baseColor[0] ?? obj.color[0],
+            g = material?.baseColor[1] ?? obj.color[1],
+            b = material?.baseColor[2] ?? obj.color[2];
+        final analysis =
+            obj.faceColors != null && obj.faceColors!.length >= (f + 1) * 3;
+        if (analysis) {
           r = obj.faceColors![f * 3];
           g = obj.faceColors![f * 3 + 1];
           b = obj.faceColors![f * 3 + 2];
         }
-        if (obj.faceMask != null &&
+        final selected = obj.faceMask != null &&
             f < obj.faceMask!.length &&
-            obj.faceMask![f] != 0) {
-          r = (r * 0.35 + 0.65);
-          g = (g * 0.35 + 0.45);
-          b = (b * 0.35 + 0.10);
-        }
+            obj.faceMask![f] != 0;
 
         // Two-light Lambert plus ambient.
         final l1 = _normalize(<double>[0.45, 0.75, 0.5]);
@@ -136,12 +140,27 @@ class Rasterizer {
         final d1 = math.max(0.0, nx * l1[0] + ny * l1[1] + nz * l1[2]);
         final d2 = math.max(0.0, nx * l2[0] + ny * l2[1] + nz * l2[2]) * 0.35;
         final shade = (opts.ambient + d1 * 0.75 + d2).clamp(0.0, 1.35);
-        final cr = (r * shade).clamp(0.0, 1.0);
-        final cg = (g * shade).clamp(0.0, 1.0);
-        final cb = (b * shade).clamp(0.0, 1.0);
+        final cr = r * shade;
+        final cg = g * shade;
+        final cb = b * shade;
 
         _drawTriangle(color, depth, w, h, vp, ax, ay, az, bx, by, bz, cx, cy,
-            cz, cr, cg, cb, opts.wireframe);
+            cz, cr, cg, cb, opts.wireframe,
+            material: analysis ? null : material,
+            selected: selected,
+            shade: shade,
+            attributes: [
+              for (var k = 0; k < 3; k++)
+                [
+                  mesh.cornerUvs?[f * 6 + k * 2] ?? 0,
+                  mesh.cornerUvs?[f * 6 + k * 2 + 1] ?? 0,
+                  for (var c = 0; c < 3; c++)
+                    analysis
+                        ? 1.0
+                        : mesh.vertexColors?[mesh.indices[f * 3 + k] * 3 + c] ??
+                            1.0
+                ]
+            ]);
       }
     }
     return color;
@@ -165,17 +184,27 @@ class Rasterizer {
       double r,
       double g,
       double b,
-      bool wireframe) {
+      bool wireframe,
+      {List<List<double>>? attributes,
+      MeshMaterial? material,
+      bool selected = false,
+      double shade = 1}) {
     // Clip-space vertices.
     final p0 = _project(vp, ax, ay, az);
     final p1 = _project(vp, bx, by, bz);
     final p2 = _project(vp, cx, cy, cz);
+    if (attributes != null) {
+      p0.addAll(attributes[0]);
+      p1.addAll(attributes[1]);
+      p2.addAll(attributes[2]);
+    }
     // Near-plane clip in homogeneous space (z + w >= eps).
     final poly = _clipNear(<List<double>>[p0, p1, p2]);
     if (poly.length < 3) return;
     for (var i = 2; i < poly.length; i++) {
       _rasterizeClipped(
-          color, depth, w, h, poly[0], poly[i - 1], poly[i], r, g, b);
+          color, depth, w, h, poly[0], poly[i - 1], poly[i], r, g, b,
+          material: material, selected: selected, shade: shade);
     }
     if (wireframe) {
       for (var i = 0; i < poly.length; i++) {
@@ -206,11 +235,8 @@ class Rasterizer {
       if (dCur >= 0) out.add(cur);
       if ((dCur >= 0) != (dNxt >= 0)) {
         final t = dCur / (dCur - dNxt);
-        out.add(<double>[
-          cur[0] + (nxt[0] - cur[0]) * t,
-          cur[1] + (nxt[1] - cur[1]) * t,
-          cur[2] + (nxt[2] - cur[2]) * t,
-          cur[3] + (nxt[3] - cur[3]) * t,
+        out.add([
+          for (var k = 0; k < cur.length; k++) cur[k] + (nxt[k] - cur[k]) * t
         ]);
       }
     }
@@ -227,7 +253,10 @@ class Rasterizer {
       List<double> p2,
       double r,
       double g,
-      double b) {
+      double b,
+      {MeshMaterial? material,
+      bool selected = false,
+      double shade = 1}) {
     // Perspective divide to screen space.
     final w0 = p0[3] == 0 ? 1e-9 : p0[3];
     final w1 = p1[3] == 0 ? 1e-9 : p1[3];
@@ -269,14 +298,71 @@ class Rasterizer {
         final z = w0b * z0 + w1b * z1 + w2b * z2;
         final idx = py * w + px;
         if (z >= depth[idx]) continue;
+        var cr = r, cg = g, cb = b;
+        var alpha = material?.baseColor[3] ?? 1;
+        if (p0.length > 4) {
+          final denominator = w0b / w0 + w1b / w1 + w2b / w2;
+          double attribute(int k) =>
+              (w0b * p0[k] / w0 + w1b * p1[k] / w1 + w2b * p2[k] / w2) /
+              denominator;
+          cr *= attribute(6);
+          cg *= attribute(7);
+          cb *= attribute(8);
+          if (material?.texture != null) {
+            final texel = sampleTexture(
+                material!.texture!, attribute(4), attribute(5),
+                clamp: material.textureClamp);
+            cr *= texel.$1;
+            cg *= texel.$2;
+            cb *= texel.$3;
+            alpha *= texel.$4;
+          }
+        }
+        // Both viewport backends deliberately use alpha cutout, not unsorted
+        // transparency. Native/OBJ data retain the original alpha values.
+        if (alpha < .5) continue;
+        if (selected) {
+          cr = cr * .35 + .65 * shade;
+          cg = cg * .35 + .45 * shade;
+          cb = cb * .35 + .10 * shade;
+        }
         depth[idx] = z;
         final o = idx * 4;
-        color[o] = (r * 255).round().clamp(0, 255);
-        color[o + 1] = (g * 255).round().clamp(0, 255);
-        color[o + 2] = (b * 255).round().clamp(0, 255);
+        color[o] = (cr * 255).round().clamp(0, 255);
+        color[o + 1] = (cg * 255).round().clamp(0, 255);
+        color[o + 2] = (cb * 255).round().clamp(0, 255);
         color[o + 3] = 255;
       }
     }
+  }
+
+  /// Bilinear sRGB sampling with v-up UVs and clamp/repeat addressing. Texel
+  /// centers are (i+0.5)/size, matching standard GPU linear samplers.
+  static (double, double, double, double) sampleTexture(
+      MeshTexture texture, double u, double v,
+      {bool clamp = false}) {
+    if (!u.isFinite || !v.isFinite) {
+      throw ArgumentError('Non-finite texture coordinate');
+    }
+    u = clamp ? u.clamp(0.0, 1.0) : u - u.floorToDouble();
+    v = clamp ? v.clamp(0.0, 1.0) : v - v.floorToDouble();
+    final x = u * texture.width - .5, y = (1 - v) * texture.height - .5;
+    final ix = x.floor(), iy = y.floor(), fx = x - ix, fy = y - iy;
+    int coordinate(int i, int n) => clamp ? i.clamp(0, n - 1) : i % n;
+    int offset(int xx, int yy) =>
+        (coordinate(yy, texture.height) * texture.width +
+            coordinate(xx, texture.width)) *
+        4;
+    final a = offset(ix, iy),
+        bb = offset(ix + 1, iy),
+        c = offset(ix, iy + 1),
+        d = offset(ix + 1, iy + 1);
+    double channel(int k) =>
+        ((texture.rgba[a + k] * (1 - fx) + texture.rgba[bb + k] * fx) *
+                (1 - fy) +
+            (texture.rgba[c + k] * (1 - fx) + texture.rgba[d + k] * fx) * fy) /
+        255;
+    return (channel(0), channel(1), channel(2), channel(3));
   }
 
   static void _line(Uint8List color, Float32List depth, int w, int h,

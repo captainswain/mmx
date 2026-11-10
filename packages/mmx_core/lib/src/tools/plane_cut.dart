@@ -19,6 +19,7 @@ class PlaneCut {
     HoleFillMode fillMode = HoleFillMode.flatMinimal,
     bool sliceBoth = false,
   }) {
+    mesh.requireUntextured('Plane cut');
     final nx = normal[0], ny = normal[1], nz = normal[2];
     final nl = math.sqrt(nx * nx + ny * ny + nz * nz);
     if (nl < 1e-12) return mesh;

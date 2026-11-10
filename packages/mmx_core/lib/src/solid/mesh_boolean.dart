@@ -44,6 +44,8 @@ class PreciseBoolean {
     double? edgeLength,
     int resolution = 160,
   }) {
+    a.requireUntextured('Precise boolean');
+    b.requireUntextured('Precise boolean');
     if (resolution < 8 ||
         resolution > 256 ||
         (edgeLength != null && (!edgeLength.isFinite || edgeLength <= 0))) {

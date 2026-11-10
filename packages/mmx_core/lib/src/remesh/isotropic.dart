@@ -40,6 +40,8 @@ class IsotropicRemesher {
     final positions = <double>[...input.positions];
     final indices = <int>[];
     final groups = input.faceGroups == null ? null : <int>[];
+    final uvs = input.cornerUvs == null ? null : <double>[];
+    final materialIds = input.faceMaterials == null ? null : <int>[];
     final colors =
         input.vertexColors == null ? null : <double>[...input.vertexColors!];
     final mids = <String, int>{};
@@ -70,6 +72,41 @@ class IsotropicRemesher {
       final bc = mid(b, c);
       final ca = mid(c, a);
       indices.addAll([a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca]);
+      if (uvs != null) {
+        final corners = [
+          for (var k = 0; k < 3; k++)
+            [
+              input.cornerUvs![f * 6 + k * 2],
+              input.cornerUvs![f * 6 + k * 2 + 1]
+            ]
+        ];
+        final mids = [
+          for (var k = 0; k < 3; k++)
+            [
+              for (var c = 0; c < 2; c++)
+                (corners[k][c] + corners[(k + 1) % 3][c]) * .5
+            ]
+        ];
+        for (final uv in [
+          corners[0],
+          mids[0],
+          mids[2],
+          mids[0],
+          corners[1],
+          mids[1],
+          mids[2],
+          mids[1],
+          corners[2],
+          mids[0],
+          mids[1],
+          mids[2]
+        ]) {
+          uvs.addAll(uv);
+        }
+      }
+      if (materialIds != null) {
+        materialIds.addAll(List.filled(4, input.faceMaterials![f]));
+      }
       if (groups != null) {
         final g = input.faceGroups![f];
         groups.addAll([g, g, g, g]);
@@ -80,6 +117,10 @@ class IsotropicRemesher {
       Uint32List.fromList(indices),
       faceGroups: groups == null ? null : Uint16List.fromList(groups),
       vertexColors: colors == null ? null : Float32List.fromList(colors),
+      cornerUvs: uvs == null ? null : Float32List.fromList(uvs),
+      faceMaterials:
+          materialIds == null ? null : Uint16List.fromList(materialIds),
+      materials: input.materials,
     );
   }
 
@@ -133,6 +174,7 @@ class IsotropicRemesher {
     void Function(int done, int total)? progress,
     int maximumFaces = defaultMaximumGeneratedFaces,
   }) {
+    input.requireUntextured('Isotropic remesh');
     if (!targetEdgeLength.isFinite ||
         targetEdgeLength <= 0 ||
         iterations < 0 ||

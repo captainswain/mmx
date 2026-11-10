@@ -38,7 +38,7 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | JoinTool | `ComplexTools.join` | Combine all | implemented | Joins scene objects. |
 | MakePartTool | `ComplexTools.extract` | Make Part | implemented | Extract plus optional solidification. |
 | MakePatternTool | `tools/modify.dart` | Make pattern | implemented | Grid array; other pattern modes are partial. |
-| MakeSolidTool | `solid/solidifier.dart` | Make Solid | implemented | Blocky/fast/accurate modes and offsets. |
+| MakeSolidTool | `solid/solidifier.dart` | Make Solid | implemented | Blocky/fast/accurate and offsets; bounded directional minimum-wall verification in Accurate/Blocky. |
 | MeasuringTool | `tools/modify.dart` | Measure | implemented | Dimensions, area, volume, shells. |
 | MirrorTool | `tools/edits.dart` | Mirror | implemented | Seam welding. |
 | OverhangTool | `analysis/analysis.dart` | Analysis overlay | implemented | Angle-based heat map. |
@@ -55,7 +55,7 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | StitchBoundaryTool | `repair/bridge.dart` | Stitch cracks | implemented | Boundary-loop bridge/stitch. |
 | StrengthTool | none | none | out of scope | Material-strength simulation is not part of the core workflow. |
 | SurfaceBrushTool | `tools/sculpt.dart` | Sculpt | implemented | Draw/inflate/flatten/pinch/crease/twist/move. |
-| TransformTool | `scene/document.dart` transform | Numeric controls and viewport handles | implemented | Translation/rotation/uniform scale around the local pivot; drag commits one undo entry. |
+| TransformTool | `scene/document.dart` transform | Numeric controls and viewport handles | implemented | World/local axes, axis/uniform scale, snapping, numeric entry and pivot-safe single-entry undo. |
 | UnitsTool | import scaling, 3MF unit conversion | Import units selector | implemented | Scene units are millimeters; unitless formats offer explicit conversion. |
 | VolumeBrushTool | `tools/sculpt.dart` | Sculpt | partial | Volume-like inflate/draw; no separate volume brush UI. |
 
@@ -70,7 +70,7 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | Stamp | `tools/stamp.dart` | Stamp | partial |
 | Edits | `tools/*` | Modify | implemented |
 | Analysis | `analysis/*` | Analysis | implemented |
-| Shaders | `render/rasterizer.dart` | viewport | partial (one software shader) |
+| Shaders | CPU rasterizer and native wgpu | Material/texture panel and viewport | partial (diffuse materials, UV textures and alpha cutout; no PBR/sorted translucency) |
 | SeparateShells | `tools/edits.dart` | Separate shells | implemented |
 | Export | `io/*` | Export | implemented |
 | Print | `fab/*` | Print | implemented |
@@ -89,13 +89,14 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | SplitNonManifoldSurface | `repair/inspector.dart` | Auto repair | implemented |
 | MakePattern | `tools/modify.dart` | Make pattern | implemented |
 | Hollow | `solid/solidifier.dart` | Hollow | implemented |
+| Unwrap | `tools/unwrap.dart` | Material planar mapping | implemented (planar corner UVs persisted in projects and supported exports) |
 | VariationalRemesh | `remesh/isotropic.dart` | Remesh (group-aware) | implemented |
 
-## Highest-value gaps
+## Remaining parity gaps outside the selected desktop backlog
 
 1. External Meshmixer fidelity comparisons; analytical empty/disjoint boolean cases now pass.
-2. Nonuniform-scale and face-deformation manipulators beyond the core object workflow.
+2. Face-deformation manipulators beyond the implemented object transforms.
 3. Image stamps and the stamp/texture semantics.
-4. UV storage and export, or an explicit "preview only" label for Unwrap.
+4. Advanced UV seam authoring, material layers and proprietary `.mix` shader semantics.
 5. Selection-limited plane cuts and the remaining plane-cut attach modes.
 6. Face transform / variational move UI.

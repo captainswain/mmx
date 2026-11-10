@@ -22,6 +22,8 @@ Requirements:
 
 - Flutter 3.47 or newer and Dart 3.13 or newer.
 - Linux, macOS or Windows for the desktop app.
+- Rust 1.99.1 and Python 3 for native desktop builds; see the
+  [renderer build guide](apps/mmx_studio/native_renderer/README.md).
 - No Meshmixer installation is required to run the tests: the sample models
   are vendored under `packages/mmx_core/test/fixtures/models`.
 

@@ -17,6 +17,7 @@ class HoleFiller {
       {double maxLoopLength = double.infinity,
       HoleFillMode mode = HoleFillMode.flatMinimal,
       int smoothIterations = 30}) {
+    mesh.requireUntextured('Hole filling');
     final topo = MeshTopology(mesh);
     final loops = topo.boundaryLoops();
     if (loops.isEmpty) return mesh;
