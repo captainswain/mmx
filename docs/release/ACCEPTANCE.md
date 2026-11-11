@@ -28,7 +28,7 @@ deferral does not establish signature, fidelity or human-acceptance evidence.
 
 ## Local 0.3.0 observations, 2026-11-10
 
-**[observed]** The candidate working tree passed 243 kernel and 111 Studio tests,
+**[observed]** The candidate working tree passed 247 kernel and 111 Studio tests,
 both analyzers, formatting, all 24 targeted coverage gates, 22 analytical corpus
 cases, five Rust tests, seven strict GPU tests and four native Linux integration
 workflows. Python tooling passed 28 tests with one Windows-only skip. Detailed

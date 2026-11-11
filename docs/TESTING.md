@@ -16,7 +16,7 @@ acceptance still requires the native CI matrix for these changes.
 
 ### Local scan-to-print verification, 2026-11-10
 
-- `./tool/verify.sh`: **243 kernel tests**, **111 Studio tests**, formatting and
+- `./tool/verify.sh`: **247 kernel tests**, **111 Studio tests**, formatting and
   both analyzers pass. Five native capability tests are skipped in the ordinary
   Studio suite and run separately against the built library.
 - `./tool/coverage.sh`: all **24** required per-module gates pass. New modules:
@@ -31,6 +31,11 @@ acceptance still requires the native CI matrix for these changes.
   inspection of original comparison and Apply/Cancel.
 - Analytical geometry corpus: **22 cases passed**. Python build/packaging/evidence
   tooling: **28 tests**, with one Windows-only check skipped on Linux.
+
+The malformed-CLI cases each have their own test deadline. The first macOS CI
+run passed 242 kernel tests but timed out a single test containing five cold Dart
+launches; splitting those invocations retains every assertion and the default
+per-test timeout, increasing the suite from 243 to 247 tests.
 
 These observations cover the local 0.3.0 candidate working tree. They do not
 certify physical print outcomes, sustained large-scan performance, or the exact

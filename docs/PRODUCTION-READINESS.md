@@ -253,7 +253,7 @@ requirements for this scope.
 
 ## Validation record
 
-Current local validation passes 243 kernel tests, 111 Studio tests, four native
+Current local validation passes 247 kernel tests, 111 Studio tests, four native
 Linux workflows, seven strict GPU tests, five Rust tests, 22 analytical cases and
 all 24 required coverage gates. Commands and detailed counts are in
 [TESTING.md](TESTING.md). New
