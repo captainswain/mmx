@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'workers.dart';
 import 'spatial_cache.dart';
 import '../render/desktop_renderer.dart';
+import '../render/scene_render_worker.dart';
 export '../render/desktop_renderer.dart' show RenderBackendPreference;
 import 'manipulator.dart';
 import 'material_workers.dart';
@@ -20,6 +22,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:mmx_core/mmx_core.dart';
+
+part 'scan_state.dart';
 
 enum StudioTool {
   navigate,
@@ -38,6 +42,7 @@ enum StudioTool {
   modify,
   analysis,
   print,
+  scan,
 }
 
 enum AnalysisOverlay { none, thickness, overhang, stability, deviation }
@@ -54,11 +59,20 @@ class StudioState extends ChangeNotifier {
   bool busy = false;
   bool _disposed = false;
   String status = 'Ready';
+  ScanReport? scanReport;
+  int? scanReportRevision, scanReportObjectId;
+  ScanPreview? scanPreview;
+  bool scanPreviewShowOriginal = false;
+  PrintProfile printProfile = const PrintProfile();
+  double scanFragmentArea = 1, scanDisplacement = .1, scanDeviationLimit = .2;
+  double scanEdgeLength = 1, scanKeepFraction = .5, printLayerHeight = .2;
 
   int? _selectedObjectId;
   int? get selectedObjectId => _selectedObjectId;
   set selectedObjectId(int? value) {
-    if (_selectedObjectId == value || gestureActive) return;
+    if (_selectedObjectId == value || gestureActive || scanPreview != null) {
+      return;
+    }
     _spatialCache.clear();
     _selectedObjectId = value;
     selection = null;
@@ -126,6 +140,8 @@ class StudioState extends ChangeNotifier {
     if (_disposed ||
         interactionLocked ||
         obj == null ||
+        obj.locked ||
+        scanPreview != null ||
         manipulatorMode == ManipulatorMode.none ||
         axis < 0 ||
         axis > 2) {
@@ -227,7 +243,13 @@ class StudioState extends ChangeNotifier {
   }
 
   bool beginSculptStroke() {
-    if (_disposed || interactionLocked || selected == null) return false;
+    if (_disposed ||
+        interactionLocked ||
+        selected == null ||
+        selected!.locked ||
+        scanPreview != null) {
+      return false;
+    }
     _sculptGesture = ++_nextSculptGesture;
     _sculptSnapshotGesture = null;
     _sculptRollback = doc.checkpoint();
@@ -308,6 +330,7 @@ class StudioState extends ChangeNotifier {
   Future<Object?>? _activeWork;
   String? operationPhase;
   int _renderId = 0;
+  int _sceneRenderEpoch = 0;
   String? operationWarning;
 
   void cancelOperation() {
@@ -356,6 +379,35 @@ class StudioState extends ChangeNotifier {
         (_sculptGesture != null && label != 'sculptAt')) {
       return false;
     }
+    if (scanPreview != null && label != 'Apply scan preview') {
+      status = 'Apply or cancel the scan preview first';
+      notify();
+      return false;
+    }
+    if (selected?.locked == true &&
+        !const {
+          'New project',
+          'Save project',
+          'Open project',
+          'Scene metadata',
+          'doDuplicate',
+          'doAnalysis',
+          'inspectMesh',
+          'Scan inspection',
+          'Compare scan',
+          'Export scan data',
+          'Slice report',
+          'doMeasure',
+          'doClearance',
+          'exportSelected',
+          'importPath',
+          'addObject',
+          'Pack',
+        }.contains(label)) {
+      status = 'Original scan is protected; duplicate it to make changes';
+      notify();
+      return false;
+    }
     busy = true;
     _cancelled = false;
     _operationId++;
@@ -366,6 +418,7 @@ class StudioState extends ChangeNotifier {
     final sculptSnapshotBefore = _sculptSnapshotGesture;
     final cameraBefore = camera.clone();
     final pathBefore = projectPath;
+    final profileBefore = printProfile;
     final sourcesBefore = List<ProjectSourceAttachment>.from(sourceAttachments);
     operationWarning = null;
     status = '$label…';
@@ -374,6 +427,9 @@ class StudioState extends ChangeNotifier {
     try {
       await action();
       if (doc.revision != revision) {
+        ProjectIO.checkBudget(
+          ProjectData(doc.objects, sourceAttachments: sourceAttachments),
+        );
         dirty = true;
         _invalidateGeometry();
       }
@@ -390,6 +446,7 @@ class StudioState extends ChangeNotifier {
         dirty = wasDirty;
         camera = cameraBefore;
         projectPath = pathBefore;
+        printProfile = profileBefore;
         sourceAttachments
           ..clear()
           ..addAll(sourcesBefore);
@@ -428,6 +485,9 @@ class StudioState extends ChangeNotifier {
   }
 
   void _invalidateGeometry() {
+    _sceneRenderEpoch++;
+    scanPreview = null;
+    scanReport = null;
     _spatialCache.clear();
     selection = null;
     overlay = AnalysisOverlay.none;
@@ -498,7 +558,7 @@ class StudioState extends ChangeNotifier {
   PrimitiveKind primitiveKind = PrimitiveKind.box;
   bool remeshGroupAware = false;
 
-  StudioState({bool loadStartup = true}) {
+  StudioState({bool loadStartup = false}) {
     if (loadStartup) _loadStartupModel();
   }
 
@@ -535,6 +595,26 @@ class StudioState extends ChangeNotifier {
     camera.frame(b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
   }
 
+  /// Start an untitled, empty document after the UI resolves unsaved changes.
+  /// A new project is a document boundary: undo cannot restore the old project.
+  Future<bool> newProject() => _perform('New project', () async {
+    doc.replaceObjects([]);
+    sourceAttachments.clear();
+    printProfile = const PrintProfile();
+    projectPath = null;
+    selectedObjectId = null;
+    camera = Camera(yaw: 0.7, pitch: 0.3, distance: 3);
+    tool = StudioTool.navigate;
+    manipulatorMode = ManipulatorMode.none;
+    _invalidateGeometry();
+    // Never show the previous project's image if the empty preview fails.
+    _renderId++;
+    frame?.dispose();
+    frame = null;
+    lastRenderMs = 0;
+    status = 'New project — import a mesh to begin';
+  }, cleanOnSuccess: true);
+
   Future<bool> saveProject(String path) async {
     if (interactionLocked || _disposed) return false;
     return _perform('Save project', () async {
@@ -544,6 +624,7 @@ class StudioState extends ChangeNotifier {
         camera: camera.clone(),
         selectedId: selectedObjectId,
         sourceAttachments: List.of(sourceAttachments),
+        printProfile: printProfile,
       );
       final bytes = await _work(encodeProjectWorker(project));
       await writeFileAtomically(path, bytes);
@@ -564,6 +645,7 @@ class StudioState extends ChangeNotifier {
         ..clear()
         ..addAll(project.sourceAttachments);
       camera = project.camera;
+      printProfile = project.printProfile;
       selectedObjectId = project.selectedId;
       projectPath = asRecovery ? null : path;
       // Presentation of incoming data is part of accepting an open: retain the
@@ -586,6 +668,7 @@ class StudioState extends ChangeNotifier {
       camera: camera.clone(),
       selectedId: selectedObjectId,
       sourceAttachments: List.of(sourceAttachments),
+      printProfile: printProfile,
     );
     final bytes = await encodeProjectWorker(project);
     if (!_disposed && revision == doc.revision && dirty) {
@@ -672,47 +755,52 @@ class StudioState extends ChangeNotifier {
       });
 
   Future<void> packAll() => _perform('Pack', () async {
-    final meshes = doc.objects.map((o) => o.worldMesh()).toList();
-    final result = await _work(packWorker(meshes));
+    final objects = doc.objects.where((o) => o.visible && !o.locked).toList();
+    final meshes = objects.map((o) => o.worldMesh()).toList();
+    final result = await _work(packWorker(meshes, profile: printProfile));
     doc.snapshot('Pack');
     for (final p in result.placed) {
-      doc.objects[p.index].transform = multiply4(
+      objects[p.index].transform = multiply4(
         Float64List.fromList(p.transform),
-        doc.objects[p.index].transform,
+        objects[p.index].transform,
       );
     }
-    status = 'Packed ${result.placed.length} objects';
+    status =
+        'Packed ${result.placed.length} objects; ${result.unplaced.length} unplaced${result.unplaced.isEmpty ? '' : ': ${result.unplaced.map((i) => objects[i].name).join(', ')}'}';
   });
 
   // ---------------------------------------------------------------- camera
   void orbit(double dx, double dy) {
     camera.orbit(-dx * 0.006, dy * 0.006);
-    _scheduleRender();
+    _scheduleRender(cameraOnly: true);
   }
 
   void pan(double dx, double dy) {
     camera.pan(dx, dy);
-    _scheduleRender();
+    _scheduleRender(cameraOnly: true);
   }
 
   void zoom(double delta) {
     camera.zoom(delta > 0 ? 0.92 : 1.08);
-    _scheduleRender();
+    _scheduleRender(cameraOnly: true);
   }
 
   void frameSelection() {
     final obj = selected;
     if (obj == null) return;
     _frameObject(obj);
-    _scheduleRender();
+    _scheduleRender(cameraOnly: true);
   }
 
   // ----------------------------------------------------------------- render
-  void _scheduleRender() {
+  void _scheduleRender({bool cameraOnly = false}) {
+    _pendingSceneUpdate = _pendingSceneUpdate || !cameraOnly;
     if (_renderQueued) return;
     _renderQueued = true;
     Future<void>.microtask(() async {
       _renderQueued = false;
+      _cameraRequest = !_pendingSceneUpdate;
+      _pendingSceneUpdate = false;
       try {
         await render();
       } catch (e) {
@@ -724,8 +812,12 @@ class StudioState extends ChangeNotifier {
     });
   }
 
+  final _sceneRenderer = SceneRenderWorker();
+  bool _cameraRequest = false, _pendingSceneUpdate = false;
   Future<void>? _renderTask;
   Future<void> render() {
+    if (!_cameraRequest) _sceneRenderEpoch++;
+    _cameraRequest = false;
     _renderId++;
     return _renderTask ??= _renderLoop().whenComplete(() {
       _renderTask = null;
@@ -735,33 +827,57 @@ class StudioState extends ChangeNotifier {
   Future<void> _renderLoop() async {
     while (!_disposed) {
       final id = _renderId;
-      await _renderFrame(id);
+      try {
+        await _renderFrame(id);
+      } catch (_) {
+        if (!_disposed) rethrow;
+      }
       if (id == _renderId) break;
     }
   }
 
+  int? _renderObjectsEpoch;
+  List<RenderObject> _renderObjects = [];
+
   Future<void> _renderFrame(int id) async {
-    final objects = <RenderObject>[];
-    for (final o in doc.objects) {
-      if (!o.visible) continue;
-      final mask = (o.id == selectedObjectId && selection != null)
-          ? selection!.faceMask
-          : null;
-      Float32List? colors;
-      if (o.id == selectedObjectId &&
-          overlay != AnalysisOverlay.none &&
-          overlayColors != null) {
-        colors = _expandFaceColors(o.mesh, overlayColors!);
+    final sceneEpoch = _sceneRenderEpoch;
+    final revision = doc.revision;
+    if (_renderObjectsEpoch != sceneEpoch) {
+      _renderObjects = [];
+      _renderObjectsEpoch = sceneEpoch;
+      for (final o in doc.objects) {
+        if (!o.visible) continue;
+        final preview = scanPreview;
+        final previewing =
+            preview != null &&
+            preview.objectId == o.id &&
+            preview.revision == doc.revision;
+        final original = previewing && scanPreviewShowOriginal
+            ? (doc.byId(o.scanSourceId ?? -1) ?? o)
+            : null;
+        final renderMesh =
+            original?.mesh ?? (previewing ? preview.result.mesh : o.mesh);
+        final mask =
+            (!previewing && o.id == selectedObjectId && selection != null)
+            ? selection!.faceMask
+            : null;
+        Float32List? colors;
+        if (o.id == selectedObjectId &&
+            overlay != AnalysisOverlay.none &&
+            overlayColors != null) {
+          colors = _expandFaceColors(o.mesh, overlayColors!);
+        }
+        _renderObjects.add(
+          RenderObject(
+            renderMesh,
+            transform:
+                original?.transform ?? (previewing ? identity4() : o.transform),
+            color: _materialColor(o),
+            faceMask: mask,
+            faceColors: colors,
+          ),
+        );
       }
-      objects.add(
-        RenderObject(
-          o.mesh,
-          transform: o.transform,
-          color: _materialColor(o),
-          faceMask: mask,
-          faceColors: colors,
-        ),
-      );
     }
     final opts = RenderOptions(
       width: frameWidth,
@@ -769,20 +885,26 @@ class StudioState extends ChangeNotifier {
       wireframe: wireframe,
       showBed: showBed,
       showGrid: showBed,
-      bedSize: 200,
+      bedWidth: printProfile.width,
+      bedDepth: printProfile.depth,
+      centerBed: false,
       background: const <double>[0.086, 0.094, 0.11],
     );
     final sw = Stopwatch()..start();
     final cameraCopy = camera.clone();
-    final rendered = await renderWorker(
-      objects,
+    final rendered = await _sceneRenderer.render(
+      _renderObjects,
       cameraCopy,
       opts,
-      preference: renderBackendPreference,
+      renderBackendPreference,
+      sceneEpoch,
     );
     sw.stop();
+    if (_disposed) return;
     final img = await _decode(rendered.rgba, opts.width, opts.height);
-    if (_disposed || id != _renderId) {
+    if (_disposed ||
+        sceneEpoch != _sceneRenderEpoch ||
+        revision != doc.revision) {
       img.dispose();
       return;
     }
@@ -825,7 +947,14 @@ class StudioState extends ChangeNotifier {
       for (var k = 0; k < 3; k++) {
         v = mathMax(v, perVertex[mesh.indices[f * 3 + k]]);
       }
-      final t = v / 255.0;
+      if (v == 255) {
+        // Reserved unknown marker for thickness probes; other overlays use 0–254.
+        out[f * 3] = .5;
+        out[f * 3 + 1] = .5;
+        out[f * 3 + 2] = .5;
+        continue;
+      }
+      final t = v / 254.0;
       // Blue (safe) -> yellow -> red (bad)
       final r = (t < 0.5 ? t * 2 : 1.0);
       final g = (t < 0.5 ? 0.6 + t * 0.8 : 1.0 - (t - 0.5) * 1.6);
@@ -994,25 +1123,42 @@ class StudioState extends ChangeNotifier {
     status = '$label done (${result.faceCount} faces)';
   });
 
-  Future<void> doRemesh({bool groupAware = false}) async {
+  Future<void> doRemesh({
+    bool groupAware = false,
+    bool selectionOnly = false,
+  }) async {
     final obj = selected;
     if (obj == null) return;
     final target = obj.mesh.bounds().diagonal * (0.02 + remeshDensity * 0.06);
     final mesh = obj.mesh;
     final preserveGroups = groupAware && mesh.faceGroups != null;
+    final mask = selectionOnly ? selection?.faceMask : null;
+    if (selectionOnly && (mask == null || !mask.any((v) => v != 0))) {
+      status = 'Select faces before remeshing';
+      notify();
+      return;
+    }
     await runOp('Remesh', () async {
-      final result = await _work(remeshWorker(mesh, target, preserveGroups));
+      final result = await _work(
+        remeshWorker(mesh, target, preserveGroups, mask: mask),
+      );
       operationWarning = result.fallbackReason;
       return result.mesh;
     });
   }
 
-  Future<void> doReduce() async {
+  Future<void> doReduce({bool selectionOnly = false}) async {
     final obj = selected;
     if (obj == null) return;
     final pct = reducePercent;
     final mesh = obj.mesh;
-    await runOp('Reduce', () => _work(reduceWorker(mesh, pct)));
+    final mask = selectionOnly ? selection?.faceMask : null;
+    if (selectionOnly && (mask == null || !mask.any((v) => v != 0))) {
+      status = 'Select faces before reducing';
+      notify();
+      return;
+    }
+    await runOp('Reduce', () => _work(reduceWorker(mesh, pct, mask: mask)));
   }
 
   Future<void> extractSelection() =>
@@ -1077,7 +1223,7 @@ class StudioState extends ChangeNotifier {
     final obj = selected;
     if (obj == null) return;
     final minimum = solidMinThickness;
-    final mesh = minimum > 0 ? obj.worldMesh() : obj.mesh;
+    final mesh = obj.worldMesh();
     final res = solidResolution.toInt();
     final mode = solidMode;
     final offset = solidOffset;
@@ -1088,14 +1234,14 @@ class StudioState extends ChangeNotifier {
       );
       _reportWallVerification(result);
       return result.mesh;
-    }, worldSpace: minimum > 0);
+    }, worldSpace: true);
   }
 
   Future<void> doHollow() async {
     final obj = selected;
     if (obj == null) return;
     final minimum = hollowMinThickness;
-    final mesh = minimum > 0 ? obj.worldMesh() : obj.mesh;
+    final mesh = obj.worldMesh();
     final t = hollowThickness;
     final holes = hollowHoles;
     final res = solidResolution.toInt();
@@ -1103,7 +1249,7 @@ class StudioState extends ChangeNotifier {
       final result = await _work(hollowWorker(mesh, t, holes, res, minimum));
       _reportWallVerification(result);
       return result.mesh;
-    }, worldSpace: minimum > 0);
+    }, worldSpace: true);
   }
 
   void _reportWallVerification(SolidResult result) {
@@ -1265,12 +1411,21 @@ class StudioState extends ChangeNotifier {
       notify();
       return;
     }
-    final sources = doc.objects.map((o) => o.worldMesh()).toList();
+    final combinable = doc.objects
+        .where((o) => o.visible && !o.locked)
+        .toList();
+    if (combinable.length < 2) {
+      throw StateError("Combine needs two visible editable objects");
+    }
+    if (!combinable.contains(obj)) {
+      throw StateError('Select a visible editable object before combining');
+    }
+    final sources = combinable.map((o) => o.worldMesh()).toList();
     final combined = await _work(combineWorker(sources));
     doc.snapshot('Combine');
     obj.mesh = combined;
     obj.transform = identity4();
-    for (final other in doc.objects.toList()) {
+    for (final other in combinable) {
       if (other.id != obj.id) doc.remove(other.id);
     }
     selection = null;
@@ -1426,11 +1581,16 @@ class StudioState extends ChangeNotifier {
       case AnalysisOverlay.thickness:
         final th = thicknessThreshold;
         final r = await _work(thicknessWorker(mesh, th));
-        colors = _normalizeToBytes(r.perVertex, th * 2);
+        colors = Uint8List.fromList([
+          for (final value in r.perVertex)
+            !value.isFinite
+                ? 255
+                : (254 * (1 - value / (th * 2)).clamp(0.0, 1.0)).round(),
+        ]);
         summary =
             'min ${r.minThickness.toStringAsFixed(2)}, '
             'mean ${r.meanThickness.toStringAsFixed(2)}, '
-            '${r.belowThresholdCount} verts below $th';
+            '${r.belowThresholdCount} verts below $th; ${r.unknownCount} unknown probes';
       case AnalysisOverlay.overhang:
         final angle = overhangAngle;
         final r = await _work(overhangWorker(mesh, angle));
@@ -1481,7 +1641,7 @@ class StudioState extends ChangeNotifier {
         out[i] = 0;
         continue;
       }
-      out[i] = (255 * (v / m).clamp(0.0, 1.0)).round();
+      out[i] = (254 * (v / m).clamp(0.0, 1.0)).round();
     }
     return out;
   }
@@ -1493,23 +1653,17 @@ class StudioState extends ChangeNotifier {
   Future<void> _inspectMeshImpl() async {
     final obj = selected;
     if (obj == null) return;
-    notify();
-    final mesh = obj.mesh;
-    final defects = await _work(inspectWorker(mesh));
-    final counts = <String, int>{};
-    for (final d in defects) {
-      counts[d.kind.name] = (counts[d.kind.name] ?? 0) + 1;
-    }
-    status = 'Inspector: ${counts.isEmpty ? "clean" : counts.toString()}';
-    await render();
+    scanReport = await _work(
+      scanInspectWorker(obj.worldMesh(), printProfile, scanFragmentArea),
+    );
+    scanReportRevision = doc.revision;
+    scanReportObjectId = obj.id;
+    tool = StudioTool.scan;
+    status =
+        'Scan inspection: ${scanReport!.findings.length} findings; review the report';
   }
 
-  Future<void> autoRepair() async {
-    final obj = selected;
-    if (obj == null) return;
-    final mesh = obj.mesh;
-    await runOp('Auto Repair', () => _work(repairWorker(mesh)));
-  }
+  Future<void> autoRepair() => previewScan(ScanStep('repair'));
 
   // ----------------------------------------------------------------- scene
   Future<void> addObject(TriMesh mesh, String name) =>
@@ -1649,6 +1803,7 @@ class StudioState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sceneRenderer.dispose();
     unawaited(cancelInteraction());
     final work = _activeWork;
     if (work != null) cancelWorker(work);
@@ -1657,6 +1812,11 @@ class StudioState extends ChangeNotifier {
   }
 
   void setTool(StudioTool t) {
+    if (scanPreview != null) {
+      status = 'Apply or cancel the scan preview first';
+      notify();
+      return;
+    }
     if (interactionLocked) return;
     tool = t;
     if (t == StudioTool.separate) refreshShellCount();

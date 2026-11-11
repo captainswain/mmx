@@ -123,6 +123,7 @@ void main() {
       await openPropertiesPanel(tester);
       final material = find.text('Material and texture');
       await tester.ensureVisible(material);
+      await tester.pumpAndSettle();
       await tester.tap(material);
       await tester.pumpAndSettle();
       final red = find.byKey(const ValueKey('material-rgba-0'));

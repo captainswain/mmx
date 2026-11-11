@@ -8,7 +8,7 @@ reverse engineering study of **Autodesk Meshmixer 3.5.0**.
 [![Flutter](https://img.shields.io/badge/Flutter-3.47%2B-02569B)](https://flutter.dev)
 [![CI](https://github.com/palindsay/mmx/actions/workflows/ci.yml/badge.svg)](https://github.com/palindsay/mmx/actions/workflows/ci.yml)
 
-> **Status: pre-1.0.** The core geometry workflows are usable and tested; the
+> **Status: 0.3.0 candidate, pre-1.0.** The core geometry workflows are usable and tested; the
 > release acceptance is tracked in [`docs/PRODUCTION-READINESS.md`](docs/PRODUCTION-READINESS.md).
 > The source is Apache-2.0. Sample models are Autodesk assets; see
 > [`NOTICE`](NOTICE).
@@ -33,6 +33,7 @@ and tool semantics.
 ## Documentation
 
 - [Quick start: build and run](QUICKSTART.md)
+- [Studio scan-to-print workflow](apps/mmx_studio/README.md#scan-to-print)
 - [Contributor guide](CONTRIBUTING.md)
 - [Documentation index](docs/README.md)
 - [Reverse-engineering report](docs/REVERSE-ENGINEERING.md)
@@ -43,7 +44,7 @@ and tool semantics.
 - [Production readiness and remaining release gates](docs/PRODUCTION-READINESS.md)
 - [Installers, signing and rollback](docs/RELEASE.md)
 - [Performance measurement](docs/PERFORMANCE.md)
-- [Desktop feature completion](docs/FEATURE-COMPLETION.md)
+- [Historical desktop feature checkpoint](docs/FEATURE-COMPLETION.md)
 - [Finish plan](docs/FINISH-PLAN.md)
 - [Remediation plan](docs/REMEDIATION-PLAN.md)
 
@@ -76,11 +77,20 @@ Direct3D 12 or Metal with a visible CPU fallback and explicit CPU option.
 Geometry and rendering run in workers; cancellation terminates active CPU work.
 Linux, Windows and macOS have build, integration and installer CI jobs.
 
+**Scan to print:** inspect selectable defects, preview fragment removal and bounded
+denoising, repair individual holes, bridge boundaries, trim cavities correctly,
+and reduce/remesh with sampled physical deviation limits. Apply retains a protected
+original; Show original, Cancel, Undo and saved edit history make changes reviewable.
+Printer settings drive bed bounds, wall/overhang findings and packing. Export JSON
+preflight reports or whole-mesh cleanup recipes; `mmx cleanup` and `mmx batch` reuse
+the same operations. See [the Studio walkthrough](apps/mmx_studio/README.md#scan-to-print)
+and [recipe contracts and limits](docs/CLI.md#scan-to-print-workflow).
+
 ## Build and test
 
 Start with the [quick start](QUICKSTART.md) to install the tools. CI uses Flutter
 3.47.9 and its bundled Dart SDK. Desktop builds also require Rust 1.99.1,
-Python 3, and the native tools for your OS.
+Python 3.11+, and the native tools for your OS.
 
 From the repository root:
 
@@ -88,8 +98,13 @@ From the repository root:
 python3 start.py          # Build and run Studio; Windows: py -3 start.py
 python3 start.py --debug  # Development with hot reload
 
-# Full verification (kernel + Studio); use Git Bash on Windows
-./tool/verify.sh
+# Optimized CLI + Studio; run each desktop build on its native OS
+make build               # Or: python3 tool/build.py
+make linux               # Explicit Linux target
+make package             # Portable review archive and provenance
+
+# Full verification (kernel + Studio)
+make test                # Or: ./tool/verify.sh
 ```
 
 For individual packages, run each block from the repository root:
@@ -145,8 +160,12 @@ Use the Project menu to open/save `.mmx` projects, transform the selected object
 and apply booleans. Native dialogs import/export mesh files; project saves preserve
 the whole scene. Recovery autosaves are offered on restart.
 
-The app starts with a procedural sphere. Repository sample models are test
-fixtures and are excluded from release bundles.
+The app starts with an empty project and offers **Import mesh** and **Open project**.
+Use **Project → New project** or **Ctrl+N** (**Command+N** on macOS) to start fresh.
+Unsaved projects offer **Save**, **Discard**, and **Cancel**; a failed or canceled
+save keeps the current project open. New projects reset undo history and project
+metadata, and safely clear this session's old recovery after pending writes.
+Repository sample models are test fixtures and are excluded from release bundles.
 
 ## Performance
 

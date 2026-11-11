@@ -55,8 +55,10 @@ jobs:
           cargo clippy --locked --release --all-targets -- -D warnings
       - name: Verify kernel and Studio
         run: ./tool/verify.sh
-      - name: Packaging regression tests
-        run: python -B -m unittest discover -s tool -p 'test_package_release.py'
+      - name: Build and packaging regression tests
+        run: |
+          python -B -m unittest discover -s tool -p 'test_package_release.py'
+          python -B -m unittest discover -s tool -p 'test_build.py'
       - name: Kernel coverage gate
         if: runner.os == 'Linux'
         run: ./tool/coverage.sh
@@ -86,12 +88,8 @@ jobs:
               flutter test "$test_file" -d '${{ matrix.platform }}'
             fi
           done
-      - name: Compile CLI
-        working-directory: packages/mmx_core
-        run: dart compile exe bin/mmx.dart -o mmx-${{ matrix.platform }}.exe
-      - name: Build desktop
-        working-directory: apps/mmx_studio
-        run: flutter build ${{ matrix.platform }} --release
+      - name: Build optimized CLI and desktop
+        run: python tool/build.py --platform '${{ matrix.platform }}'
       - name: Native renderer depth and texture acceptance
         working-directory: apps/mmx_studio
         run: |

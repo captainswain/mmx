@@ -29,6 +29,12 @@ class RenderOptions {
   final bool wireframe;
   final bool showBed;
   final double bedSize;
+  final double? bedWidth, bedDepth;
+  final bool centerBed;
+  double get actualBedWidth => bedWidth ?? bedSize;
+  double get actualBedDepth => bedDepth ?? bedSize;
+  double get bedMinX => centerBed ? -actualBedWidth / 2 : 0;
+  double get bedMinZ => centerBed ? -actualBedDepth / 2 : 0;
   final bool showGrid;
   final bool flatShading;
   final double ambient;
@@ -40,6 +46,9 @@ class RenderOptions {
     this.wireframe = false,
     this.showBed = true,
     this.bedSize = 200,
+    this.bedWidth,
+    this.bedDepth,
+    this.centerBed = true,
     this.showGrid = true,
     this.flatShading = true,
     this.ambient = 0.28,
@@ -397,26 +406,22 @@ class Rasterizer {
   /// Draws the print bed and a metric grid at y=0.
   static void _drawBed(Uint8List color, Float32List depth, int w, int h,
       List<double> vp, Camera camera, RenderOptions opts) {
-    final half = opts.bedSize / 2;
-    final step = opts.bedSize <= 120 ? 10.0 : 20.0;
-    for (var x = -half; x <= half + 1e-6; x += step) {
-      _worldLine(
-          color, depth, w, h, vp, x, 0, -half, x, 0, half, 0.32, 0.34, 0.38);
+    final x0 = opts.bedMinX, z0 = opts.bedMinZ;
+    final x1 = x0 + opts.actualBedWidth, z1 = z0 + opts.actualBedDepth;
+    if (opts.showGrid) {
+      for (var i = 0; i <= 20; i++) {
+        final x = x0 + i * opts.actualBedWidth / 20;
+        final z = z0 + i * opts.actualBedDepth / 20;
+        _worldLine(color, depth, w, h, vp, x, 0, z0, x, 0, z1, .32, .34, .38);
+        _worldLine(color, depth, w, h, vp, x0, 0, z, x1, 0, z, .32, .34, .38);
+      }
     }
-    for (var z = -half; z <= half + 1e-6; z += step) {
-      _worldLine(
-          color, depth, w, h, vp, -half, 0, z, half, 0, z, 0.32, 0.34, 0.38);
+    if (opts.showBed) {
+      _worldLine(color, depth, w, h, vp, x0, 0, z0, x1, 0, z0, .55, .58, .62);
+      _worldLine(color, depth, w, h, vp, x1, 0, z0, x1, 0, z1, .55, .58, .62);
+      _worldLine(color, depth, w, h, vp, x1, 0, z1, x0, 0, z1, .55, .58, .62);
+      _worldLine(color, depth, w, h, vp, x0, 0, z1, x0, 0, z0, .55, .58, .62);
     }
-    // Bed outline.
-    final edge = <double>[0.55, 0.58, 0.62];
-    _worldLine(color, depth, w, h, vp, -half, 0, -half, half, 0, -half, edge[0],
-        edge[1], edge[2]);
-    _worldLine(color, depth, w, h, vp, half, 0, -half, half, 0, half, edge[0],
-        edge[1], edge[2]);
-    _worldLine(color, depth, w, h, vp, half, 0, half, -half, 0, half, edge[0],
-        edge[1], edge[2]);
-    _worldLine(color, depth, w, h, vp, -half, 0, half, -half, 0, -half, edge[0],
-        edge[1], edge[2]);
     assert(camera.near > 0);
   }
 

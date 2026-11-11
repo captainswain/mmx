@@ -14,6 +14,7 @@ clean-room design; it does not establish exact algorithm equivalence.
 | `repair/`, `remesh/`, `solid/` | Repair, subdivision, reduction, remeshing, SDF reconstruction and booleans |
 | `tools/`, `analysis/`, `fab/` | Editing, measurement, UV projection, supports, packing and slicing |
 | `io/` | Bounded mesh/project parsers, textures, archive validation and atomic output |
+| `scan/` | Shared scan inspection, physical printer profiles, cleanup recipes, sampled deviation and provenance |
 | `scene/` | Objects, transforms, pivots, incremental undo/redo and rollback |
 | `render/` | Camera, independent CPU rasterizer and CLI PNG rendering |
 | `apps/mmx_studio/lib/state/` | Transactions, worker ownership, gestures and recovery |
@@ -33,7 +34,11 @@ Operators preserve attributes where correspondence is defined. Reconstruction
 and unsupported topology edits reject surface attributes; users can explicitly
 remove them. OBJ/MTL and the supported 3MF subset preserve diffuse colors/textures.
 Native projects retain the editable scene and unknown original `.mix` bytes as
-source attachments.
+source attachments. Project schema 3 also stores protected originals, scan history
+and printer settings; schema 1/2 readers migrate missing fields to defaults.
+Studio checks a conservative save budget before accepting changed documents: 240 MiB
+binary payload, 8 MiB metadata estimate, 4096 entries, 1024 objects/sources and
+192 MiB encoded-plus-decoded textures. Save performs exact archive validation.
 
 Remeshing uses split/collapse/flip/relax/project passes with validated topology.
 Reduction uses versioned QEM candidates. Precise booleans classify and stitch
@@ -80,8 +85,11 @@ native-driver failures.
 
 Frames render off the UI isolate and coalesce during rapid interactions. Flutter
 uploads returned RGBA pixels; this is not a zero-copy texture integration.
-Native devices and pipelines persist within the process; scene data uploads per
-frame. Native buffers have explicit cleanup and finalizers. Resource limits
+An owned renderer isolate retains the scene across camera requests. Native devices,
+pipelines, mesh buffers and textures persist; camera-only frames update uniforms.
+A scene epoch invalidates retained geometry, while completed current-scene frames
+can publish during continuous camera input. The native cache retains one scene
+and compares packet bodies exactly; alternating windows replace that cache. Native buffers have explicit cleanup and finalizers. Resource limits
 bound packets, textures and frame dimensions.
 
 Both paths support diffuse materials, bilinear textures, UV seams, selection,

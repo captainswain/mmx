@@ -24,7 +24,7 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | DeformTool | `tools/deform.dart` | none | kernel only | Soft move/bend; no manipulator UI yet. |
 | DropTool | `tools/modify.dart` | Drop to bed | implemented | Places the object on the bed. |
 | DuplicateTool | `scene/document.dart` | Duplicate | implemented | Copies the selected object. |
-| EditPlaneCutTool | `tools/plane_cut.dart` | Plane Cut | implemented | Cut, fill modes and slice groups; attach modes are partial. |
+| EditPlaneCutTool | `tools/plane_cut.dart` | Plane Cut / Scan trim | partial | Arbitrary cuts, slice groups and cavity-preserving planar caps; alternative fill/attach semantics are not fully reproduced. |
 | ExtractTool | `ComplexTools.extract` | Extract | implemented | Same path as ConvertToPart. |
 | ExtrudeTool | `tools/edits.dart` | Extrude | implemented | Selection extrusion with skirt. |
 | FaceSelectionTool | `mesh/topology.dart`, selection sets | Select | implemented | Brush selection, expand/contract. |
@@ -34,21 +34,21 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | FlipNormalsTool | `tools/modify.dart` | Flip normals | implemented | Whole mesh or selection. |
 | GenerateFaceGroupsTool | `mesh/topology.dart` | Face groups | implemented | Angle-threshold grouping. |
 | HandleTool | none | none | out of scope | Curve/rod handles are not needed by the current workflows. |
-| InspectorTool | `repair/inspector.dart` | Inspector | implemented | Reports holes, non-manifold edges and small shells. |
-| JoinTool | `ComplexTools.join` | Combine all | implemented | Joins scene objects. |
+| InspectorTool | `repair/inspector.dart`, `scan/workflow.dart` | Inspector / Scan to print | implemented | Selectable boundaries, non-manifold connectivity, intersections and fragments; floating-point intersection checks have an explicit reporting limit. |
+| JoinTool | `ComplexTools.join` | Combine all | implemented | Joins visible editable objects; hidden or protected originals are excluded. |
 | MakePartTool | `ComplexTools.extract` | Make Part | implemented | Extract plus optional solidification. |
 | MakePatternTool | `tools/modify.dart` | Make pattern | implemented | Grid array; other pattern modes are partial. |
 | MakeSolidTool | `solid/solidifier.dart` | Make Solid | implemented | Blocky/fast/accurate and offsets; bounded directional minimum-wall verification in Accurate/Blocky. |
 | MeasuringTool | `tools/modify.dart` | Measure | implemented | Dimensions, area, volume, shells. |
 | MirrorTool | `tools/edits.dart` | Mirror | implemented | Seam welding. |
 | OverhangTool | `analysis/analysis.dart` | Analysis overlay | implemented | Angle-based heat map. |
-| ReduceTool | `remesh/decimate.dart` | Reduce | implemented | Percentage, uniform and max-deviation modes; triangle budget is partial. |
-| RemeshTool | `remesh/isotropic.dart` | Remesh | implemented | Isotropic, adaptive, group-aware; transition widths are approximated. |
+| ReduceTool | `remesh/decimate.dart` | Reduce / Scan preview | partial | Percentage controls, CLI face targets/uniform mode, regional boundary pinning and sampled physical deviation checks; not all recovered modes have Studio controls. |
+| RemeshTool | `remesh/isotropic.dart` | Remesh / Scan preview | partial | Isotropic, adaptive and group-aware kernel paths; selected-patch boundaries are pinned. No faithful transition-width control. |
 | ReplaceTool | `tools/modify.dart` | Replace with primitive | implemented | Fit primitive and replace. |
 | SelectPlaneCutTool | `tools/plane_cut.dart` | Plane Cut | partial | Selection-limited cut is not exposed in the panel. |
 | SmoothBoundaryTool | `repair/holes.dart` | none | partial | Hole-fill relaxation exists; no standalone boundary smooth action. |
 | SmoothingBrushTool | `tools/sculpt.dart` | Sculpt (smooth) | implemented | Taubin-style brush. |
-| SmoothTool | `tools/modify.dart` | Smooth | implemented | Whole-mesh Taubin smoothing. |
+| SmoothTool | `tools/modify.dart`, `scan/workflow.dart` | Smooth / Scan denoise | implemented | Whole-mesh/selected smoothing; scan denoise additionally bounds physical displacement and pins boundaries/creases. |
 | SoftTransformTool | `tools/deform.dart` | none | kernel only | Soft move/bend. |
 | StabilityTool | `analysis/analysis.dart` | Analysis overlay | implemented | COM, support polygon and tip angle. |
 | StampTool | `tools/stamp.dart` | Stamp | partial | Analytic height fields; image stamps are not decoded. |
@@ -86,13 +86,29 @@ strings and RTTI), `docs/METHODS.md` and `docs/RTTI.md`.
 | MakeSolid | `solid/solidifier.dart` | Make Solid | implemented |
 | CreateInteriorSurface | `solid/solidifier.dart` | Hollow | partial |
 | ExtractExteriorSurface | `ComplexTools.extract` | Extract | partial |
-| SplitNonManifoldSurface | `repair/inspector.dart` | Auto repair | implemented |
+| SplitNonManifoldSurface | `repair/inspector.dart` | Auto repair / Scan connectivity preview | implemented (attribute-preserving vertex fan splits; introduced boundaries require review) |
 | MakePattern | `tools/modify.dart` | Make pattern | implemented |
 | Hollow | `solid/solidifier.dart` | Hollow | implemented |
 | Unwrap | `tools/unwrap.dart` | Material planar mapping | implemented (planar corner UVs persisted in projects and supported exports) |
 | VariationalRemesh | `remesh/isotropic.dart` | Remesh (group-aware) | implemented |
 
-## Remaining parity gaps outside the selected desktop backlog
+## Additional mmx scan workflow
+
+These are **observed mmx capabilities**, not claims of Autodesk algorithm parity:
+
+| Workflow | Exposure and limits |
+|---|---|
+| Fresh project | Empty startup, New Project shortcut, Save/Discard/Cancel and recovery-safe replacement. |
+| Reversible cleanup | Fragment/denoise/hole/bridge/trim/reduce/remesh previews, original comparison, Apply/Cancel and undo. |
+| Traceable edits | Protected original, schema 3 history, geometry/attribute hashes and inferred-patch groups; whole-mesh recipe export checks continuity. |
+| Printer preflight | FDM/resin assumptions, configured bed bounds, sampled wall/overhang findings and reports; drainage and print outcomes remain unverified. |
+| Batch reuse | Versioned CLI recipes, per-input failure isolation, report export and overwrite refusal. |
+
+See the [Studio guide](../apps/mmx_studio/README.md#scan-to-print),
+[recipe contracts](CLI.md#scan-to-print-workflow) and
+[commercial acceptance requirements](PRODUCTION-READINESS.md#commercial-acceptance-work).
+
+## Remaining parity gaps
 
 1. External Meshmixer fidelity comparisons; analytical empty/disjoint boolean cases now pass.
 2. Face-deformation manipulators beyond the implemented object transforms.

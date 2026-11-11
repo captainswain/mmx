@@ -300,7 +300,7 @@ void main() {
       }
     });
     test(
-        'native schema 2 persists immutable image bytes, RGBA, UVs and opaque imports',
+        'native schema 3 persists immutable image bytes, RGBA, UVs and opaque imports',
         () {
       final source = _mesh();
       final project = ProjectData([
@@ -313,7 +313,7 @@ void main() {
       final encoded = ProjectIO.write(project),
           entries = ZipArchive.read(ProjectIO.write(project));
       expect(entries.where((e) => e.name.startsWith('textures/')).length, 1);
-      expect(jsonDecode(utf8.decode(entries.first.data))['version'], 2);
+      expect(jsonDecode(utf8.decode(entries.first.data))['version'], 3);
       final back = ProjectIO.read(encoded);
       expect(back.objects.first.mesh.cornerUvs, source.cornerUvs);
       final texture = back.objects.first.mesh.materials.single.texture!;

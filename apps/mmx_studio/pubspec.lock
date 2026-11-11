@@ -333,7 +333,7 @@ packages:
       path: "../../packages/mmx_core"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0"
   objective_c:
     dependency: transitive
     description:

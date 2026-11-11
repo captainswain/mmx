@@ -157,6 +157,9 @@ struct Renderer {
     pipelines: Vec<wgpu::RenderPipeline>,
     description: String,
     hardware: bool,
+    cached_body: Vec<u8>,
+    cached_scene: Option<Scene>,
+    cached_resources: Vec<(wgpu::Buffer, wgpu::BindGroup, wgpu::Buffer)>,
 }
 impl Renderer {
     fn new() -> Result<Self, String> {
@@ -291,50 +294,15 @@ impl Renderer {
             pipelines,
             description,
             hardware,
+            cached_body: Vec::new(),
+            cached_scene: None,
+            cached_resources: Vec::new(),
         })
     }
-    fn render(&self, scene: &Scene, output: &mut [u8]) -> Result<(), String> {
-        if output.len() != scene.width as usize * scene.height as usize * 4 {
-            return Err("Invalid output buffer length".into());
-        }
-        let validation_scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
-        let memory_scope = self.device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
-        let result = self.render_inner(scene, output);
-        let memory_error = pollster::block_on(memory_scope.pop());
-        let validation_error = pollster::block_on(validation_scope.pop());
-        if let Some(e) = memory_error.or(validation_error) {
-            return Err(format!("GPU validation/resource failure: {e}"));
-        }
-        result
-    }
-    fn render_inner(&self, scene: &Scene, output: &mut [u8]) -> Result<(), String> {
-        let extent = wgpu::Extent3d {
-            width: scene.width,
-            height: scene.height,
-            depth_or_array_layers: 1,
-        };
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("MMX offscreen color"),
-            size: extent,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let depth = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("MMX depth"),
-            size: extent,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-        let view = texture.create_view(&Default::default());
-        let depth_view = depth.create_view(&Default::default());
+    fn create_resources(
+        &self,
+        scene: &Scene,
+    ) -> Vec<(wgpu::Buffer, wgpu::BindGroup, wgpu::Buffer)> {
         let mut resources = Vec::new();
         for draw in &scene.draws {
             let vertices = self
@@ -359,7 +327,7 @@ impl Renderer {
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("MMX camera"),
                     contents: bytemuck::cast_slice(&uniform),
-                    usage: wgpu::BufferUsages::UNIFORM,
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 });
             let tex = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("MMX material texture"),
@@ -421,7 +389,114 @@ impl Renderer {
                     },
                 ],
             });
-            resources.push((vertices, bind));
+            resources.push((vertices, bind, buffer));
+        }
+        resources
+    }
+
+    // Keep only one scene resident. Exact byte comparison avoids hash collision
+    // aliases; camera-only frames validate a small header and retain GPU buffers.
+    fn render_packet(&mut self, bytes: &[u8], output: &mut [u8]) -> Result<(), String> {
+        if bytes.len() < 104 {
+            return Err("Truncated GPU packet".into());
+        }
+        let memory_scope = self.device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+        let validation_scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let result = self.render_packet_inner(bytes, output);
+        let validation_error = pollster::block_on(validation_scope.pop());
+        let memory_error = pollster::block_on(memory_scope.pop());
+        if let Some(error) = memory_error.or(validation_error) {
+            self.cached_scene = None;
+            self.cached_resources.clear();
+            self.cached_body.clear();
+            return Err(format!("GPU scene upload failed: {error}"));
+        }
+        result
+    }
+
+    fn render_packet_inner(&mut self, bytes: &[u8], output: &mut [u8]) -> Result<(), String> {
+        if self.cached_scene.is_none() || self.cached_body != bytes[104..] {
+            let mut scene = parse(bytes)?;
+            let resources = self.create_resources(&scene);
+            for draw in &mut scene.draws {
+                draw.vertices = Vec::new();
+                draw.texture = Vec::new();
+            }
+            self.cached_body = bytes[104..].to_vec();
+            self.cached_scene = Some(scene);
+            self.cached_resources = resources;
+        } else if let Some(scene) = self.cached_scene.as_mut() {
+            let count = u32::from_le_bytes(bytes[16..20].try_into().unwrap()) as usize;
+            if count != scene.draws.len() {
+                return Err("Cached draw count mismatch".into());
+            }
+            let mut header = bytes[..104].to_vec();
+            header[16..20].fill(0);
+            let frame = parse(&header)?;
+            scene.width = frame.width;
+            scene.height = frame.height;
+            scene.background = frame.background;
+            scene.vp = frame.vp;
+            scene.ambient = frame.ambient;
+        }
+        self.render(self.cached_scene.as_ref().unwrap(), output)
+    }
+
+    fn render(&self, scene: &Scene, output: &mut [u8]) -> Result<(), String> {
+        if output.len() != scene.width as usize * scene.height as usize * 4 {
+            return Err("Invalid output buffer length".into());
+        }
+        let validation_scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let memory_scope = self.device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+        let result = self.render_inner(scene, output);
+        let memory_error = pollster::block_on(memory_scope.pop());
+        let validation_error = pollster::block_on(validation_scope.pop());
+        if let Some(e) = memory_error.or(validation_error) {
+            return Err(format!("GPU validation/resource failure: {e}"));
+        }
+        result
+    }
+    fn render_inner(&self, scene: &Scene, output: &mut [u8]) -> Result<(), String> {
+        let extent = wgpu::Extent3d {
+            width: scene.width,
+            height: scene.height,
+            depth_or_array_layers: 1,
+        };
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("MMX offscreen color"),
+            size: extent,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let depth = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("MMX depth"),
+            size: extent,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&Default::default());
+        let depth_view = depth.create_view(&Default::default());
+        for (draw, (_, _, uniform_buffer)) in scene.draws.iter().zip(&self.cached_resources) {
+            let mut uniform = Vec::with_capacity(52);
+            uniform.extend_from_slice(&scene.vp);
+            uniform.extend_from_slice(&draw.model);
+            uniform.extend_from_slice(&draw.normal);
+            uniform.extend_from_slice(&[
+                scene.ambient,
+                if draw.flags & 1 != 0 { 1. } else { 0. },
+                if draw.flags & 2 != 0 { 1. } else { 0. },
+                0.,
+            ]);
+            self.queue
+                .write_buffer(uniform_buffer, 0, bytemuck::cast_slice(&uniform));
         }
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
@@ -453,7 +528,7 @@ impl Renderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            for (draw, (vertices, bind)) in scene.draws.iter().zip(&resources) {
+            for (draw, (vertices, bind, _)) in scene.draws.iter().zip(&self.cached_resources) {
                 let variant = if draw.lines {
                     3
                 } else if draw.flags & 16 != 0 {
@@ -589,14 +664,21 @@ pub unsafe extern "C" fn mmx_gpu_render(
         return -1;
     }
     let result = catch_unwind(AssertUnwindSafe(|| -> Result<(bool, String), String> {
-        let scene = parse(unsafe { std::slice::from_raw_parts(input, input_len) })?;
+        let packet = unsafe { std::slice::from_raw_parts(input, input_len) };
+        if packet.len() < 104 {
+            parse(packet)?;
+            return Err("Truncated GPU packet".into());
+        }
+        let mut frame_header = packet[..104].to_vec();
+        frame_header[16..20].fill(0);
+        parse(&frame_header)?;
         let output = unsafe { std::slice::from_raw_parts_mut(output, output_len) };
-        let guard = RENDERER
+        let mut guard = RENDERER
             .get_or_init(|| Mutex::new(Renderer::new()))
             .lock()
             .map_err(|_| "GPU state unavailable after driver failure")?;
-        let renderer = guard.as_ref().map_err(Clone::clone)?;
-        renderer.render(&scene, output)?;
+        let renderer = guard.as_mut().map_err(|error| error.clone())?;
+        renderer.render_packet(packet, output)?;
         Ok((renderer.hardware, renderer.description.clone()))
     }));
     let (code, message) = match result {

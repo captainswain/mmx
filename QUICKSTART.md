@@ -6,7 +6,7 @@ The start script handles dependencies and launches the desktop app.
 ## 1. Install the tools
 
 Install Git, [Flutter **3.47.9**](https://docs.flutter.dev/install/archive),
-[Python **3.9+**](https://www.python.org/downloads/), and
+[Python **3.11+**](https://www.python.org/downloads/), and
 [Rust through rustup](https://rustup.rs/). Put Flutter, Python, and Cargo on
 your `PATH`, then open a new terminal. Flutter includes Dart; use that SDK.
 
@@ -82,9 +82,17 @@ Studio in release mode. The native renderer builds automatically. The first
 build downloads dependencies and takes longer; later builds reuse the cache.
 Close the app or press `q` in the Flutter terminal to quit.
 
-Studio starts with a sphere. Import a model using the toolbar, choose its units,
+Studio starts with an empty project. Import a model using the toolbar, choose its units,
 and try a tool. Save an editable scene as `.mmx`; export a mesh when you need
 OBJ, STL, 3MF, or another supported interchange format.
+
+Use **Project → New project** or **Ctrl+N** (**Command+N** on macOS) to start
+fresh. Unsaved work offers Save, Discard and Cancel. For scanned models, follow
+the [Scan to print walkthrough](apps/mmx_studio/README.md#scan-to-print) to inspect,
+preview cleanup, retain the original and export a preflight report.
+
+New `.mmx` saves use schema 3. Older schema 1/2 projects open, but earlier app
+versions cannot read schema 3. Use Save As to retain a compatible original copy.
 
 ## Development and build-only options
 
@@ -143,3 +151,37 @@ See the [CLI reference](docs/CLI.md) for editing and conversion commands.
   A software Vulkan/DX12 adapter can be slower than the CPU renderer.
 
 Ready to change the code? Read [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Optimized binaries with Make
+
+From the repository root, after installing the native prerequisites:
+
+```sh
+make build           # Dart AOT CLI + Flutter/Rust release Studio for this host
+make linux           # Explicit Linux build (run on Linux x64)
+make windows         # Run on Windows x64 with GNU Make
+make macos           # Run on macOS; Apple Silicon and Intel build hosts
+make cli             # CLI only
+make studio          # Studio only
+make test            # Format checks, analyzers, kernel and Studio tests
+make package         # Build + portable archive, hashes, licenses and provenance
+make native-package  # Also create the host's unsigned native installer
+```
+
+The same Make targets work from `apps/mmx_studio/` through its forwarding Makefile.
+
+Without Make, use `python3 tool/build.py` (PowerShell: `py -3 tool/build.py`).
+Options include `--platform linux|windows|macos`, `--component cli|studio`,
+`--verify`, `--package`, `--native`, and `--dry-run`. The default builds both
+components. The helper stops on compiler errors and stages Studio only after a
+complete successful build. Cross-OS desktop compilation is not supported.
+
+Staged outputs are in `bin/builds/<platform>-<architecture>/`: `mmx` (`mmx.exe`
+on Windows) plus `studio/` or `mmx_studio.app`. Keep the complete app bundle.
+On Linux x64, launch `bin/builds/linux-x86_64/studio/mmx_studio` and run the CLI
+as `bin/builds/linux-x86_64/mmx --help` from the repository root.
+The CI release matrix is Linux x64, Windows x64 and macOS arm64; the helper also
+allows a native Intel macOS build, which needs its own acceptance evidence.
+Archives/installers go in `bin/releases/`. Native packaging requires `dpkg-deb`,
+`pkgbuild`, or Inno Setup and Windows redistributables as described in
+[RELEASE.md](docs/RELEASE.md). Local packages are unsigned review artifacts.

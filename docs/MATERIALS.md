@@ -6,8 +6,10 @@ Studio's Materials panel assigns a diffuse RGBA color and an optional PNG/JPEG
 texture to the selected object. Generate planar UVs before assigning a texture
 when the mesh has no mapping. Apply creates one undo step. Native `.mmx` projects
 retain material names, assignments, original encoded images and UV seams.
-Projects containing these attributes use schema 2; geometry-only projects remain
-schema 1. Older applications must reject schema 2.
+All new projects use schema 3, including geometry-only projects. Schema 1/2
+remain readable; schema 3 additionally retains protected originals, scan history
+and printer profiles. Earlier releases reject schema 3. Use Save As to retain an
+older project copy before migration.
 
 The CPU and GPU viewports multiply material color, vertex RGB and sampled texture
 color, with perspective-correct UV interpolation and bilinear filtering. UVs use
@@ -44,7 +46,8 @@ the returned bytes with `commitExport` only after cancellation/revision checks.
 ## Editing and resource limits
 
 Transforms, smoothing, non-refining deformation/sculpting, winding reversal,
-mirroring, combination, welding and face extraction retain surface attributes.
+mirroring, combination, welding, non-manifold fan splitting, bounded scan
+denoising and face extraction retain surface attributes.
 Linear subdivision interpolates UVs separately on each side of a seam. Remeshing,
 decimation, cuts, extrusion, hole filling, dynamic sculpt topology and booleans
 reject attributed meshes when they cannot preserve the mapping.

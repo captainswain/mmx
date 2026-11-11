@@ -53,6 +53,85 @@ class RecoveryPreviewState extends StudioState {
 }
 
 void main() {
+  for (final interveningEdit in [false, true]) {
+    testWidgets(
+      'New project drains recovery and protects intervening edits ($interveningEdit)',
+      (tester) async {
+        late Directory dir;
+        await tester.runAsync(() async {
+          dir = await Directory.systemTemp.createTemp('mmx-new-recovery-');
+        });
+        final state = RecoveryTestState()..dirty = true;
+        state.selectedObjectId = state.doc
+            .add(
+              TriMesh(
+                Float32List.fromList([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+                Uint32List.fromList([0, 1, 2]),
+              ),
+              name: 'Old scan',
+            )
+            .id;
+        try {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: StudioScreen(
+                state: state,
+                recoveryDirectory: () async => dir,
+              ),
+            ),
+          );
+          await flushFilesystem(tester);
+          final other = File('${dir.path}/recovery-other.mmx');
+          await tester.runAsync(() => other.writeAsString('another session'));
+          await tester.pump(const Duration(seconds: 30));
+          expect(state.autosaveCount, 1);
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Discard'));
+          await tester.pumpAndSettle();
+          expect(
+            state.doc.objects.single.name,
+            'Old scan',
+            reason:
+                'Wait for the old recovery write before clearing the document',
+          );
+          if (interveningEdit) {
+            state.doc.snapshot('Newer edit');
+            state.doc.add(TriMesh.empty(), name: 'Newer scan');
+          }
+          state.finishAutosave.complete();
+          final elapsed = Stopwatch()..start();
+          var complete = false;
+          while (elapsed.elapsed < const Duration(seconds: 10)) {
+            await flushFilesystem(tester);
+            complete =
+                state.completedAutosaveCount == 1 &&
+                (interveningEdit || state.doc.objects.isEmpty);
+            if (complete) break;
+          }
+          expect(complete, true);
+          expect(state.doc.objects.length, interveningEdit ? 2 : 0);
+          expect(state.dirty, interveningEdit);
+          expect(
+            await tester.runAsync(() => File(state.autosavePath!).exists()),
+            interveningEdit,
+          );
+          expect(await tester.runAsync(other.readAsString), 'another session');
+        } finally {
+          if (!state.finishAutosave.isCompleted) {
+            state.finishAutosave.complete();
+          }
+          await tester.pumpWidget(const SizedBox());
+          await flushFilesystem(tester);
+          state.dispose();
+          await tester.runAsync(() => dir.delete(recursive: true));
+        }
+      },
+    );
+  }
+
   for (final decision in ['Keep for later', 'Discard recovery']) {
     testWidgets('recovery choice $decision affects only its candidate', (
       tester,

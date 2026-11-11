@@ -9,6 +9,8 @@ import 'gpu_packet.dart';
 
 enum RenderBackendPreference { auto, cpu, gpu }
 
+NativeGpuRenderer? _retainedRenderer;
+
 /// Sendable across isolates. An API-backed software adapter is named explicitly;
 /// successful native rendering does not imply physical GPU acceleration.
 class DesktopRenderFrame {
@@ -30,11 +32,20 @@ DesktopRenderFrame renderDesktopFrame(
   Camera camera,
   RenderOptions options, {
   RenderBackendPreference preference = RenderBackendPreference.auto,
+  bool retainScene = false,
 }) {
   GpuPacket.validateFrame(options);
   if (preference != RenderBackendPreference.cpu) {
     try {
-      return NativeGpuRenderer().render(objects, camera, options);
+      final renderer = retainScene
+          ? (_retainedRenderer ??= NativeGpuRenderer())
+          : NativeGpuRenderer();
+      return renderer.render(
+        objects,
+        camera,
+        options,
+        retainScene: retainScene,
+      );
     } on Object catch (error) {
       return DesktopRenderFrame(
         Rasterizer.render(objects, camera, options),
@@ -74,6 +85,11 @@ typedef _Render = int Function(
 );
 
 class NativeGpuRenderer {
+  List<RenderObject>? _lastObjects;
+  Object? _lastGeometryOptions;
+  Uint8List? _header;
+  _NativeBuffer? _retainedInput, _retainedOutput, _retainedDiagnostic;
+
   final DynamicLibrary library;
   late final _Allocate _allocate = library
       .lookupFunction<_AllocateNative, _Allocate>('mmx_gpu_allocate');
@@ -117,14 +133,65 @@ class NativeGpuRenderer {
   DesktopRenderFrame render(
     List<RenderObject> objects,
     Camera camera,
-    RenderOptions options,
-  ) {
-    final packet = GpuPacket.encode(objects, camera, options);
-    final input = _buffer(packet.length),
-        output = _buffer(options.width * options.height * 4),
-        diagnostic = _buffer(4096);
-    try {
+    RenderOptions options, {
+    bool retainScene = false,
+  }) {
+    GpuPacket.validateFrame(options);
+    final geometryOptions = (
+      options.wireframe,
+      options.showBed,
+      options.showGrid,
+      options.actualBedWidth,
+      options.actualBedDepth,
+      options.centerBed,
+      options.flatShading,
+    );
+    _NativeBuffer input, output, diagnostic;
+    if (retainScene) {
+      if (!identical(objects, _lastObjects) ||
+          geometryOptions != _lastGeometryOptions ||
+          _retainedInput == null) {
+        final packet = GpuPacket.encode(objects, camera, options);
+        _retainedInput?.dispose();
+        _retainedInput = _buffer(packet.length);
+        _retainedInput!.pointer.asTypedList(packet.length).setAll(0, packet);
+        _header = Uint8List.fromList(packet.sublist(0, 104));
+        _lastObjects = objects;
+        _lastGeometryOptions = geometryOptions;
+      }
+      final header = ByteData.sublistView(_header!);
+      header.setUint32(8, options.width, Endian.little);
+      header.setUint32(12, options.height, Endian.little);
+      final frame = [
+        ...options.background,
+        1.0,
+        ...camera.viewProjection(options.width / options.height),
+        options.ambient,
+      ];
+      for (var i = 0; i < frame.length; i++) {
+        if (!frame[i].isFinite) throw ArgumentError('Invalid GPU camera');
+        header.setFloat32(20 + i * 4, frame[i], Endian.little);
+        if (!header.getFloat32(20 + i * 4, Endian.little).isFinite) {
+          throw ArgumentError('GPU camera exceeds float32 range');
+        }
+      }
+      input = _retainedInput!;
+      input.pointer.asTypedList(104).setAll(0, _header!);
+      final size = options.width * options.height * 4;
+      if (_retainedOutput?.size != size) {
+        _retainedOutput?.dispose();
+        _retainedOutput = _buffer(size);
+      }
+      output = _retainedOutput!;
+      diagnostic = _retainedDiagnostic ??= _buffer(4096);
+    } else {
+      final packet = GpuPacket.encode(objects, camera, options);
+      input = _buffer(packet.length);
+      output = _buffer(options.width * options.height * 4);
+      diagnostic = _buffer(4096);
       input.pointer.asTypedList(packet.length).setAll(0, packet);
+    }
+    try {
       final status = _render(
         input.pointer,
         input.size,
@@ -149,9 +216,11 @@ class NativeGpuRenderer {
         hardwareAccelerated: status == 0,
       );
     } finally {
-      input.dispose();
-      output.dispose();
-      diagnostic.dispose();
+      if (!retainScene) {
+        input.dispose();
+        output.dispose();
+        diagnostic.dispose();
+      }
     }
   }
 

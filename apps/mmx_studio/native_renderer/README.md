@@ -9,7 +9,7 @@ existing renderer boundary, avoiding a deprecated macOS OpenGL dependency.
 ## Build and package
 
 Install Rust **1.99.1** (`rustup toolchain install 1.99.1 --profile minimal`).
-`rust-toolchain.toml` and `Cargo.lock` pin the build. Python 3 collects third-party
+`rust-toolchain.toml` and `Cargo.lock` pin the build. Python 3.11+ collects third-party
 notices. Normal `flutter build linux`, `flutter build windows`, and
 `flutter build macos` build/embed the library and notices. macOS universal builds
 also need `rustup target add --toolchain 1.99.1 aarch64-apple-darwin x86_64-apple-darwin`.
@@ -32,15 +32,23 @@ WGSL vertex/fragment shaders render into RGBA8 with a **Depth32Float** attachmen
 Depth writes and comparison resolve occlusion per fragment, including intersecting
 triangles. Near/far clipping occurs in the graphics pipeline. Readback handles
 256-byte row alignment and returns top-down RGBA to Flutter. There is no painter's
-sort. Device and pipelines are reused within the process; draws and textures are
-uploaded per frame. A native mutex serializes calls from worker isolates.
+sort. Studio owns a persistent rendering isolate. Scene epochs replace geometry
+only when the scene changes; camera-only requests reuse its retained packet and
+update the camera header. Completed frames for the current scene are published
+even while newer camera requests arrive, avoiding starvation during a drag.
+
+The native backend retains one scene's vertex buffers and textures, comparing
+the exact scene bytes before reuse. Camera-only frames update uniforms; scene
+changes replace cached resources. The cache is process-wide and bounded to one
+scene, so alternating windows/scenes can cause uploads. A native mutex serializes
+calls. Device and pipelines are also reused within the process.
 
 Flat/smooth normals, affine transforms (including reflection), selection tints,
 analysis colors, wire edges, bed/grid, vertex RGB, diffuse RGBA and per-corner UV
 textures are supported. Texture sampling is bilinear with clamp/repeat addressing;
 UVs use v-up while image rows are top-down. The viewport uses **alpha cutout**:
 combined alpha below 0.5 discards the fragment; retained fragments are opaque.
-Sorted translucency, PBR, GPU picking, persistent scene buffers and zero-copy
+Sorted translucency, PBR, GPU picking and zero-copy
 Flutter textures are outside this backend's current contract. Readback/upload
 costs remain measurable; do not assume a frame-rate improvement on every model.
 
@@ -58,8 +66,11 @@ MMX_GPU_LIBRARY="$PWD/build/linux/x64/release/bundle/lib/libmmx_gpu.so" \
 ```
 
 The tests independently check submission-order depth, intersecting triangles,
-near clipping, resizing, bounded input, missing-library fallback, UV orientation,
-texture sampling and alpha-cutout parity with the CPU renderer. Without
+near clipping, resizing, bounded input, missing-library fallback, retained scene
+replacement, camera updates, UV orientation, texture sampling, bed visibility
+and alpha-cutout parity with the CPU renderer. Studio's
+`test/scene_render_worker_test.dart` checks continuous input, scene epochs,
+worker restart and disposal separately. Without
 `MMX_GPU_LIBRARY`, native capability tests are explicitly skipped; fallback and
 packet tests still run. The JSON probe records adapter name/backend/type.
 Software/unknown/virtual adapters never set `hardwareAccelerated=true`; passing
@@ -74,7 +85,7 @@ explicit cleanup, so worker-isolate cancellation does not abandon allocations.
 Rust contains panics at the C boundary and returns diagnostics; invalid caller
 pointers remain a C ABI contract violation. GPU readback waits are bounded.
 
-The little-endian packet contains magic `0x47584d4d`, version, width, height,
+The little-endian packet has a 104-byte header containing magic `0x47584d4d`, version, width, height,
 draw count, RGBA background, camera matrix, and ambient value. Each draw contains
 vertex count, primitive, flags, texture dimensions/byte count, model/normal
 matrices, interleaved float vertices and RGBA texture bytes. Vertex stride is
@@ -83,5 +94,7 @@ Flags are unlit=1, wire=2, reflected=4, clamp=8, no-cull=16. Triangle/line count
 finite attributes and exact packet consumption are checked before GPU submission.
 Limits are 4096×4096 pixels, 4096 draws, four million expanded vertices,
 4096×4096 texture dimensions, and 256 MiB total packet bytes. No unbounded counts
-from a model are trusted. The full packet and buffers are copied; memory pressure
-can cause a reported CPU fallback.
+from a model are trusted. Scene replacement still serializes and copies geometry;
+camera reuse avoids repeated GPU geometry uploads but retains byte comparison and
+per-frame RGBA readback/Flutter image upload. Memory pressure can cause a reported
+CPU fallback. These changes do not establish a sustained large-scan frame rate.

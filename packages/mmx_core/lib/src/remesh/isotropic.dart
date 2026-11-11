@@ -5,8 +5,6 @@ import '../mesh/topology.dart';
 import '../mesh/attributes.dart';
 import '../mesh/limits.dart';
 import '../mesh/tri_mesh.dart';
-import '../repair/holes.dart';
-import '../repair/inspector.dart';
 import '../repair/weld.dart';
 import '../spatial/bvh.dart';
 import 'collapse_mesh.dart';
@@ -228,6 +226,7 @@ class IsotropicRemesher {
       }
       mesh = _splitLong(mesh, targetEdgeLength * 4.0 / 3.0,
           maximumFaces: maximumFaces,
+          preserveBoundary: preserveBoundary,
           maxFor: curvSplit == null
               ? null
               : (a, b) =>
@@ -262,23 +261,14 @@ class IsotropicRemesher {
     progress?.call(iterations, iterations);
     mesh.removeDegenerateFaces();
     mesh.compact();
-    if (adaptiveDensity > 0) {
-      Weld.removeDuplicateFaces(mesh);
-      for (var pass = 0; pass < 3; pass++) {
-        var changed = false;
-        if (MeshTopology(mesh).boundaryLoops().isNotEmpty) {
-          mesh = HoleFiller.fill(mesh, mode: HoleFillMode.flatMinimal);
-          changed = true;
-        }
-        if (MeshTopology(mesh).nonManifoldEdges().isNotEmpty) {
-          mesh = MeshInspector.splitNonManifold(mesh);
-          changed = true;
-        }
-        if (!changed) break;
-      }
-    }
+    if (adaptiveDensity > 0) Weld.removeDuplicateFaces(mesh);
+    final outputTopology = MeshTopology(mesh);
+    final inputTopology = MeshTopology(input);
     if (adaptiveDensity > 0 &&
-        MeshTopology(mesh).nonManifoldEdges().isNotEmpty) {
+        (outputTopology.nonManifoldEdges().isNotEmpty ||
+            inputTopology.nonManifoldEdges().isNotEmpty ||
+            (inputTopology.boundaryEdges().isEmpty &&
+                outputTopology.boundaryEdges().isNotEmpty))) {
       // The angle-defect density heuristic can create non-manifold junctions
       // on aggressive settings. Fall back to the uniform pass, which is
       // topology-safe, rather than returning a non-manifold result.
@@ -463,12 +453,15 @@ class IsotropicRemesher {
   /// Splits every edge longer than [maxLen]. Handles faces with one, two or
   /// three long edges so the result stays conforming.
   static TriMesh _splitLong(TriMesh mesh, double maxLen,
-      {double Function(int, int)? maxFor, required int maximumFaces}) {
+      {double Function(int, int)? maxFor,
+      required int maximumFaces,
+      bool preserveBoundary = false}) {
     final midCache = <int, int>{};
     final n = mesh.vertexCount;
     final topo = MeshTopology(mesh);
     final splitEdges = <int>{};
     for (final key in topo.edgeFaces.keys) {
+      if (preserveBoundary && topo.edgeFaces[key]!.length == 1) continue;
       final a = key ~/ n, b = key % n;
       if (_len(mesh, a, b) > (maxFor?.call(a, b) ?? maxLen)) {
         splitEdges.add(key);
@@ -574,7 +567,11 @@ class IsotropicRemesher {
       TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp,
       {double Function(int, int)? minFor}) {
     final state = CollapseMesh(mesh);
-    final pinned = <int>{...sharp};
+    final pinned = <int>{
+      ...sharp,
+      if (preserveBoundary)
+        for (final e in MeshTopology(mesh).boundaryEdges()) ...e.take(2)
+    };
     final n = mesh.vertexCount;
     final edges = state.edgeCount.keys.toList()
       ..sort((a, b) {

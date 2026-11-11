@@ -411,7 +411,7 @@ class Modify {
       7,
     ];
     for (var i = 0; i < faces.length; i += 3) {
-      b.addTriangle(v[faces[i]], v[faces[i + 1]], v[faces[i + 2]]);
+      b.addTriangle(v[faces[i]], v[faces[i + 2]], v[faces[i + 1]]);
     }
     return b.build();
   }

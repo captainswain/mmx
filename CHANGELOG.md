@@ -6,6 +6,25 @@ semantic versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Scan-to-print candidate (0.3.0)
+
+- Start empty and create a New Project with Save/Discard/Cancel and recovery-safe replacement.
+- Scan inspection with selectable findings, fragment protection, bounded denoising,
+  guided hole/bridge previews, sampled deviation budgets, original comparison,
+  protected references, printer profiles, reports and repeatable CLI recipes/batches.
+- Object rename/delete/visibility/isolate/target controls and selection-limited Reduce/Remesh.
+- `.mmx` schema 3 retains scan history and profiles; schema 1/2 remain readable.
+  Older releases cannot open new schema 3 documents.
+- Persistent renderer isolate and GPU scene resources; camera input no longer
+  invalidates every completed frame. Printer bed graphics match configured bounds.
+- Correct nonadjacent intersection inspection, attribute-preserving fan splits,
+  cavity-aware caps, bridge topology, primitive winding, physical Hollow units,
+  packing spacing/borders and wall/overhang analysis colors/directions.
+- `mmx repair` preserves holes by default; `--fill-holes` explicitly fills them.
+  `reduce --max-dev` measures sampled physical surface distance before writing.
+- Root Makefile and portable Python helper build optimized native CLI/Studio
+  bundles and unsigned packages. Commercial acceptance gates remain documented.
+
 ### Added
 
 - Incremental geometry history, world/local manipulators, snapping and numeric transforms.
@@ -29,7 +48,7 @@ semantic versioning once it reaches 1.0.
 
 ### Changed
 
-- Studio starts with procedural geometry; repository-only model assets are excluded from releases.
+- Studio starts with an empty project; repository-only model assets are excluded from releases.
 - Unsupported 3MF layers and unverified/unsupported minimum-wall requests fail explicitly.
 - Extract in Studio now delegates to `ComplexTools.extract`.
 - Pivot state is preserved by document undo/redo snapshots.
