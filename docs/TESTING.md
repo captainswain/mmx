@@ -131,6 +131,9 @@ clean-account acceptance remain separate release checks. See
   propagate errors, and verify unexpected worker exit completes promptly.
 - Python packaging tests verify repeated archives are byte-identical and file
   manifests/checksums reflect their contents.
+- Build-helper tests pair the simulated OS with its architecture, including ARM
+  and Intel macOS, so host rejection, dry-run safety and compiler failures are
+  exercised independently of the machine running the tests.
 
 ## Coverage gate
 
