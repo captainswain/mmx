@@ -53,3 +53,8 @@ export 'src/tools/unwrap.dart';
 
 export 'src/io/project.dart';
 export 'src/io/atomic_file.dart';
+
+export 'src/tools/selection_edit.dart';
+export 'src/scan/workflow.dart';
+export 'src/scan/recipe.dart';
+export 'src/scan/provenance.dart';

@@ -7,18 +7,23 @@ needs work. Fixes, new features, useful test models, and clearer docs all help.
 
 Follow the [quick start](QUICKSTART.md) for the platform setup. Use Flutter
 **3.47.9**, the version pinned in CI, with its bundled Dart SDK. Desktop builds
-also need Rust **1.99.1**, Python 3, and the native tools for your OS.
+also need Rust **1.99.1**, Python **3.11+**, and the native tools for your OS.
 
 From the repository root, run `python3 start.py --debug` for development and hot
 reload. On Windows, use `py -3 start.py --debug`. Tests use repository fixtures;
 you do not need Meshmixer installed.
+
+Use `make build` for optimized CLI and Studio binaries, or `make cli` and
+`make studio` for one component. Without Make, use `python3 tool/build.py` (Windows:
+`py -3 tool/build.py`). Build on the target OS; staged outputs and packaging
+commands are documented in the [quick start](QUICKSTART.md#optimized-binaries-with-make).
 
 ## Know where the change belongs
 
 | Path | What belongs here |
 |---|---|
 | `packages/mmx_core/lib/src/` | Pure Dart geometry, file formats, scene history, and CPU rendering |
-| `packages/mmx_core/bin/mmx.dart` | CLI commands |
+| `packages/mmx_core/bin/` | CLI commands, scan reports and batch orchestration |
 | `apps/mmx_studio/lib/` | Desktop state, controls, and rendering integration |
 | `apps/mmx_studio/native_renderer/` | Rust/wgpu renderer and shaders |
 | Each package's `test/` | Unit tests and fixtures |
@@ -49,8 +54,9 @@ From the repository root, run:
 ./tool/verify.sh
 ```
 
-On Windows, run that script in Git Bash. It fetches dependencies, checks Dart
-formatting, runs both analyzers, and runs the kernel and Studio test suites.
+On Windows, run that script in Git Bash, or use `py -3 tool/build.py --verify`.
+`make test` invokes the same portable verifier. It fetches dependencies, checks
+Dart formatting, runs both analyzers, and runs the kernel and Studio test suites.
 
 Use `*_test.dart` names. The kernel uses `package:test`; Studio uses
 `flutter_test`. For a focused run, use `dart test test/remesh_test.dart` from

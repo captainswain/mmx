@@ -1,5 +1,12 @@
 # Desktop feature completion
 
+This is the **historical PR #5 checkpoint (2026-11-09)**. The 0.3.0 scan-to-print
+candidate adds New Project, reversible cleanup, printer profiles, recipe/report
+export, retained rendering and native build helpers. Its current behavior and
+remaining acceptance gates are tracked in [production readiness](PRODUCTION-READINESS.md),
+with validation in [testing](TESTING.md). The plan below records the earlier
+delivery and must not be used as the current release acceptance record.
+
 This extends the validated [PR #4](https://github.com/palindsay/mmx/pull/4)
 hardening checkpoint. The user requested the optional backlog on 2026-11-09.
 Windows/macOS signing hosts and licensed Meshmixer reference outputs are

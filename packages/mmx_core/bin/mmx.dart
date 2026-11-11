@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'scan_commands.dart';
 import 'dart:convert';
 import 'package:args/args.dart';
 import 'dart:typed_data';
@@ -8,8 +9,11 @@ import 'package:mmx_core/mmx_core.dart';
 const String _usage = '''
 mmx — cross-platform mesh kernel CLI (Meshmixer-class operators)
 
+  mmx scan <input> [--units mm|cm|m|inch] [--report report.json]
+  mmx cleanup <input> <output> --recipe recipe.json
+  mmx batch <inputs...> --recipe recipe.json --outdir directory
   mmx info <file> [--json]
-  mmx repair <in> <out> [--weld 1e-5]
+  mmx repair <in> <out> [--weld 1e-5] [--fill-holes]
   mmx remesh <in> <out> --edge <len> [--iters 6] [--adaptive 0-1]
   mmx reduce <in> <out> --percent <0-1> | --faces <n> [--uniform] [--max-dev <d>]
   mmx solid <in> <out> [--mode fast|accurate|blocky] [--res 128] [--offset 0] [--smooth 0] [--min-thickness 0] [--max-growth <d>] [--attempts 6]
@@ -78,9 +82,13 @@ Future<void> run(List<String> args) async {
     stdout.writeln(_usage);
     return;
   }
+  if ({'scan', 'cleanup', 'batch'}.contains(args.first)) {
+    await runScanCommand(args);
+    return;
+  }
   const specs = <String, (int, String)>{
     'info': (1, 'json'),
-    'repair': (2, 'weld'),
+    'repair': (2, 'weld fill-holes'),
     'remesh': (2, 'edge iters adaptive debug-topology'),
     'reduce': (2, 'percent faces uniform max-dev'),
     'solid': (2, 'mode res offset smooth min-thickness max-growth attempts'),
@@ -115,6 +123,7 @@ Future<void> run(List<String> args) async {
   if (spec == null) throw UsageError('Unknown command: $cmd');
   final parser = ArgParser()..addFlag('help', abbr: 'h', negatable: false);
   const switches = {
+    'fill-holes',
     'precise',
     'keep',
     'uniform',
@@ -300,8 +309,13 @@ Future<void> run(List<String> args) async {
         mesh = Weld.weldCracks(mesh, tolerance: flag('weld', 1e-5));
         Weld.removeDuplicateFaces(mesh);
         mesh = MeshInspector.splitNonManifold(mesh);
-        mesh = HoleFiller.fill(mesh, mode: HoleFillMode.smooth);
+        if (flags.containsKey('fill-holes')) {
+          mesh = HoleFiller.fill(mesh,
+              mode: HoleFillMode.smooth, requireAll: true);
+        }
+        final report = ScanWorkflow.inspect(mesh);
         await save(positional[1], mesh);
+        stdout.writeln(jsonEncode(report.toJson()));
       }
     case 'remesh':
       {
@@ -328,8 +342,16 @@ Future<void> run(List<String> args) async {
         final out = Decimator.reduce(mesh,
             targetFaceCount: faces,
             percentage: pct,
-            uniform: flags.containsKey('uniform'),
-            maxDeviation: maxDev == null || maxDev <= 0 ? null : maxDev);
+            uniform: flags.containsKey('uniform'));
+        if (maxDev != null) {
+          if (maxDev <= 0) throw UsageError('--max-dev must be positive');
+          final deviation = SurfaceDeviation.measure(mesh, out);
+          if (deviation.maximum > maxDev) {
+            throw StateError(
+                'Sampled surface deviation ${deviation.maximum} exceeds $maxDev; use a less aggressive reduction');
+          }
+          stdout.writeln(jsonEncode({'deviation': deviation.toJson()}));
+        }
         await save(positional[1], out);
       }
     case 'solid':

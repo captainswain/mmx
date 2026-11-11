@@ -25,6 +25,11 @@ void main(List<String> args) {
     'solid/marching_tetrahedra.dart',
     'mesh/attributes.dart',
     'mesh/limits.dart',
+    'geom/planar_region.dart',
+    'tools/selection_edit.dart',
+    'scan/workflow.dart',
+    'scan/recipe.dart',
+    'scan/provenance.dart',
   ];
   final found = <String>{};
   for (final record in source.split('end_of_record')) {

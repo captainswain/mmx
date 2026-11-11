@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../mesh/tri_mesh.dart';
+import '../scan/workflow.dart';
 import '../scene/document.dart';
 import '../tools/pivot.dart';
 import '../render/camera.dart';
@@ -21,14 +22,70 @@ class ProjectSourceAttachment {
 class ProjectData {
   final List<SceneObject> objects;
   final Camera camera;
+  final PrintProfile printProfile;
   final int? selectedId;
   final List<ProjectSourceAttachment> sourceAttachments;
   ProjectData(this.objects,
-      {Camera? camera, this.selectedId, this.sourceAttachments = const []})
+      {Camera? camera,
+      this.selectedId,
+      this.sourceAttachments = const [],
+      this.printProfile = const PrintProfile()})
       : camera = camera ?? Camera();
 }
 
 class ProjectIO {
+  /// Conservative, allocation-bounded admission check for editable documents.
+  /// Leave room under the 256 MiB archive limit for JSON and ZIP framing.
+  static void checkBudget(ProjectData project) {
+    var bytes = 0, metadata = 0, entries = 1;
+    final textures = <MeshTexture>{};
+    if (project.objects.length > 1024 ||
+        project.sourceAttachments.length > 1024) {
+      throw const FormatException('Project object/source limit exceeded');
+    }
+    for (final object in project.objects) {
+      final mesh = object.mesh;
+      metadata += 4096 + object.name.length * 6;
+      metadata += object.scanHistory
+          .fold<int>(0, (n, entry) => n + entry.length * 6 + 8);
+      for (final buffer in <TypedData?>[
+        mesh.positions,
+        mesh.indices,
+        mesh.faceGroups,
+        mesh.vertexColors,
+        mesh.cornerUvs,
+        mesh.faceMaterials
+      ]) {
+        if (buffer != null) {
+          bytes += buffer.lengthInBytes;
+          entries++;
+        }
+      }
+      for (final material in mesh.materials) {
+        metadata += 1024 +
+            material.name.length * 6 +
+            (material.texture?.name.length ?? 0) * 6;
+        if (material.texture != null) textures.add(material.texture!);
+      }
+    }
+    for (final source in project.sourceAttachments) {
+      metadata += 256 + source.name.length * 6;
+      bytes += source.bytes.length;
+      entries++;
+    }
+    for (final texture in textures) {
+      bytes += texture.bytes.length;
+      entries++;
+    }
+    if (entries > 4096 ||
+        bytes > 240 * 1024 * 1024 ||
+        metadata > 8 * 1024 * 1024 ||
+        textures.fold<int>(0, (n, t) => n + t.byteSize) > 192 * 1024 * 1024) {
+      throw const FormatException(
+          'Project exceeds the supported save budget. Reduce the scene or use separate projects.');
+    }
+  }
+
   static void _validateCamera(Camera camera) {
     if (camera.target.length != 3 ||
         ![
@@ -80,10 +137,17 @@ class ProjectIO {
       throw const FormatException('Invalid project metadata');
     }
     _validateCamera(c);
+    project.printProfile.validate();
     for (final o in project.objects) {
       if (o.id <= 0 ||
           !ids.add(o.id) ||
           o.name.length > 1048576 ||
+          o.scanHistory.length > 10000 ||
+          o.scanHistory.any((entry) => entry.length > 4096) ||
+          (o.scanSourceId != null &&
+              (o.scanSourceId == o.id ||
+                  !project.objects
+                      .any((candidate) => candidate.id == o.scanSourceId))) ||
           o.transform.length != 16 ||
           o.transform.any((v) => !v.isFinite) ||
           o.transform[3] != 0 ||
@@ -121,6 +185,9 @@ class ProjectIO {
         'transform': o.transform.toList(),
         'visible': o.visible,
         'target': o.isTarget,
+        'locked': o.locked,
+        'scanSourceId': o.scanSourceId,
+        'scanHistory': o.scanHistory,
         'pivot': o.pivot == null
             ? null
             : {'position': o.pivot!.position, 'normal': o.pivot!.normal},
@@ -179,10 +246,9 @@ class ProjectIO {
         ZipEntry(
             'manifest.json',
             Uint8List.fromList(utf8.encode(jsonEncode({
-              'version': project.objects.any((o) => o.mesh.hasSurfaceAttributes)
-                  ? 2
-                  : 1,
+              'version': 3,
               'units': 'millimeter',
+              'printProfile': project.printProfile.toJson(),
               'objects': objects,
               'selectedId': project.selectedId,
               'sources': sources,
@@ -212,7 +278,7 @@ class ProjectIO {
       final files = {for (final e in ZipArchive.read(bytes)) e.name: e.data};
       final m = jsonDecode(utf8.decode(files['manifest.json']!))
           as Map<String, dynamic>;
-      if (![1, 2].contains(m['version']) || m['units'] != 'millimeter') {
+      if (![1, 2, 3].contains(m['version']) || m['units'] != 'millimeter') {
         throw const FormatException('Unsupported project version or units');
       }
       final objectRecords = m['objects'] as List;
@@ -343,11 +409,24 @@ class ProjectIO {
             transform: Float64List.fromList(transform))
           ..visible = o['visible'] as bool
           ..isTarget = o['target'] as bool
+          ..locked = (o['locked'] ?? false) as bool
+          ..scanSourceId = o['scanSourceId'] as int?
+          ..scanHistory =
+              List<String>.from(o['scanHistory'] ?? const <String>[])
           ..pivot = o['pivot'] == null
               ? null
               : Pivot(
                   position: vector(o['pivot']['position'], 3),
                   normal: vector(o['pivot']['normal'], 3)));
+      }
+      for (final object in objects) {
+        if (object.scanHistory.length > 10000 ||
+            object.scanHistory.any((entry) => entry.length > 4096) ||
+            (object.scanSourceId != null &&
+                (object.scanSourceId == object.id ||
+                    !objects.any((o) => o.id == object.scanSourceId)))) {
+          throw const FormatException('Invalid scan provenance');
+        }
       }
       final c = m['camera'];
       final v = vector(
@@ -367,7 +446,11 @@ class ProjectIO {
         throw const FormatException('Missing selected object');
       }
       return ProjectData(objects,
-          sourceAttachments: sources, selectedId: selected, camera: camera);
+          sourceAttachments: sources,
+          selectedId: selected,
+          printProfile: PrintProfile.fromJson(
+              Map<String, dynamic>.from(m['printProfile'] ?? {})),
+          camera: camera);
     } on FormatException {
       rethrow;
     } catch (_) {

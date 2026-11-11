@@ -79,7 +79,7 @@ void main() {
         ProjectIO.write(ProjectData([SceneObject(1, 'test', triangle())])));
     final manifest =
         jsonDecode(utf8.decode(entries.first.data)) as Map<String, dynamic>;
-    manifest['version'] = 3;
+    manifest['version'] = 4;
     entries[0] = ZipEntry(
         'manifest.json', Uint8List.fromList(utf8.encode(jsonEncode(manifest))));
     expect(

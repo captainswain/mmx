@@ -93,6 +93,47 @@ void main() {
     () {
       late NativeGpuRenderer gpu;
       setUpAll(() => gpu = NativeGpuRenderer(libraryPath: nativePath));
+      test('retained geometry handles camera changes, resize and scene replacement', () {
+        final scene = [
+          object(triangle(0), [1, 0, 0]),
+        ];
+        final first = gpu.render(scene, camera, options, retainScene: true);
+        expect(pixel(first.rgba, 48, 48), [255, 0, 0, 255]);
+        final moved = camera.clone()..target = [20, 0, 0];
+        final next = gpu.render(scene, moved, options, retainScene: true);
+        expect(pixel(next.rgba, 48, 48), isNot([255, 0, 0, 255]));
+        expect(
+          gpu.render(scene, camera, options, retainScene: true).rgba,
+          first.rgba,
+        );
+        const resized = RenderOptions(
+          width: 48,
+          height: 48,
+          showBed: false,
+          showGrid: false,
+          ambient: 1,
+        );
+        expect(
+          pixel(
+            gpu.render(scene, camera, resized, retainScene: true).rgba,
+            24,
+            24,
+            width: 48,
+          ),
+          [255, 0, 0, 255],
+        );
+        final replacement = [
+          object(triangle(0), [0, 0, 1]),
+        ];
+        expect(
+          pixel(
+            gpu.render(replacement, camera, options, retainScene: true).rgba,
+            48,
+            48,
+          ),
+          [0, 0, 255, 255],
+        );
+      });
       test('real depth occlusion is independent of triangle submission order', () {
         final near = object(triangle(.5), [1, 0, 0]),
             far = object(triangle(-.5), [0, 0, 1]);

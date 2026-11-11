@@ -175,8 +175,10 @@ class GpuPacket {
         !options.ambient.isFinite ||
         options.ambient < 0 ||
         options.ambient > 1 ||
-        !options.bedSize.isFinite ||
-        options.bedSize <= 0) {
+        !options.actualBedWidth.isFinite ||
+        !options.actualBedDepth.isFinite ||
+        options.actualBedWidth <= 0 ||
+        options.actualBedDepth <= 0) {
       throw ArgumentError('Invalid frame options; maximum size is 4096 × 4096');
     }
   }
@@ -256,7 +258,8 @@ class GpuPacket {
   }
 
   static void _bed(RenderOptions options, void Function(_Draw) add) {
-    final half = options.bedSize * .5;
+    final x0 = options.bedMinX, z0 = options.bedMinZ;
+    final x1 = x0 + options.actualBedWidth, z1 = z0 + options.actualBedDepth;
     final identity = Float32List.fromList(identity4());
     final values = <double>[];
     void vertex(double x, double y, double z, List<double> color) {
@@ -267,14 +270,14 @@ class GpuPacket {
       // The bed is a reference outline, not a solid floor: geometry below y=0
       // must remain editable and visible, as in the software rasterizer.
       for (final p in [
-        [-half, 0.0, -half],
-        [half, 0.0, -half],
-        [half, 0.0, -half],
-        [half, 0.0, half],
-        [half, 0.0, half],
-        [-half, 0.0, half],
-        [-half, 0.0, half],
-        [-half, 0.0, -half],
+        [x0, 0.0, z0],
+        [x1, 0.0, z0],
+        [x1, 0.0, z0],
+        [x1, 0.0, z1],
+        [x1, 0.0, z1],
+        [x0, 0.0, z1],
+        [x0, 0.0, z1],
+        [x0, 0.0, z0],
       ]) {
         vertex(p[0], p[1], p[2], [.55, .58, .62]);
       }
@@ -291,12 +294,13 @@ class GpuPacket {
     }
     if (options.showGrid) {
       for (var i = 0; i <= 20; i++) {
-        final position = -half + i * options.bedSize / 20;
+        final x = x0 + i * options.actualBedWidth / 20;
+        final z = z0 + i * options.actualBedDepth / 20;
         for (final p in [
-          [position, .005, -half],
-          [position, .005, half],
-          [-half, .005, position],
-          [half, .005, position],
+          [x, .005, z0],
+          [x, .005, z1],
+          [x0, .005, z],
+          [x1, .005, z],
         ]) {
           vertex(p[0], p[1], p[2], i == 10 ? [.35, .4, .45] : [.22, .25, .28]);
         }

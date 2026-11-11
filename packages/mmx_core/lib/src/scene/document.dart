@@ -14,6 +14,9 @@ class SceneObject {
   Float64List transform;
   bool visible;
   bool isTarget;
+  bool locked = false;
+  int? scanSourceId;
+  List<String> scanHistory = [];
   Pivot? pivot;
 
   SceneObject(this.id, this.name, this.mesh, {Float64List? transform})
@@ -25,6 +28,9 @@ class SceneObject {
       transform: Float64List.fromList(transform))
     ..visible = visible
     ..isTarget = isTarget
+    ..locked = locked
+    ..scanSourceId = scanSourceId
+    ..scanHistory = List<String>.from(scanHistory)
     ..pivot = pivot == null
         ? null
         : Pivot(
@@ -83,6 +89,8 @@ class Document {
   }
 
   static int objectBytes(SceneObject o) =>
+      o.name.length * 2 +
+      o.scanHistory.fold<int>(0, (n, entry) => n + entry.length * 2) +
       o.mesh.positions.lengthInBytes +
       o.mesh.indices.lengthInBytes +
       (o.mesh.faceGroups?.lengthInBytes ?? 0) +
@@ -103,6 +111,8 @@ class Document {
       for (final object in snapshot.objects) {
         bytes += 32 +
             object.name.length * 2 +
+            object.scanHistory
+                .fold<int>(0, (n, entry) => n + entry.length * 2) +
             object.transform.lengthInBytes +
             (object.pivot == null ? 0 : 48);
         for (final buffer in object.mesh.buffers) {
@@ -257,7 +267,9 @@ class _ObjectState {
   final String name;
   final _FrozenMesh mesh;
   final Float64List transform;
-  final bool visible, isTarget;
+  final bool visible, isTarget, locked;
+  final int? scanSourceId;
+  final List<String> scanHistory;
   final Pivot? pivot;
   _ObjectState(SceneObject object, this.mesh)
       : id = object.id,
@@ -265,6 +277,9 @@ class _ObjectState {
         transform = Float64List.fromList(object.transform),
         visible = object.visible,
         isTarget = object.isTarget,
+        locked = object.locked,
+        scanSourceId = object.scanSourceId,
+        scanHistory = List<String>.unmodifiable(object.scanHistory),
         pivot = _copyPivot(object.pivot);
 
   static Pivot? _copyPivot(Pivot? value) => value == null
@@ -277,6 +292,9 @@ class _ObjectState {
       SceneObject(id, name, mesh, transform: Float64List.fromList(transform))
         ..visible = visible
         ..isTarget = isTarget
+        ..locked = locked
+        ..scanSourceId = scanSourceId
+        ..scanHistory = List<String>.from(scanHistory)
         ..pivot = _copyPivot(pivot);
 }
 
