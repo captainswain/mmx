@@ -1,0 +1,122 @@
+{
+  "label": "0.2.0+1 release; d605fc8 plus accessibility/overwrite fixes (working tree)",
+  "started_utc": "2026-11-09T21:55:49.586636+00:00",
+  "harness_sha256": "1ab05c6cb57060904ff8f62c6cd974ae3bbc568a3755e09e6486e131b834b60f",
+  "host": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43",
+  "os_release": "PRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo\n",
+  "uid": 1000,
+  "display": ":99",
+  "session": "private D-Bus / Xvfb / XDG",
+  "build_mode": "release (caller-supplied binary)",
+  "binaries": {
+    "mmx_studio": "2cda5b2e6a62e9c6b75b8053a964d9cff65a477821154d2ab97129374c89c70f",
+    "lib/libapp.so": "1786dc2cd05d2785d2ab00f2aba8ac5d7f56721c21392936be8a145e92881c89"
+  },
+  "checks": [
+    {
+      "name": "AT-SPI icon/tool control names",
+      "result": "pass",
+      "labels": [
+        "Project",
+        "Import mesh",
+        "Export selected",
+        "Navigate",
+        "Select",
+        "Sculpt",
+        "Stamp",
+        "Plane Cut",
+        "Mirror",
+        "Extrude",
+        "Separate Shells",
+        "Remesh",
+        "Reduce",
+        "Make Solid",
+        "Hollow",
+        "Analysis",
+        "Supports",
+        "Modify",
+        "Print / Layout",
+        "Wireframe",
+        "Print bed",
+        "Frame selection"
+      ]
+    },
+    {
+      "name": "AT-SPI tool activation and named slider",
+      "result": "pass"
+    },
+    {
+      "name": "native Import cancel leaves document unchanged",
+      "result": "pass"
+    },
+    {
+      "name": "Unicode native open and keyboard Inches selection",
+      "result": "pass"
+    },
+    {
+      "name": "native Save cancel, Unicode save, units persisted",
+      "result": "pass",
+      "units": "millimeter",
+      "positions": [
+        0.0,
+        0.0,
+        0.0,
+        25.399999618530273,
+        0.0,
+        0.0,
+        0.0,
+        25.399999618530273,
+        0.0
+      ],
+      "sha256": "5b8903dc2509729f13535bb11d0e99076a324d29cbaec592ccdaaf66e41a1a12"
+    },
+    {
+      "name": "keyboard Undo and Redo",
+      "result": "pass"
+    },
+    {
+      "name": "Save As overwrite Cancel preserves bytes; Replace changes file",
+      "result": "pass",
+      "before_sha256": "5b8903dc2509729f13535bb11d0e99076a324d29cbaec592ccdaaf66e41a1a12",
+      "after_sha256": "edc386f42af469e07c00b3b08a83573b908f87d8bb024b7323b7f1f29be060b4"
+    },
+    {
+      "name": "native STL export and overwrite Cancel",
+      "result": "pass",
+      "triangles": 960,
+      "sha256": "1d51766518fa1791ad841fa441c8fbc6d1a50dc2262eab726a85c9047e213b0b"
+    },
+    {
+      "name": "native destination permission failure preserves dirty document",
+      "result": "pass"
+    },
+    {
+      "name": "WM_DELETE_WINDOW dirty-exit Cancel retains app/document",
+      "result": "pass"
+    },
+    {
+      "name": "forced termination, Keep for later, then Recover",
+      "result": "pass",
+      "recovery_sha256": "2ae21984d0fdf9335528bbe489ed2b6a4ea53873cf512ac742cbfa5fd679c3e0"
+    },
+    {
+      "name": "dirty-exit Save dialog Cancel keeps app; successful Save exits",
+      "result": "pass"
+    },
+    {
+      "name": "recovered project requires chosen save path; native project reopen",
+      "result": "pass",
+      "recovered_sha256": "2ae21984d0fdf9335528bbe489ed2b6a4ea53873cf512ac742cbfa5fd679c3e0"
+    },
+    {
+      "name": "WM_DELETE_WINDOW dirty-exit Discard exits",
+      "result": "pass"
+    }
+  ],
+  "limitations": [
+    "No human screen-reader acceptance",
+    "No physical display, HiDPI, Wayland portal, or clean OS install coverage"
+  ],
+  "result": "pass",
+  "completed_utc": "2026-11-09T21:56:34.030938+00:00"
+}

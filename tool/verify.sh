@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Local/CI verification. Expects the Meshmixer installer models on this host
-# at the path baked into the kernel tests.
+# Local/CI verification uses only vendored fixtures.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root/packages/mmx_core"
@@ -10,6 +9,6 @@ dart analyze
 dart test
 cd "$root/apps/mmx_studio"
 flutter pub get
-dart format --output=none --set-exit-if-changed lib test
+dart format --output=none --set-exit-if-changed lib test integration_test test_driver
 flutter analyze
 flutter test

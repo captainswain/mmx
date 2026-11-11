@@ -1,10 +1,15 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../analysis/wall_thickness.dart';
 import '../geom/bbox.dart';
+import '../mesh/topology.dart';
 import '../mesh/tri_mesh.dart';
 import '../repair/holes.dart';
+import '../repair/weld.dart';
 import '../spatial/bvh.dart';
+import '../tools/modify.dart';
+import 'marching_tetrahedra.dart';
 import 'surface_nets.dart';
 import 'voxel.dart';
 
@@ -17,7 +22,23 @@ class SolidResult {
   final int gridResolution;
   final double cellSize;
   final int elapsedMs;
-  SolidResult(this.mesh, this.gridResolution, this.cellSize, this.elapsedMs);
+  final WallThicknessCertificate? wallCertificate;
+
+  /// Total applied Make Solid offset, including bounded thickness growth.
+  final double appliedOffset;
+
+  /// SDF shell thickness used by Hollow, which can exceed its requested value.
+  final double? appliedShellThickness;
+  final int thicknessAttempts;
+  final String reconstruction;
+  final String? reconstructionDiagnostic;
+  SolidResult(this.mesh, this.gridResolution, this.cellSize, this.elapsedMs,
+      {this.wallCertificate,
+      this.appliedOffset = 0,
+      this.appliedShellThickness,
+      this.thicknessAttempts = 0,
+      this.reconstruction = 'surface-nets',
+      this.reconstructionDiagnostic});
 }
 
 /// Converts triangle soup into watertight solids and performs grid-based CSG.
@@ -28,6 +49,13 @@ class SolidResult {
 /// Mesh Resolution / Reduce Percentage controls exposed in the UI.
 class Solidifier {
   static VoxelGrid _gridFor(BBox bounds, int resolution, double padCells) {
+    if (resolution < 8 ||
+        resolution > 256 ||
+        !padCells.isFinite ||
+        padCells < 0) {
+      throw ArgumentError('Resolution must be 8–256 and padding finite');
+    }
+    if (bounds.isEmpty) return VoxelGrid(8, 8, 8, 1, -4, -4, -4);
     final extent =
         math.max(bounds.extentX, math.max(bounds.extentY, bounds.extentZ));
     if (extent <= 0) {
@@ -51,7 +79,51 @@ class Solidifier {
     int smoothing = 0,
     double minThickness = 0,
     bool closeHoles = true,
+    int maxThicknessAttempts = 6,
+    double? maxAdditionalOffset,
+    int maxThicknessCandidatePairs = 5000000,
   }) {
+    mesh.requireUntextured('Make Solid');
+    if (resolution < 8 ||
+        resolution > 256 ||
+        !offset.isFinite ||
+        smoothing < 0 ||
+        smoothing > 1000 ||
+        !minThickness.isFinite ||
+        minThickness < 0) {
+      throw ArgumentError('Invalid Make Solid parameters');
+    }
+    if (minThickness > 0) {
+      if (mode == SolidMode.fast) {
+        throw UnsupportedError('Minimum clearance requires Accurate or Blocky '
+            'mode; Fast mode reprojects vertices onto the original surface');
+      }
+      return _makeSolidWithClearance(mesh,
+          mode: mode,
+          resolution: resolution,
+          offset: offset,
+          smoothing: smoothing,
+          minimum: minThickness,
+          closeHoles: closeHoles,
+          attempts: maxThicknessAttempts,
+          maxGrowth: maxAdditionalOffset ?? minThickness,
+          candidateBudget: maxThicknessCandidatePairs);
+    }
+    return _makeSolidMesh(mesh,
+        mode: mode,
+        resolution: resolution,
+        offset: offset,
+        smoothing: smoothing,
+        closeHoles: closeHoles);
+  }
+
+  static SolidResult _makeSolidMesh(TriMesh mesh,
+      {required SolidMode mode,
+      required int resolution,
+      required double offset,
+      required int smoothing,
+      required bool closeHoles,
+      bool verifyTopology = false}) {
     final sw = Stopwatch()..start();
     var work = mesh;
     if (closeHoles) {
@@ -79,9 +151,10 @@ class Solidifier {
     // surface falls outside the exact-distance region and gets clipped.
     grid.rasterize(work, bandCells: offset.abs() / grid.cellSize + 2.5);
     if (offset != 0) grid.offset(offset);
-    if (minThickness > 0) _enforceMinThickness(grid, minThickness);
     if (effectiveSmoothing > 0) grid.smooth(effectiveSmoothing);
-    var solid = SurfaceNets.polygonize(grid);
+    final (polygonized, reconstruction, diagnostic) =
+        _polygonize(grid, verifyTopology: verifyTopology);
+    var solid = polygonized;
     if (solid.signedVolume() < 0) solid = _flip(solid);
     // Meshmixer's Fast mode reprojects the meshed voxel surface back onto the
     // input mesh after polygonization (see the Make Solid help page).
@@ -104,12 +177,116 @@ class Solidifier {
     solid.compact();
     sw.stop();
     return SolidResult(
-        solid, effectiveResolution, grid.cellSize, sw.elapsedMilliseconds);
+        solid, effectiveResolution, grid.cellSize, sw.elapsedMilliseconds,
+        appliedOffset: offset,
+        reconstruction: reconstruction,
+        reconstructionDiagnostic: diagnostic);
+  }
+
+  static (TriMesh, String, String?) _polygonize(VoxelGrid grid,
+      {required bool verifyTopology}) {
+    var mesh = SurfaceNets.polygonize(grid,
+        maximumFaces: verifyTopology ? 500000 : null);
+    if (!verifyTopology) return (mesh, 'surface-nets', null);
+    mesh = Weld.weldVertices(mesh, tolerance: grid.cellSize * 1e-6);
+    final topology = MeshTopology(mesh);
+    if (topology.boundaryEdges().isEmpty &&
+        topology.nonManifoldEdges().isEmpty &&
+        topology.nonManifoldVertices().isEmpty) {
+      return (mesh, 'surface-nets', null);
+    }
+    final fallback = MarchingTetrahedra.polygonize(grid);
+    return (
+      fallback,
+      'marching-tetrahedra',
+      'Surface nets produced nonmanifold topology; used bounded marching '
+          'tetrahedra on the same SDF grid before final clearance verification'
+    );
+  }
+
+  static void _validateClearanceBudget(
+      int attempts, double growth, int candidateBudget) {
+    if (attempts < 1 ||
+        attempts > 12 ||
+        !growth.isFinite ||
+        growth < 0 ||
+        candidateBudget < 1 ||
+        candidateBudget > 100000000) {
+      throw ArgumentError('Clearance verification needs 1–12 attempts, finite '
+          'nonnegative growth and a 1–100000000 candidate-pair budget');
+    }
+  }
+
+  static SolidResult _makeSolidWithClearance(TriMesh mesh,
+      {required SolidMode mode,
+      required int resolution,
+      required double offset,
+      required int smoothing,
+      required double minimum,
+      required bool closeHoles,
+      required int attempts,
+      required double maxGrowth,
+      required int candidateBudget}) {
+    _validateClearanceBudget(attempts, maxGrowth, candidateBudget);
+    final watch = Stopwatch()..start();
+    var currentOffset = offset;
+    WallThicknessCertificate? last;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      final result = _makeSolidMesh(mesh,
+          mode: mode,
+          resolution: resolution,
+          offset: currentOffset,
+          smoothing: smoothing,
+          closeHoles: closeHoles,
+          verifyTopology: true);
+      // Surface nets can emit coincident vertices at grid-aligned crossings.
+      // Weld before verification; no operation may change a certified result.
+      final output =
+          Weld.weldVertices(result.mesh, tolerance: result.cellSize * 1e-6);
+      final certificate = WallThickness.certify(output, minimum,
+          maxCandidatePairs: candidateBudget);
+      if (certificate.passed) {
+        return SolidResult(output, result.gridResolution, result.cellSize,
+            watch.elapsedMilliseconds,
+            wallCertificate: certificate,
+            appliedOffset: currentOffset,
+            thicknessAttempts: attempt,
+            reconstruction: result.reconstruction,
+            reconstructionDiagnostic: result.reconstructionDiagnostic);
+      }
+      last = certificate;
+      if (certificate.witnessClearance == null) {
+        throw StateError('Make Solid clearance could not be verified: '
+            '${certificate.diagnostic}. Applied offset $currentOffset; '
+            'repair the input or adjust resolution/work budget.');
+      }
+      final remaining = offset + maxGrowth - currentOffset;
+      if (remaining <= 0 || attempt == attempts) break;
+      final increment = math.max(
+          (minimum - certificate.witnessClearance!) * .5 +
+              certificate.numericalMargin,
+          result.cellSize * 1.5);
+      currentOffset += math.min(remaining, increment);
+    }
+    throw StateError(
+        'Make Solid could not meet ${WallThicknessCertificate.metric} '
+        '$minimum within $attempts attempts and $maxGrowth additional offset. '
+        'Last offset $currentOffset: ${last!.diagnostic}. Increase the explicit '
+        'growth bound/resolution or revise sharp/thin features.');
   }
 
   static SolidResult boolean(TriMesh a, TriMesh b, BooleanOp op,
       {int resolution = 160}) {
+    if (resolution < 8 || resolution > 256) {
+      throw ArgumentError('Resolution must be 8–256');
+    }
     final sw = Stopwatch()..start();
+    final exact = trivialBoolean(a, b, op);
+    if (exact != null) {
+      return SolidResult(exact, resolution, 0, sw.elapsedMilliseconds);
+    }
+    a.requireUntextured('Grid Boolean');
+    b.requireUntextured('Grid Boolean');
     final bounds = BBox();
     bounds.addBox(a.bounds());
     bounds.addBox(b.bounds());
@@ -154,7 +331,49 @@ class Solidifier {
     int resolution = 128,
     bool openTop = false,
     double minThickness = 0.0,
+    int maxThicknessAttempts = 6,
+    double? maxAdditionalThickness,
+    int maxThicknessCandidatePairs = 5000000,
   }) {
+    mesh.requireUntextured('Hollow');
+    if (!thickness.isFinite ||
+        thickness <= 0 ||
+        !minThickness.isFinite ||
+        minThickness < 0 ||
+        holes < 0 ||
+        holes > 1000 ||
+        !holeRadius.isFinite ||
+        holeRadius <= 0) {
+      throw ArgumentError('Invalid hollow parameters');
+    }
+    if (minThickness > 0) {
+      if (holes != 0 || openTop) {
+        throw UnsupportedError('Verified Hollow clearance requires an enclosed '
+            'shell (holes: 0, openTop: false); hole rims have zero local clearance');
+      }
+      return _hollowWithClearance(mesh,
+          thickness: thickness,
+          minimum: minThickness,
+          resolution: resolution,
+          attempts: maxThicknessAttempts,
+          maxGrowth: maxAdditionalThickness ?? minThickness,
+          candidateBudget: maxThicknessCandidatePairs);
+    }
+    return _hollowMesh(mesh,
+        thickness: thickness,
+        holes: holes,
+        holeRadius: holeRadius,
+        resolution: resolution,
+        openTop: openTop);
+  }
+
+  static SolidResult _hollowMesh(TriMesh mesh,
+      {required double thickness,
+      required int holes,
+      required double holeRadius,
+      required int resolution,
+      required bool openTop,
+      bool verifyTopology = false}) {
     final sw = Stopwatch()..start();
     final bounds = mesh.bounds();
     final grid = _gridFor(bounds, resolution, 3.0);
@@ -183,15 +402,97 @@ class Solidifier {
     if (holes > 0) {
       _drillEscapeHoles(grid, bounds, holes, holeRadius, thickness);
     }
-    if (minThickness > 0) {
-      _enforceMinThickness(grid, minThickness);
-    }
-    var out = SurfaceNets.polygonize(grid);
+    final (polygonized, reconstruction, diagnostic) =
+        _polygonize(grid, verifyTopology: verifyTopology);
+    var out = polygonized;
     if (out.signedVolume() < 0) out = _flip(out);
     out.removeDegenerateFaces(minArea: -1);
     out.compact();
     sw.stop();
-    return SolidResult(out, resolution, grid.cellSize, sw.elapsedMilliseconds);
+    return SolidResult(out, resolution, grid.cellSize, sw.elapsedMilliseconds,
+        appliedShellThickness: thickness,
+        reconstruction: reconstruction,
+        reconstructionDiagnostic: diagnostic);
+  }
+
+  static SolidResult _hollowWithClearance(TriMesh mesh,
+      {required double thickness,
+      required double minimum,
+      required int resolution,
+      required int attempts,
+      required double maxGrowth,
+      required int candidateBudget}) {
+    _validateClearanceBudget(attempts, maxGrowth, candidateBudget);
+    final watch = Stopwatch()..start();
+    final maximum = thickness + maxGrowth;
+    final initial = math.min(maximum, math.max(thickness, minimum));
+    var current = initial;
+    WallThicknessCertificate? last;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      final result = _hollowMesh(mesh,
+          thickness: current,
+          holes: 0,
+          holeRadius: 3,
+          resolution: resolution,
+          openTop: false,
+          verifyTopology: true);
+      final output =
+          Weld.weldVertices(result.mesh, tolerance: result.cellSize * 1e-6);
+      final certificate = WallThickness.certify(output, minimum,
+          maxCandidatePairs: candidateBudget);
+      if (!certificate.passed && certificate.witnessClearance == null) {
+        throw StateError('Hollow clearance could not be verified: '
+            '${certificate.diagnostic}. Applied shell thickness $current; '
+            'repair input or adjust resolution/work budget.');
+      }
+      // Verification already bounded faces/shells before component extraction.
+      final (labels, count) = MeshTopology(output).components();
+      var hasCavity = false;
+      for (var part = 0; part < count; part++) {
+        final shell = output.extractFaces([
+          for (var f = 0; f < labels.length; f++)
+            if (labels[f] == part) f
+        ]);
+        final bounds = shell.bounds();
+        final cx = (bounds.minX + bounds.maxX) * .5;
+        final cy = (bounds.minY + bounds.maxY) * .5;
+        final cz = (bounds.minZ + bounds.maxZ) * .5;
+        for (var v = 0; v < shell.vertexCount; v++) {
+          shell.positions[v * 3] -= cx;
+          shell.positions[v * 3 + 1] -= cy;
+          shell.positions[v * 3 + 2] -= cz;
+        }
+        if (shell.signedVolume() < 0) hasCavity = true;
+      }
+      if (!hasCavity) {
+        throw StateError('Verified Hollow would remove the enclosed cavity at '
+            'shell thickness $current; reduce the requested minimum or increase resolution');
+      }
+      if (certificate.passed) {
+        return SolidResult(output, result.gridResolution, result.cellSize,
+            watch.elapsedMilliseconds,
+            wallCertificate: certificate,
+            appliedShellThickness: current,
+            thicknessAttempts: attempt,
+            reconstruction: result.reconstruction,
+            reconstructionDiagnostic: result.reconstructionDiagnostic);
+      }
+      last = certificate;
+      final remaining = maximum - current;
+      if (remaining <= 0 || attempt == attempts) break;
+      current = math.min(
+          maximum,
+          current +
+              math.max(
+                  minimum -
+                      certificate.witnessClearance! +
+                      certificate.numericalMargin,
+                  result.cellSize * 1.5));
+    }
+    throw StateError('Hollow could not meet ${WallThicknessCertificate.metric} '
+        '$minimum within $attempts attempts and $maxGrowth additional thickness. '
+        'Last shell thickness $current: ${last!.diagnostic}. Increase the '
+        'explicit growth bound/resolution or revise sharp/thin features.');
   }
 
   /// Drills radial escape holes around the lower part of the shell.
@@ -229,41 +530,6 @@ class Solidifier {
     }
   }
 
-  static void _enforceMinThickness(VoxelGrid grid, double minThickness) {
-    // Push the inner surface inward where the solid would be thinner than
-    // the requested minimum: a simple erosion of the field.
-    final cells = (minThickness / grid.cellSize).ceil();
-    for (var it = 0; it < cells; it++) {
-      final next = Float32List.fromList(grid.values);
-      for (var i = 1; i < grid.nx - 1; i++) {
-        for (var j = 1; j < grid.ny - 1; j++) {
-          for (var k = 1; k < grid.nz - 1; k++) {
-            final idx = grid.index(i, j, k);
-            if (grid.values[idx] >= 0) continue;
-            var best = double.infinity;
-            for (final d in <List<int>>[
-              <int>[1, 0, 0],
-              <int>[-1, 0, 0],
-              <int>[0, 1, 0],
-              <int>[0, -1, 0],
-              <int>[0, 0, 1],
-              <int>[0, 0, -1],
-            ]) {
-              final v = grid.values[grid.index(i + d[0], j + d[1], k + d[2])];
-              if (v > 0 && v < best) best = v;
-            }
-            if (best.isFinite && best < grid.cellSize * 1.5) {
-              next[idx] = math.max(grid.values[idx], -grid.cellSize);
-            }
-          }
-        }
-      }
-      for (var i = 0; i < grid.values.length; i++) {
-        grid.values[i] = next[i];
-      }
-    }
-  }
-
   static TriMesh _flip(TriMesh m) {
     final idx = Uint32List(m.indices.length);
     for (var f = 0; f < m.faceCount; f++) {
@@ -274,4 +540,43 @@ class Solidifier {
     return TriMesh(m.positions, idx,
         faceGroups: m.faceGroups, vertexColors: m.vertexColors);
   }
+}
+
+/// Exact empty, identical and strictly disjoint set operations. Returns null
+/// when surface classification or voxelization is required.
+TriMesh? trivialBoolean(TriMesh a, TriMesh b, BooleanOp op) {
+  if (a.validate().isNotEmpty || b.validate().isNotEmpty) {
+    throw ArgumentError('Invalid boolean operand');
+  }
+  if (a.faceCount == 0 || b.faceCount == 0) {
+    return switch (op) {
+      BooleanOp.union => (a.faceCount == 0 ? b : a).clone(),
+      BooleanOp.intersection => TriMesh.empty(),
+      BooleanOp.difference => a.clone(),
+    };
+  }
+  bool same(List<num> x, List<num> y) {
+    if (x.length != y.length) return false;
+    for (var i = 0; i < x.length; i++) {
+      if (x[i] != y[i]) return false;
+    }
+    return true;
+  }
+
+  if (same(a.positions, b.positions) && same(a.indices, b.indices)) {
+    return op == BooleanOp.difference ? TriMesh.empty() : a.clone();
+  }
+  final aa = a.bounds(), bb = b.bounds();
+  final disjoint = aa.maxX < bb.minX ||
+      bb.maxX < aa.minX ||
+      aa.maxY < bb.minY ||
+      bb.maxY < aa.minY ||
+      aa.maxZ < bb.minZ ||
+      bb.maxZ < aa.minZ;
+  if (!disjoint) return null;
+  return switch (op) {
+    BooleanOp.union => Modify.combine([a, b]),
+    BooleanOp.intersection => TriMesh.empty(),
+    BooleanOp.difference => a.clone(),
+  };
 }

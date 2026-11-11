@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import '../mesh/topology.dart';
 import '../mesh/tri_mesh.dart';
+import '../repair/weld.dart';
 
 /// Mirror across a plane, optionally welding the seam.
 ///
@@ -20,6 +21,14 @@ class Mirror {
     double weldTolerance = 0,
     bool flipNormals = true,
   }) {
+    if (point.length != 3 ||
+        normal.length != 3 ||
+        point.any((v) => !v.isFinite) ||
+        normal.any((v) => !v.isFinite) ||
+        !weldTolerance.isFinite ||
+        weldTolerance < 0) {
+      throw ArgumentError('Invalid mirror plane or weld tolerance');
+    }
     final nl = math.sqrt(
         normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
     if (nl < 1e-12) return mesh.clone();
@@ -53,8 +62,37 @@ class Mirror {
         builder.addTriangle(a, b, c);
       }
     }
-    var out = builder.build();
-    out.removeDegenerateFaces();
+    var out = builder.build()
+      ..faceGroups = mesh.faceGroups == null
+          ? null
+          : Uint16List.fromList([
+              if (keepOriginal) ...mesh.faceGroups!,
+              ...mesh.faceGroups!,
+            ])
+      ..vertexColors = mesh.vertexColors == null
+          ? null
+          : Float32List.fromList([
+              if (keepOriginal) ...mesh.vertexColors!,
+              ...mesh.vertexColors!,
+            ])
+      ..materials = mesh.materials
+      ..faceMaterials = mesh.faceMaterials == null
+          ? null
+          : Uint16List.fromList([
+              if (keepOriginal) ...mesh.faceMaterials!,
+              ...mesh.faceMaterials!
+            ])
+      ..cornerUvs = mesh.cornerUvs == null
+          ? null
+          : Float32List.fromList([
+              if (keepOriginal) ...mesh.cornerUvs!,
+              for (var f = 0; f < mesh.faceCount; f++)
+                for (final k in (flipNormals ? [0, 2, 1] : [0, 1, 2])) ...[
+                  mesh.cornerUvs![f * 6 + k * 2],
+                  mesh.cornerUvs![f * 6 + k * 2 + 1]
+                ]
+            ]);
+    out.removeDegenerateFaces(minArea: 0);
     if (weldTolerance > 0) {
       out = WeldLike.weld(out, weldTolerance);
     }
@@ -63,38 +101,10 @@ class Mirror {
   }
 }
 
-/// Small local weld used by mirror/merge paths to avoid a circular import
-/// between repair and tools.
+/// Compatibility wrapper shared by existing mirror/merge callers.
 class WeldLike {
-  static TriMesh weld(TriMesh mesh, double tolerance) {
-    final inv = 1.0 / tolerance;
-    final map = <int, int>{};
-    final remap = Uint32List(mesh.vertexCount);
-    final builder = MeshBuilder();
-    for (var i = 0; i < mesh.vertexCount; i++) {
-      final key = (((mesh.vx(i) * inv).round() & 0x1FFFFF) << 42) |
-          (((mesh.vy(i) * inv).round() & 0x1FFFFF) << 21) |
-          ((mesh.vz(i) * inv).round() & 0x1FFFFF);
-      final existing = map[key];
-      if (existing != null) {
-        remap[i] = existing;
-      } else {
-        final id = builder.addVertex(mesh.vx(i), mesh.vy(i), mesh.vz(i));
-        map[key] = id;
-        remap[i] = id;
-      }
-    }
-    for (var f = 0; f < mesh.faceCount; f++) {
-      final a = remap[mesh.indices[f * 3]];
-      final b = remap[mesh.indices[f * 3 + 1]];
-      final c = remap[mesh.indices[f * 3 + 2]];
-      if (a == b || b == c || a == c) continue;
-      builder.addTriangle(a, b, c);
-    }
-    final out = builder.build();
-    out.removeDegenerateFaces();
-    return out;
-  }
+  static TriMesh weld(TriMesh mesh, double tolerance) =>
+      Weld.weldVertices(mesh, tolerance: tolerance);
 }
 
 /// Extrudes a face selection along the surface normal, adding side walls.
@@ -109,6 +119,13 @@ class Extruder {
     bool smoothBoundary = false,
     int smoothIterations = 4,
   }) {
+    mesh.requireUntextured('Extrude');
+    if (faceMask.length != mesh.faceCount ||
+        !distance.isFinite ||
+        smoothIterations < 0 ||
+        smoothIterations > 1000) {
+      throw ArgumentError('Invalid extrusion parameters');
+    }
     if (distance.abs() < 1e-9) return mesh.clone();
     final topo = MeshTopology(mesh);
     final n = mesh.vertexCount;
@@ -140,6 +157,9 @@ class Extruder {
     rz /= rl;
 
     final builder = MeshBuilder();
+    final colors =
+        mesh.vertexColors == null ? null : <double>[...mesh.vertexColors!];
+    final groups = mesh.faceGroups == null ? null : <int>[];
     final vmap = Int32List(n);
     for (var v = 0; v < n; v++) {
       vmap[v] = builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v));
@@ -159,6 +179,7 @@ class Extruder {
           mesh.vy(v) + ry * distance,
           mesh.vz(v) + rz * distance,
         );
+        colors?.addAll(mesh.vertexColors!.sublist(v * 3, v * 3 + 3));
       }
     }
 
@@ -167,12 +188,14 @@ class Extruder {
       if (faceMask[f] != 0) continue;
       builder.addTriangle(vmap[mesh.indices[f * 3]],
           vmap[mesh.indices[f * 3 + 1]], vmap[mesh.indices[f * 3 + 2]]);
+      groups?.add(mesh.faceGroups![f]);
     }
     // Raised top.
     for (var f = 0; f < mesh.faceCount; f++) {
       if (faceMask[f] == 0) continue;
       builder.addTriangle(raised[mesh.indices[f * 3]],
           raised[mesh.indices[f * 3 + 1]], raised[mesh.indices[f * 3 + 2]]);
+      groups?.add(mesh.faceGroups![f]);
     }
     // Skirt along the selection boundary.
     var walls = 0;
@@ -192,17 +215,15 @@ class Extruder {
         if (a2 < 0 || b2 < 0) continue;
         builder.addTriangle(vmap[a], vmap[b], b2);
         builder.addTriangle(vmap[a], b2, a2);
+        groups?.addAll([mesh.faceGroups![f], mesh.faceGroups![f]]);
         walls++;
       }
     }
-    if (walls == 0) {
-      // Fully closed selection (whole shell): nothing to connect.
-      return builder.build();
-    }
-
-    var out = builder.build();
-    out.removeDegenerateFaces();
-    if (smoothBoundary && smoothIterations > 0) {
+    final out = builder.build()
+      ..faceGroups = groups == null ? null : Uint16List.fromList(groups)
+      ..vertexColors = colors == null ? null : Float32List.fromList(colors);
+    out.removeDegenerateFaces(minArea: 0);
+    if (walls > 0 && smoothBoundary && smoothIterations > 0) {
       _relaxBoundary(out, raised, smoothIterations);
     }
     out.compact();
@@ -244,34 +265,13 @@ class ShellSeparator {
     final topo = MeshTopology(mesh);
     final (faceComp, count) = topo.components();
     if (count <= 1) return <TriMesh>[mesh];
-    final builders = List<MeshBuilder>.generate(count, (_) => MeshBuilder());
-    final maps =
-        List<Int32List>.generate(count, (_) => Int32List(mesh.vertexCount));
-    for (var c = 0; c < count; c++) {
-      for (var v = 0; v < mesh.vertexCount; v++) {
-        maps[c][v] = -1;
-      }
-    }
-    for (var f = 0; f < mesh.faceCount; f++) {
-      final c = faceComp[f];
-      final b = builders[c];
-      final map = maps[c];
-      final ids = <int>[];
-      for (var k = 0; k < 3; k++) {
-        final v = mesh.indices[f * 3 + k];
-        if (map[v] < 0) {
-          map[v] = b.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v));
-        }
-        ids.add(map[v]);
-      }
-      b.addTriangle(ids[0], ids[1], ids[2]);
-    }
-    final out = <TriMesh>[];
-    for (final b in builders) {
-      final m = b.build();
-      m.compact();
-      out.add(m);
-    }
+    final out = <TriMesh>[
+      for (var c = 0; c < count; c++)
+        mesh.extractFaces([
+          for (var f = 0; f < mesh.faceCount; f++)
+            if (faceComp[f] == c) f,
+        ]),
+    ];
     out.sort((a, b) => b.surfaceArea().compareTo(a.surfaceArea()));
     return out;
   }

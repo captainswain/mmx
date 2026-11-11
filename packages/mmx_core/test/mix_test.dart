@@ -12,11 +12,7 @@ TriMesh loadModel(String name) =>
 void main() {
   group('mix import', () {
     test('reads the scene Meshmixer saved under Wine', () {
-      final file = File('/data/re/meshmixer/sample.mix');
-      if (!file.existsSync()) {
-        markTestSkipped('sample.mix not present');
-        return;
-      }
+      final file = File('../../apps/mmx_studio/test/fixtures/sample.mix');
       final objects = MixIO.read(file.readAsBytesSync());
       expect(objects.length, 1);
       expect(objects.first.mesh.vertexCount, 5550);
@@ -27,10 +23,6 @@ void main() {
 
     test('reads the older VFMesh 1.2 sample from the official mm-api repo', () {
       final file = File('test/fixtures/mmapi_sphere.mix');
-      if (!file.existsSync()) {
-        markTestSkipped('mm-api sphere.mix fixture not present');
-        return;
-      }
       final objects = MixIO.read(file.readAsBytesSync());
       expect(objects.length, 1);
       expect(objects.first.mesh.vertexCount, 6302);
@@ -42,10 +34,6 @@ void main() {
 
     test('reads face groups from a Meshmixer scene', () {
       final file = File('test/fixtures/grouped.mix');
-      if (!file.existsSync()) {
-        markTestSkipped('grouped.mix fixture not present');
-        return;
-      }
       final objects = MixIO.read(file.readAsBytesSync());
       expect(objects.length, 1);
       final groups = objects.first.mesh.faceGroups;
@@ -72,10 +60,6 @@ void main() {
 
     test('rewrite preserves the scene XML and updates the mesh', () {
       final file = File('test/fixtures/grouped.mix');
-      if (!file.existsSync()) {
-        markTestSkipped('grouped.mix fixture not present');
-        return;
-      }
       final original = file.readAsBytesSync();
       final objects = MixIO.read(original);
       final mesh = objects.first.mesh;
@@ -100,11 +84,7 @@ void main() {
     });
 
     test('MeshIO dispatches .mix to the scene reader', () {
-      final file = File('/data/re/meshmixer/sample.mix');
-      if (!file.existsSync()) {
-        markTestSkipped('sample.mix not present');
-        return;
-      }
+      final file = File('../../apps/mmx_studio/test/fixtures/sample.mix');
       final mesh = MeshIO.readBytes('sample.mix', file.readAsBytesSync());
       expect(mesh.faceCount, 10996);
       expect(mesh.vertexCount, 5550);

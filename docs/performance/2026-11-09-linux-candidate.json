@@ -1,0 +1,245 @@
+{
+  "schema": 2,
+  "recordedAtUtc": "2026-11-09T20:25:13.465766Z",
+  "host": {
+    "id": "local-ryzen7950x-20261109",
+    "os": "linux",
+    "osVersion": "Linux 7.0.0-42-generic #42-Ubuntu SMP PREEMPT_DYNAMIC Thu Oct 15 08:06:44 UTC 2026",
+    "architecture": "linux_x64",
+    "cpuModel": "AMD Ryzen 9 7950X 16-Core Processor",
+    "logicalProcessors": 32,
+    "physicalMemoryBytes": 115341807616,
+    "executionEnvironment": {
+      "cpuGovernor": "performance",
+      "cpuAffinity": "0-31"
+    }
+  },
+  "runtime": {
+    "mode": "aot",
+    "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"linux_x64\""
+  },
+  "configuration": {
+    "workloadVersion": 2,
+    "warmups": 1,
+    "samples": 3,
+    "isolation": "process-per-case",
+    "validation": "closed-oriented-edge-manifold",
+    "reducePercentage": 0.5,
+    "remeshDiagonalDivisor": 60,
+    "remeshIterations": 2,
+    "solidResolution": 96
+  },
+  "inputs": {
+    "12k": {
+      "sha256": "8c0b1e1c0eb05037b9b94ddc4169088b54395b79214eb9a0ad29da209954be0d",
+      "vertices": 6302,
+      "faces": 12600,
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      }
+    },
+    "100k": {
+      "sha256": "0c944aefd8f54d1794e4d6cd52d3d1599965ab1840621c62655617ab250a14b0",
+      "vertices": 50002,
+      "faces": 100000,
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      }
+    }
+  },
+  "provenance": {
+    "gitRevision": "a4b80f8418330b798e17b34a9ee1b007a9c8b803",
+    "gitStatus": "M .github/workflows/ci.yml\n M docs/PERFORMANCE.md\n M docs/RELEASE.md\n M packages/mmx_core/lib/src/remesh/decimate.dart\n M packages/mmx_core/test/geometry_acceptance_test.dart\n M packages/mmx_core/test/performance_test.dart\n M packages/mmx_core/tool/performance.dart\n M packages/mmx_core/tool/performance_support.dart\n M tool/package_release.py\n?? apps/mmx_studio/integration_test/desktop_performance.dart\n?? apps/mmx_studio/integration_test/desktop_performance.md\n?? docs/performance/2026-11-09-before-closure-fix.json\n?? docs/performance/2026-11-09-legacy.json\n?? tool/release/find_windows_runtime.ps1",
+    "executableSha256": "17bf2f989ce5538120ff0d0f0bb4b27f63fed318b812281daaf4e295aee27ee6",
+    "fixtureSha256": "8344b49fefcb1c5bcd5b1119152d6bbe15ffb71374709038468cfd34c08636de",
+    "kernelWorkingTreeSha256": "244b189448b0b06ae42f053bff9de645852505fdbefead87518b26d379829766",
+    "benchmarkWorkingTreeSha256": "33ab6c12b5af9b5b42dae065a10c9f78a673f746e18e104c185651ac26bca27e"
+  },
+  "cases": {
+    "12k/reduce": {
+      "samplesMicroseconds": [
+        45356,
+        49198,
+        50084
+      ],
+      "medianMicroseconds": 49198,
+      "minMicroseconds": 45356,
+      "maxMicroseconds": 50084,
+      "processPeakRssBytes": 85479424,
+      "rssAfterInputBytes": 9588736,
+      "rssAfterOperationBytes": [
+        72073216,
+        64315392,
+        52162560
+      ],
+      "outputFaces": [
+        6300,
+        6300,
+        6300
+      ],
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      },
+      "workerWallMicroseconds": 217925
+    },
+    "12k/remesh": {
+      "samplesMicroseconds": [
+        6477221,
+        6510545,
+        6370343
+      ],
+      "medianMicroseconds": 6477221,
+      "minMicroseconds": 6370343,
+      "maxMicroseconds": 6510545,
+      "processPeakRssBytes": 76562432,
+      "rssAfterInputBytes": 9478144,
+      "rssAfterOperationBytes": [
+        49205248,
+        48308224,
+        48316416
+      ],
+      "outputFaces": [
+        9102,
+        9102,
+        9102
+      ],
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      },
+      "workerWallMicroseconds": 25998862
+    },
+    "12k/solid": {
+      "samplesMicroseconds": [
+        345991,
+        355250,
+        352698
+      ],
+      "medianMicroseconds": 352698,
+      "minMicroseconds": 345991,
+      "maxMicroseconds": 355250,
+      "processPeakRssBytes": 77033472,
+      "rssAfterInputBytes": 9699328,
+      "rssAfterOperationBytes": [
+        51363840,
+        52322304,
+        51761152
+      ],
+      "outputFaces": [
+        86512,
+        86512,
+        86512
+      ],
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      },
+      "workerWallMicroseconds": 1473815
+    },
+    "100k/reduce": {
+      "samplesMicroseconds": [
+        479274,
+        530522,
+        477609
+      ],
+      "medianMicroseconds": 479274,
+      "minMicroseconds": 477609,
+      "maxMicroseconds": 530522,
+      "processPeakRssBytes": 203456512,
+      "rssAfterInputBytes": 14835712,
+      "rssAfterOperationBytes": [
+        190996480,
+        119803904,
+        191684608
+      ],
+      "outputFaces": [
+        50000,
+        50000,
+        50000
+      ],
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      },
+      "workerWallMicroseconds": 2108629
+    },
+    "100k/remesh": {
+      "samplesMicroseconds": [
+        12969467,
+        13086266,
+        13482140
+      ],
+      "medianMicroseconds": 13086266,
+      "minMicroseconds": 12969467,
+      "maxMicroseconds": 13482140,
+      "processPeakRssBytes": 143282176,
+      "rssAfterInputBytes": 14815232,
+      "rssAfterOperationBytes": [
+        60301312,
+        60604416,
+        60092416
+      ],
+      "outputFaces": [
+        6988,
+        6988,
+        6988
+      ],
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      },
+      "workerWallMicroseconds": 52673588
+    },
+    "100k/solid": {
+      "samplesMicroseconds": [
+        1006439,
+        1041612,
+        1016668
+      ],
+      "medianMicroseconds": 1016668,
+      "minMicroseconds": 1006439,
+      "maxMicroseconds": 1041612,
+      "processPeakRssBytes": 124743680,
+      "rssAfterInputBytes": 14823424,
+      "rssAfterOperationBytes": [
+        57315328,
+        57630720,
+        58982400
+      ],
+      "outputFaces": [
+        86512,
+        86512,
+        86512
+      ],
+      "topology": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentWindingEdges": 0
+      },
+      "workerWallMicroseconds": 4180468
+    }
+  },
+  "comparison": {
+    "maxRegressionPercent": 20,
+    "medianChangePercent": {
+      "12k/reduce": 7.2950515778684055,
+      "12k/remesh": 1.5462025728236295,
+      "12k/solid": 1.8225385048428855,
+      "100k/reduce": -0.30017661118704186,
+      "100k/remesh": 1.3821815179840824,
+      "100k/solid": 1.2758751220289577
+    },
+    "regressions": [],
+    "passed": true
+  }
+}

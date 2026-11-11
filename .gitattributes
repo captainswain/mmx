@@ -1,0 +1,5 @@
+# Match .editorconfig on every checkout, including Windows CI.
+* text=auto eol=lf
+*.mix binary
+*.png binary
+*.ico binary

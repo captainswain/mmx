@@ -1,5 +1,9 @@
 # Finish plan: Meshmixer reverse engineering and mmx parity
 
+> Historical plan. See [production readiness](PRODUCTION-READINESS.md) for
+> implemented hardening work, current validation, and outstanding release gates.
+
+
 This is the closing plan for the project. It separates three different
 questions that were previously mixed together:
 

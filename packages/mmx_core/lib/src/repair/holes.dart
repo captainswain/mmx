@@ -16,17 +16,33 @@ class HoleFiller {
   static TriMesh fill(TriMesh mesh,
       {double maxLoopLength = double.infinity,
       HoleFillMode mode = HoleFillMode.flatMinimal,
-      int smoothIterations = 30}) {
+      int smoothIterations = 30,
+      Set<int>? loopIndices,
+      bool requireAll = false}) {
+    mesh.requireUntextured('Hole filling');
     final topo = MeshTopology(mesh);
     final loops = topo.boundaryLoops();
     if (loops.isEmpty) return mesh;
 
+    if (maxLoopLength.isNaN ||
+        maxLoopLength < 0 ||
+        smoothIterations < 0 ||
+        smoothIterations > 1000 ||
+        (loopIndices != null &&
+            loopIndices.any((i) => i < 0 || i >= loops.length))) {
+      throw ArgumentError('Invalid hole-fill settings');
+    }
     final positions = <double>[...mesh.positions];
+    final colors =
+        mesh.vertexColors == null ? null : <double>[...mesh.vertexColors!];
     final indices = <int>[...mesh.indices];
+    final groups = mesh.faceGroups == null ? null : <int>[...mesh.faceGroups!];
     var added = 0;
     final filledVertices = <int>{};
 
-    for (final loop in loops) {
+    for (var loopIndex = 0; loopIndex < loops.length; loopIndex++) {
+      if (loopIndices != null && !loopIndices.contains(loopIndex)) continue;
+      final loop = loops[loopIndex];
       if (loop.length < 3) continue;
       var perimeter = 0.0;
       for (var i = 0; i < loop.length; i++) {
@@ -110,30 +126,66 @@ class HoleFiller {
       }
       final area2 = _signedArea(pts);
       final wantCcw = area2 > 0;
-      final tris = mode == HoleFillMode.fixed
-          ? _fan(pts.length, wantCcw)
-          : _earClip(pts, wantCcw);
+      final tris = _earClip(pts, wantCcw);
+      if (tris.length != loop.length - 2) {
+        if (requireAll) {
+          throw StateError(
+              'Cannot fill ambiguous boundary; repair or bridge it manually');
+        }
+        continue;
+      }
       if (tris.isEmpty) continue;
-      filledVertices.addAll(loop);
+
+      final edgeFaces =
+          topo.edgeFaces[topo.edgeKey(loop[0], loop[1])] ?? const <int>[];
+      var flip = false;
+      for (final f in edgeFaces) {
+        for (var k = 0; k < 3; k++) {
+          if (mesh.indices[f * 3 + k] == loop[0] &&
+              mesh.indices[f * 3 + (k + 1) % 3] == loop[1]) {
+            flip = true;
+          }
+        }
+      }
       for (final t in tris) {
-        final ia = loop[t[0]], ib = loop[t[1]], ic = loop[t[2]];
-        indices.addAll(<int>[ia, ib, ic]);
-        added++;
+        final a = loop[t[0]], b = loop[t[1]], c = loop[t[2]];
+        if (mode == HoleFillMode.smooth || mode == HoleFillMode.flatRemeshed) {
+          final center = positions.length ~/ 3;
+          for (var k = 0; k < 3; k++) {
+            positions.add((mesh.positions[a * 3 + k] +
+                    mesh.positions[b * 3 + k] +
+                    mesh.positions[c * 3 + k]) /
+                3);
+            colors?.add((mesh.vertexColors![a * 3 + k] +
+                    mesh.vertexColors![b * 3 + k] +
+                    mesh.vertexColors![c * 3 + k]) /
+                3);
+          }
+          filledVertices.add(center);
+          for (final edge in [
+            [a, b],
+            [b, c],
+            [c, a]
+          ]) {
+            indices.addAll(
+                flip ? [edge[1], edge[0], center] : [edge[0], edge[1], center]);
+            groups?.add(0);
+            added++;
+          }
+        } else {
+          indices.addAll(flip ? [a, c, b] : [a, b, c]);
+          groups?.add(0);
+          added++;
+        }
       }
     }
 
-    final out =
-        TriMesh(Float32List.fromList(positions), Uint32List.fromList(indices));
+    final out = TriMesh(
+        Float32List.fromList(positions), Uint32List.fromList(indices),
+        faceGroups: groups == null ? null : Uint16List.fromList(groups),
+        vertexColors: colors == null ? null : Float32List.fromList(colors));
     if (mode == HoleFillMode.smooth && added > 0) {
       _relax(out, smoothIterations, movable: filledVertices);
-    }
-    return out;
-  }
-
-  static List<List<int>> _fan(int n, bool ccw) {
-    final out = <List<int>>[];
-    for (var i = 1; i + 1 < n; i++) {
-      out.add(ccw ? <int>[0, i, i + 1] : <int>[0, i + 1, i]);
     }
     return out;
   }

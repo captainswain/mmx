@@ -2,9 +2,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../mesh/topology.dart';
+import '../mesh/attributes.dart';
+import '../mesh/limits.dart';
 import '../mesh/tri_mesh.dart';
-import '../repair/holes.dart';
-import '../repair/inspector.dart';
 import '../repair/weld.dart';
 import '../spatial/bvh.dart';
 import 'collapse_mesh.dart';
@@ -29,10 +29,19 @@ class IsotropicRemesher {
   /// Linear subdivision: splits every triangle into four by adding edge
   /// midpoints. This exactly preserves the input surface, matching Meshmixer's
   /// Linear Subdivision remesh mode. Face groups are inherited by the children.
-  static TriMesh linearSubdivide(TriMesh input) {
+  static TriMesh linearSubdivide(TriMesh input,
+      {int maximumFaces = defaultMaximumGeneratedFaces}) {
+    final faces =
+        checkedFaceProduct(input.faceCount, 4, maximumFaces, 'Subdivision');
+    checkGeneratedSize(faces, input.vertexCount + input.indices.length,
+        maximumFaces, 'Subdivision');
     final positions = <double>[...input.positions];
     final indices = <int>[];
     final groups = input.faceGroups == null ? null : <int>[];
+    final uvs = input.cornerUvs == null ? null : <double>[];
+    final materialIds = input.faceMaterials == null ? null : <int>[];
+    final colors =
+        input.vertexColors == null ? null : <double>[...input.vertexColors!];
     final mids = <String, int>{};
     int mid(int a, int b) {
       final key = a < b ? '$a:$b' : '$b:$a';
@@ -42,6 +51,13 @@ class IsotropicRemesher {
       positions.add((input.vx(a) + input.vx(b)) * 0.5);
       positions.add((input.vy(a) + input.vy(b)) * 0.5);
       positions.add((input.vz(a) + input.vz(b)) * 0.5);
+      if (colors != null) {
+        for (var k = 0; k < 3; k++) {
+          colors.add((input.vertexColors![a * 3 + k] +
+                  input.vertexColors![b * 3 + k]) *
+              .5);
+        }
+      }
       mids[key] = idx;
       return idx;
     }
@@ -54,6 +70,41 @@ class IsotropicRemesher {
       final bc = mid(b, c);
       final ca = mid(c, a);
       indices.addAll([a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca]);
+      if (uvs != null) {
+        final corners = [
+          for (var k = 0; k < 3; k++)
+            [
+              input.cornerUvs![f * 6 + k * 2],
+              input.cornerUvs![f * 6 + k * 2 + 1]
+            ]
+        ];
+        final mids = [
+          for (var k = 0; k < 3; k++)
+            [
+              for (var c = 0; c < 2; c++)
+                (corners[k][c] + corners[(k + 1) % 3][c]) * .5
+            ]
+        ];
+        for (final uv in [
+          corners[0],
+          mids[0],
+          mids[2],
+          mids[0],
+          corners[1],
+          mids[1],
+          mids[2],
+          mids[1],
+          corners[2],
+          mids[0],
+          mids[1],
+          mids[2]
+        ]) {
+          uvs.addAll(uv);
+        }
+      }
+      if (materialIds != null) {
+        materialIds.addAll(List.filled(4, input.faceMaterials![f]));
+      }
       if (groups != null) {
         final g = input.faceGroups![f];
         groups.addAll([g, g, g, g]);
@@ -63,6 +114,11 @@ class IsotropicRemesher {
       Float32List.fromList(positions),
       Uint32List.fromList(indices),
       faceGroups: groups == null ? null : Uint16List.fromList(groups),
+      vertexColors: colors == null ? null : Float32List.fromList(colors),
+      cornerUvs: uvs == null ? null : Float32List.fromList(uvs),
+      faceMaterials:
+          materialIds == null ? null : Uint16List.fromList(materialIds),
+      materials: input.materials,
     );
   }
 
@@ -86,6 +142,7 @@ class IsotropicRemesher {
     double adaptiveDensity = 0.0,
     bool debugTopology = false,
     void Function(int done, int total)? progress,
+    int maximumFaces = defaultMaximumGeneratedFaces,
   }) {
     return remeshDetailed(
       input,
@@ -98,6 +155,7 @@ class IsotropicRemesher {
       adaptiveDensity: adaptiveDensity,
       debugTopology: debugTopology,
       progress: progress,
+      maximumFaces: maximumFaces,
     ).mesh;
   }
 
@@ -112,7 +170,30 @@ class IsotropicRemesher {
     double adaptiveDensity = 0.0,
     bool debugTopology = false,
     void Function(int done, int total)? progress,
+    int maximumFaces = defaultMaximumGeneratedFaces,
   }) {
+    input.requireUntextured('Isotropic remesh');
+    if (!targetEdgeLength.isFinite ||
+        targetEdgeLength <= 0 ||
+        iterations < 0 ||
+        iterations > 1000 ||
+        !adaptiveDensity.isFinite ||
+        adaptiveDensity < 0 ||
+        adaptiveDensity > 1 ||
+        !sharpAngleDegrees.isFinite ||
+        sharpAngleDegrees < 0 ||
+        sharpAngleDegrees > 180) {
+      throw ArgumentError('Invalid remesh parameters');
+    }
+    checkGeneratedSize(
+        input.faceCount, input.vertexCount, maximumFaces, 'Remesh');
+    if (iterations > 0 &&
+        input.surfaceArea() /
+                (targetEdgeLength * targetEdgeLength * .4330127018922193) >
+            maximumFaces) {
+      throw StateError(
+          'Requested remesh edge length exceeds the output face budget');
+    }
     if (input.faceCount == 0) return RemeshResult(input);
     final originalBvh = TriangleBVH.build(input);
     var mesh = input.clone();
@@ -144,6 +225,8 @@ class IsotropicRemesher {
             'before split nm=${t.nonManifoldEdges().length} b=${t.boundaryLoops().length}');
       }
       mesh = _splitLong(mesh, targetEdgeLength * 4.0 / 3.0,
+          maximumFaces: maximumFaces,
+          preserveBoundary: preserveBoundary,
           maxFor: curvSplit == null
               ? null
               : (a, b) =>
@@ -178,23 +261,14 @@ class IsotropicRemesher {
     progress?.call(iterations, iterations);
     mesh.removeDegenerateFaces();
     mesh.compact();
-    if (adaptiveDensity > 0) {
-      Weld.removeDuplicateFaces(mesh);
-      for (var pass = 0; pass < 3; pass++) {
-        var changed = false;
-        if (MeshTopology(mesh).boundaryLoops().isNotEmpty) {
-          mesh = HoleFiller.fill(mesh, mode: HoleFillMode.flatMinimal);
-          changed = true;
-        }
-        if (MeshTopology(mesh).nonManifoldEdges().isNotEmpty) {
-          mesh = MeshInspector.splitNonManifold(mesh);
-          changed = true;
-        }
-        if (!changed) break;
-      }
-    }
+    if (adaptiveDensity > 0) Weld.removeDuplicateFaces(mesh);
+    final outputTopology = MeshTopology(mesh);
+    final inputTopology = MeshTopology(input);
     if (adaptiveDensity > 0 &&
-        MeshTopology(mesh).nonManifoldEdges().isNotEmpty) {
+        (outputTopology.nonManifoldEdges().isNotEmpty ||
+            inputTopology.nonManifoldEdges().isNotEmpty ||
+            (inputTopology.boundaryEdges().isEmpty &&
+                outputTopology.boundaryEdges().isNotEmpty))) {
       // The angle-defect density heuristic can create non-manifold junctions
       // on aggressive settings. Fall back to the uniform pass, which is
       // topology-safe, rather than returning a non-manifold result.
@@ -210,14 +284,17 @@ class IsotropicRemesher {
           adaptiveDensity: 0.0,
           debugTopology: debugTopology,
           progress: progress,
+          maximumFaces: maximumFaces,
         ),
         usedUniformFallback: true,
         fallbackReason: 'adaptive remesh produced non-manifold edges',
       );
     }
-    if (groupSegments.isNotEmpty) {
+    if (input.faceGroups != null) {
       mesh.faceGroups = _transferFaceGroups(input, mesh, originalBvh);
     }
+    mesh.vertexColors =
+        transferVertexColors(input, mesh, sourceBvh: originalBvh);
     return RemeshResult(mesh);
   }
 
@@ -376,20 +453,34 @@ class IsotropicRemesher {
   /// Splits every edge longer than [maxLen]. Handles faces with one, two or
   /// three long edges so the result stays conforming.
   static TriMesh _splitLong(TriMesh mesh, double maxLen,
-      {double Function(int, int)? maxFor}) {
-    final builder = MeshBuilder();
-    final vmap = List<int>.generate(mesh.vertexCount,
-        (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
+      {double Function(int, int)? maxFor,
+      required int maximumFaces,
+      bool preserveBoundary = false}) {
     final midCache = <int, int>{};
     final n = mesh.vertexCount;
     final topo = MeshTopology(mesh);
     final splitEdges = <int>{};
     for (final key in topo.edgeFaces.keys) {
+      if (preserveBoundary && topo.edgeFaces[key]!.length == 1) continue;
       final a = key ~/ n, b = key % n;
       if (_len(mesh, a, b) > (maxFor?.call(a, b) ?? maxLen)) {
         splitEdges.add(key);
       }
     }
+    var predictedFaces = mesh.faceCount;
+    for (var f = 0; f < mesh.faceCount; f++) {
+      for (var k = 0; k < 3; k++) {
+        if (splitEdges.contains(topo.edgeKey(
+            mesh.indices[f * 3 + k], mesh.indices[f * 3 + (k + 1) % 3]))) {
+          predictedFaces++;
+        }
+      }
+    }
+    checkGeneratedSize(predictedFaces, mesh.vertexCount + splitEdges.length,
+        maximumFaces, 'Remesh subdivision');
+    final builder = MeshBuilder();
+    final vmap = List<int>.generate(mesh.vertexCount,
+        (v) => builder.addVertex(mesh.vx(v), mesh.vy(v), mesh.vz(v)));
 
     int midpoint(int a, int b) {
       final key = a < b ? a * n + b : b * n + a;
@@ -449,7 +540,7 @@ class IsotropicRemesher {
           final m1 = midpoint(vc, va), m2 = midpoint(va, vb);
           builder.addTriangle(A, m2, m1);
           builder.addTriangle(m2, B, C);
-          builder.addTriangle(m1, C, m2);
+          builder.addTriangle(m1, m2, C);
         }
         continue;
       }
@@ -476,6 +567,11 @@ class IsotropicRemesher {
       TriMesh mesh, double minLen, bool preserveBoundary, Set<int> sharp,
       {double Function(int, int)? minFor}) {
     final state = CollapseMesh(mesh);
+    final pinned = <int>{
+      ...sharp,
+      if (preserveBoundary)
+        for (final e in MeshTopology(mesh).boundaryEdges()) ...e.take(2)
+    };
     final n = mesh.vertexCount;
     final edges = state.edgeCount.keys.toList()
       ..sort((a, b) {
@@ -486,16 +582,37 @@ class IsotropicRemesher {
     for (final key in edges) {
       if ((state.edgeCount[key] ?? 0) == 0) continue;
       final a = key ~/ n, b = key % n;
-      if (_len(mesh, a, b) >= (minFor?.call(a, b) ?? minLen)) continue;
-      state.tryCollapse(
+      final dx = state.positions[a * 3] - state.positions[b * 3];
+      final dy = state.positions[a * 3 + 1] - state.positions[b * 3 + 1];
+      final dz = state.positions[a * 3 + 2] - state.positions[b * 3 + 2];
+      if (math.sqrt(dx * dx + dy * dy + dz * dz) >=
+          (minFor?.call(a, b) ?? minLen)) {
+        continue;
+      }
+      final anchor = pinned.contains(a)
+          ? a
+          : pinned.contains(b)
+              ? b
+              : null;
+      final collapsed = state.tryCollapse(
         a,
         b,
-        (mesh.vx(a) + mesh.vx(b)) * 0.5,
-        (mesh.vy(a) + mesh.vy(b)) * 0.5,
-        (mesh.vz(a) + mesh.vz(b)) * 0.5,
+        anchor == null
+            ? (state.positions[a * 3] + state.positions[b * 3]) * .5
+            : state.positions[anchor * 3],
+        anchor == null
+            ? (state.positions[a * 3 + 1] + state.positions[b * 3 + 1]) * .5
+            : state.positions[anchor * 3 + 1],
+        anchor == null
+            ? (state.positions[a * 3 + 2] + state.positions[b * 3 + 2]) * .5
+            : state.positions[anchor * 3 + 2],
         preserveBoundary: preserveBoundary,
-        sharp: sharp,
+        sharp: pinned,
       );
+      if (collapsed && anchor != null) {
+        pinned.remove(b);
+        pinned.add(a);
+      }
     }
     final out = state.build();
     out.removeDegenerateFaces();
@@ -567,7 +684,7 @@ class IsotropicRemesher {
       final t1 = _normalOf(mesh, c, b, d);
       final d0 = t0[0] * orig0[0] + t0[1] * orig0[1] + t0[2] * orig0[2];
       final d1 = t1[0] * orig1[0] + t1[1] * orig1[1] + t1[2] * orig1[2];
-      if (d0.abs() < 1e-12 || d1.abs() < 1e-12) continue;
+      if (d0.abs() < 1e-12 || d1.abs() < 1e-12 || d0 * d1 <= 0) continue;
       faces[f0] = d0 > 0 ? <int>[a, c, d] : <int>[a, d, c];
       faces[f1] = d1 > 0 ? <int>[c, b, d] : <int>[c, d, b];
       valence[a]--;

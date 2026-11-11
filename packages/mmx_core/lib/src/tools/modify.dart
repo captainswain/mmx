@@ -12,6 +12,8 @@ import 'dart:typed_data';
 
 import '../mesh/topology.dart';
 import '../mesh/tri_mesh.dart';
+import '../mesh/material.dart';
+import '../mesh/limits.dart';
 import '../spatial/bvh.dart';
 
 enum PrimitiveKind { box, cylinder, sphere }
@@ -56,9 +58,7 @@ class Modify {
       if (faceMask != null && (f >= faceMask.length || faceMask[f] == 0)) {
         continue;
       }
-      final a = out.indices[f * 3 + 1];
-      out.indices[f * 3 + 1] = out.indices[f * 3 + 2];
-      out.indices[f * 3 + 2] = a;
+      out.reverseFace(f);
     }
     return out;
   }
@@ -114,13 +114,7 @@ class Modify {
       pass(lambda);
       pass(mu);
     }
-    return TriMesh(positions, Uint32List.fromList(mesh.indices),
-        faceGroups: mesh.faceGroups == null
-            ? null
-            : Uint16List.fromList(mesh.faceGroups!),
-        vertexColors: mesh.vertexColors == null
-            ? null
-            : Float32List.fromList(mesh.vertexColors!));
+    return mesh.clone()..positions = positions;
   }
 
   /// Drops the object onto the print bed: lowest point sits at [bedY].
@@ -182,26 +176,73 @@ class Modify {
     }
     final positions = Float32List(vertexTotal * 3);
     final indices = Uint32List(faceTotal * 3);
-    final groups = groupTotal == faceTotal ? Uint16List(faceTotal) : null;
+    final groups = groupTotal > 0 ? Uint16List(faceTotal) : null;
+    final colors = usable.any((m) => m.vertexColors != null)
+        ? Float32List(vertexTotal * 3)
+        : null;
+    colors?.fillRange(0, colors.length, 1.0);
+    final uvs = usable.any((m) => m.cornerUvs != null)
+        ? Float32List(faceTotal * 6)
+        : null;
+    final materials = <MeshMaterial>[];
+    final materialMap = <MeshMaterial, int>{};
+    final materialIds = usable.any((m) => m.materials.isNotEmpty)
+        ? Uint16List(faceTotal)
+        : null;
+    final fallbackMaterial = MeshMaterial(name: 'unassigned');
     var vOffset = 0;
     var fOffset = 0;
     var groupId = 0;
     for (final m in usable) {
+      if (uvs != null && m.cornerUvs != null) {
+        uvs.setRange(
+            fOffset * 6, fOffset * 6 + m.cornerUvs!.length, m.cornerUvs!);
+      }
+      if (materialIds != null) {
+        final remap = <int, int>{};
+        int mapped(int id) => remap.putIfAbsent(id, () {
+              final material = id < 0 ? fallbackMaterial : m.materials[id];
+              return materialMap.putIfAbsent(material, () {
+                if (materials.length >= 4096) {
+                  throw const FormatException(
+                      'Combined material limit exceeded');
+                }
+                materials.add(material);
+                return materials.length - 1;
+              });
+            });
+        for (var f = 0; f < m.faceCount; f++) {
+          materialIds[fOffset + f] = mapped(m.faceMaterials?[f] ?? -1);
+        }
+      }
       positions.setRange(
           vOffset * 3, vOffset * 3 + m.positions.length, m.positions);
       for (var i = 0; i < m.indices.length; i++) {
         indices[fOffset * 3 + i] = m.indices[i] + vOffset;
       }
-      if (groups != null && m.faceGroups != null) {
-        for (var f = 0; f < m.faceCount; f++) {
-          groups[fOffset + f] = m.faceGroups![f] + groupId;
+      if (colors != null && m.vertexColors != null) {
+        colors.setRange(
+            vOffset * 3, vOffset * 3 + m.vertexColors!.length, m.vertexColors!);
+      }
+      if (groups != null) {
+        final maxGroup = m.faceGroups?.reduce(math.max) ?? 0;
+        if (maxGroup + groupId > 65535) {
+          throw StateError('Combined face groups exceed uint16 range');
         }
-        groupId += (m.faceGroups!.reduce(math.max)) + 1;
+        for (var f = 0; f < m.faceCount; f++) {
+          groups[fOffset + f] = (m.faceGroups?[f] ?? 0) + groupId;
+        }
+        groupId += maxGroup + 1;
       }
       vOffset += m.vertexCount;
       fOffset += m.faceCount;
     }
-    return TriMesh(positions, indices, faceGroups: groups);
+    return TriMesh(positions, indices,
+        faceGroups: groups,
+        vertexColors: colors,
+        cornerUvs: uvs,
+        faceMaterials: materialIds,
+        materials: materials);
   }
 
   /// Rectangular array of copies (Meshmixer's MakePatternTool, grid mode).
@@ -214,8 +255,27 @@ class Modify {
     double gap = 2,
     double? spacingX,
     double? spacingZ,
+    int maximumFaces = defaultMaximumGeneratedFaces,
   }) {
+    if (countX <= 0 ||
+        countY <= 0 ||
+        countZ <= 0 ||
+        !gap.isFinite ||
+        (spacingX != null && !spacingX.isFinite) ||
+        (spacingZ != null && !spacingZ.isFinite)) {
+      throw ArgumentError('Pattern counts must be positive and spacing finite');
+    }
+    checkGeneratedSize(
+        mesh.faceCount, mesh.vertexCount, maximumFaces, 'Pattern');
     if (mesh.faceCount == 0) return TriMesh.empty();
+    var faces = mesh.faceCount;
+    for (final count in [countX, countY, countZ]) {
+      faces = checkedFaceProduct(faces, count, maximumFaces, 'Pattern');
+    }
+    final copiesCount = faces ~/ mesh.faceCount;
+    if (mesh.vertexCount > maximumFaces * 3 ~/ copiesCount) {
+      throw StateError('Pattern exceeds the output vertex budget');
+    }
     final b = mesh.bounds();
     final sx = spacingX ?? (b.extentX + gap);
     final sz = spacingZ ?? (b.extentZ + gap);
@@ -351,7 +411,7 @@ class Modify {
       7,
     ];
     for (var i = 0; i < faces.length; i += 3) {
-      b.addTriangle(v[faces[i]], v[faces[i + 1]], v[faces[i + 2]]);
+      b.addTriangle(v[faces[i]], v[faces[i + 2]], v[faces[i + 1]]);
     }
     return b.build();
   }

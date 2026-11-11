@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../geom/bbox.dart';
+import 'material.dart';
 
 /// Indexed triangle mesh: the single geometry container used by every
 /// operator in this kernel. Positions and indices are flat typed arrays so
@@ -17,7 +18,49 @@ class TriMesh {
   /// Per-vertex RGB, 3 floats per vertex. Optional.
   Float32List? vertexColors;
 
-  TriMesh(this.positions, this.indices, {this.faceGroups, this.vertexColors});
+  /// UV pairs per triangle corner (indices.length * 2); permits UV seams.
+  Float32List? cornerUvs;
+
+  /// Per-face index into [materials]. All faces need an assignment when present.
+  Uint16List? faceMaterials;
+  List<MeshMaterial> _materials;
+  List<MeshMaterial> get materials => _materials;
+  set materials(List<MeshMaterial> value) =>
+      _materials = List.unmodifiable(value);
+
+  TriMesh(this.positions, this.indices,
+      {this.faceGroups,
+      this.vertexColors,
+      this.cornerUvs,
+      this.faceMaterials,
+      List<MeshMaterial> materials = const []})
+      : _materials = List.unmodifiable(materials);
+
+  /// Mutable geometry/attribute storage; immutable textures can be shared safely.
+  List<TypedData> get dataBuffers => [
+        positions,
+        indices,
+        if (faceGroups != null) faceGroups!,
+        if (vertexColors != null) vertexColors!,
+        if (cornerUvs != null) cornerUvs!,
+        if (faceMaterials != null) faceMaterials!
+      ];
+  int get attributeBytes =>
+      (cornerUvs?.lengthInBytes ?? 0) +
+      (faceMaterials?.lengthInBytes ?? 0) +
+      materials
+          .map((m) => m.texture)
+          .whereType<MeshTexture>()
+          .toSet()
+          .fold<int>(0, (n, t) => n + t.byteSize);
+  bool get hasSurfaceAttributes =>
+      cornerUvs != null || materials.isNotEmpty || faceMaterials != null;
+  void requireUntextured(String operation) {
+    if (hasSurfaceAttributes) {
+      throw UnsupportedError(
+          '$operation cannot preserve UV/material assignments. Remove materials and UVs explicitly first.');
+    }
+  }
 
   factory TriMesh.empty() => TriMesh(Float32List(0), Uint32List(0));
 
@@ -35,6 +78,10 @@ class TriMesh {
             faceGroups == null ? null : Uint16List.fromList(faceGroups!),
         vertexColors:
             vertexColors == null ? null : Float32List.fromList(vertexColors!),
+        cornerUvs: cornerUvs == null ? null : Float32List.fromList(cornerUvs!),
+        faceMaterials:
+            faceMaterials == null ? null : Uint16List.fromList(faceMaterials!),
+        materials: materials,
       );
 
   BBox bounds() {
@@ -99,17 +146,93 @@ class TriMesh {
 
   /// Applies a column-major 4x4 affine transform in place.
   void transform(Float64List m) {
+    if (m.length != 16 ||
+        m.any((v) => !v.isFinite) ||
+        m[3] != 0 ||
+        m[7] != 0 ||
+        m[11] != 0 ||
+        m[15] != 1) {
+      throw ArgumentError('Expected a finite affine 4x4 transform');
+    }
+    final determinant =
+        _det(m[0], m[4], m[8], m[1], m[5], m[9], m[2], m[6], m[10]);
+    if (!determinant.isFinite || determinant == 0) {
+      throw ArgumentError('Singular transform');
+    }
+    final transformed = Float32List(positions.length);
     for (var i = 0; i < positions.length; i += 3) {
       final x = positions[i], y = positions[i + 1], z = positions[i + 2];
-      positions[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
-      positions[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-      positions[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+      transformed[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
+      transformed[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+      transformed[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
     }
+    if (transformed.any((v) => !v.isFinite)) {
+      throw ArgumentError('Transform exceeds float32 range');
+    }
+    positions = transformed;
+    // Reflections reverse handedness. Keep outward-facing winding.
+    if (determinant < 0) {
+      for (var f = 0; f < indices.length; f += 3) {
+        reverseFace(f ~/ 3);
+      }
+    }
+  }
+
+  /// Reverse winding and associated corner UVs together.
+  void reverseFace(int face) {
+    final f = face * 3;
+    final tmp = indices[f + 1];
+    indices[f + 1] = indices[f + 2];
+    indices[f + 2] = tmp;
+    if (cornerUvs != null) {
+      for (var k = 0; k < 2; k++) {
+        final t = cornerUvs![(f + 1) * 2 + k];
+        cornerUvs![(f + 1) * 2 + k] = cornerUvs![(f + 2) * 2 + k];
+        cornerUvs![(f + 2) * 2 + k] = t;
+      }
+    }
+  }
+
+  /// Extract faces while preserving per-face groups and per-vertex colors.
+  TriMesh extractFaces(Iterable<int> faces) {
+    final builder = MeshBuilder();
+    final remap = <int, int>{};
+    final groups = faceGroups == null ? null : <int>[];
+    final colors = vertexColors == null ? null : <double>[];
+    final uvs = cornerUvs == null ? null : <double>[];
+    final materialIds = faceMaterials == null ? null : <int>[];
+    for (final face in faces) {
+      if (face < 0 || face >= faceCount) {
+        throw RangeError.index(face, indices, 'face');
+      }
+      final mapped = <int>[];
+      for (var k = 0; k < 3; k++) {
+        final v = indices[face * 3 + k];
+        mapped.add(remap.putIfAbsent(v, () {
+          colors?.addAll(vertexColors!.sublist(v * 3, v * 3 + 3));
+          return builder.addVertex(vx(v), vy(v), vz(v));
+        }));
+      }
+      builder.addTriangle(mapped[0], mapped[1], mapped[2]);
+      groups?.add(faceGroups![face]);
+      uvs?.addAll(cornerUvs!.sublist(face * 6, face * 6 + 6));
+      materialIds?.add(faceMaterials![face]);
+    }
+    return builder.build()
+      ..faceGroups = groups == null ? null : Uint16List.fromList(groups)
+      ..vertexColors = colors == null ? null : Float32List.fromList(colors)
+      ..cornerUvs = uvs == null ? null : Float32List.fromList(uvs)
+      ..faceMaterials =
+          materialIds == null ? null : Uint16List.fromList(materialIds)
+      ..materials = materials;
   }
 
   /// Drops faces with repeated indices or (near) zero area.
   int removeDegenerateFaces({double minArea = 1e-14}) {
     final keep = <int>[];
+    final groups = faceGroups == null ? null : <int>[];
+    final uvs = cornerUvs == null ? null : <double>[];
+    final materialIds = faceMaterials == null ? null : <int>[];
     for (var f = 0; f < indices.length; f += 3) {
       final ia = indices[f], ib = indices[f + 1], ic = indices[f + 2];
       if (ia == ib || ib == ic || ia == ic) continue;
@@ -120,6 +243,9 @@ class TriMesh {
           ny = uz * wx - ux * wz,
           nz = ux * wy - uy * wx;
       if (0.5 * math.sqrt(nx * nx + ny * ny + nz * nz) <= minArea) continue;
+      groups?.add(faceGroups![f ~/ 3]);
+      uvs?.addAll(cornerUvs!.sublist(f * 2, f * 2 + 6));
+      materialIds?.add(faceMaterials![f ~/ 3]);
       keep.add(ia);
       keep.add(ib);
       keep.add(ic);
@@ -127,9 +253,9 @@ class TriMesh {
     final removed = (indices.length - keep.length) ~/ 3;
     if (removed > 0) {
       indices = Uint32List.fromList(keep);
-      if (faceGroups != null && faceGroups!.length != keep.length ~/ 3) {
-        faceGroups = null;
-      }
+      if (groups != null) faceGroups = Uint16List.fromList(groups);
+      if (uvs != null) cornerUvs = Float32List.fromList(uvs);
+      if (materialIds != null) faceMaterials = Uint16List.fromList(materialIds);
     }
     return removed;
   }
@@ -177,6 +303,32 @@ class TriMesh {
     final issues = <String>[];
     if (positions.length % 3 != 0) issues.add('positions not a multiple of 3');
     if (indices.length % 3 != 0) issues.add('indices not a multiple of 3');
+    if (faceGroups != null && faceGroups!.length != faceCount) {
+      issues.add('face group count mismatch');
+    }
+    if (vertexColors != null &&
+        (vertexColors!.length != positions.length ||
+            vertexColors!.any((v) => !v.isFinite))) {
+      issues.add('invalid vertex colors');
+    }
+    if (cornerUvs != null &&
+        (cornerUvs!.length != indices.length * 2 ||
+            cornerUvs!.any((v) => !v.isFinite))) {
+      issues.add('invalid corner UVs');
+    }
+    if (materials.length > 4096 ||
+        (faceMaterials != null &&
+            (faceMaterials!.length != faceCount ||
+                faceMaterials!.any((id) => id >= materials.length))) ||
+        (materials.isNotEmpty && faceMaterials == null)) {
+      issues.add('invalid material assignments');
+    }
+    if (materials.any((m) => m.texture != null) && cornerUvs == null) {
+      issues.add('texture requires UVs');
+    }
+    if (attributeBytes > 192 * 1024 * 1024) {
+      issues.add('surface attributes exceed 192 MiB limit');
+    }
     final n = vertexCount;
     for (var i = 0; i < indices.length; i++) {
       if (indices[i] >= n) {

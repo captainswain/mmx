@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "runtime": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"linux_x64\"",
+  "os": "linux",
+  "processors": 32,
+  "medianMicroseconds": {
+    "12k/reduce": 47370,
+    "12k/remesh": 5687856,
+    "12k/solid": 335940,
+    "100k/reduce": 462302,
+    "100k/remesh": 12622035,
+    "100k/solid": 1019117
+  }
+}

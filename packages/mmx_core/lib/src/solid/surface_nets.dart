@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../mesh/limits.dart';
 import '../mesh/tri_mesh.dart';
 import 'voxel.dart';
 
@@ -7,11 +8,14 @@ import 'voxel.dart';
 /// grid.
 ///
 /// Meshmixer ships ImplicitPolygonizer.cpp for the same job. Surface nets are
-/// used here because they produce a manifold mesh directly from the sign field
-/// without marching-cubes tables, and they place vertices at the average edge
-/// crossing, which is smoother than naive MC output.
+/// used here to connect sign-changing grid edges without marching-cubes tables.
+/// Vertices lie at average edge crossings. Ambiguous sign configurations can
+/// still produce non-manifold topology; callers must validate their output.
 class SurfaceNets {
-  static TriMesh polygonize(VoxelGrid grid) {
+  static TriMesh polygonize(VoxelGrid grid, {int? maximumFaces}) {
+    if (maximumFaces != null) {
+      checkGeneratedSize(0, 0, maximumFaces, 'Surface nets');
+    }
     final nx = grid.nx, ny = grid.ny, nz = grid.nz;
     final cellVertex = Int32List(nx * ny * nz);
     for (var i = 0; i < cellVertex.length; i++) {
@@ -73,6 +77,9 @@ class SurfaceNets {
           }
           if (crossings == 0) continue;
           final id = pos.length ~/ 3;
+          if (maximumFaces != null) {
+            checkGeneratedSize(0, id + 1, maximumFaces, 'Surface nets');
+          }
           pos.add(sx / crossings);
           pos.add(sy / crossings);
           pos.add(sz / crossings);
@@ -95,23 +102,15 @@ class SurfaceNets {
 
     void emitQuad(int a, int b, int c, int d, int axis, bool insideToOutside) {
       if (a < 0 || b < 0 || c < 0 || d < 0) return;
-      // Orient using the sign gradient: surface normal points outward.
-      final ax = pos[a * 3], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
-      final bx = pos[b * 3], by = pos[b * 3 + 1], bz = pos[b * 3 + 2];
-      final cx = pos[c * 3], cy = pos[c * 3 + 1], cz = pos[c * 3 + 2];
-      final ux = bx - ax, uy = by - ay, uz = bz - az;
-      final wx = cx - ax, wy = cy - ay, wz = cz - az;
-      final nxq = uy * wz - uz * wy;
-      final nyq = uz * wx - ux * wz;
-      final nzq = ux * wy - uy * wx;
-      final want = insideToOutside ? 1.0 : -1.0;
-      final dot = (axis == 0
-              ? nxq
-              : axis == 1
-                  ? nyq
-                  : nzq) *
-          want;
-      if (dot >= 0) {
+      if (maximumFaces != null) {
+        checkGeneratedSize(tris.length ~/ 3 + 2, pos.length ~/ 3, maximumFaces,
+            'Surface nets');
+      }
+      // Use the grid's cyclic cell ordering, not a geometric cross product:
+      // distinct cell vertices can coincide at sharp corners, where the cross
+      // product is zero and cannot determine orientation.
+      final forward = axis == 1 ? !insideToOutside : insideToOutside;
+      if (forward) {
         tris.addAll(<int>[a, b, c]);
         tris.addAll(<int>[a, c, d]);
       } else {

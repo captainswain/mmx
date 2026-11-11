@@ -1,0 +1,191 @@
+{
+  "schema": 2,
+  "recordedAtUtc": "2026-11-09T20:17:06.407897Z",
+  "host": {
+    "id": "local-ryzen7950x-20261109",
+    "os": "linux",
+    "osVersion": "Linux 7.0.0-42-generic #42-Ubuntu SMP PREEMPT_DYNAMIC Thu Oct 15 08:06:44 UTC 2026",
+    "architecture": "linux_x64",
+    "cpuModel": "AMD Ryzen 9 7950X 16-Core Processor",
+    "logicalProcessors": 32,
+    "physicalMemoryBytes": 115341807616,
+    "executionEnvironment": {
+      "cpuGovernor": "performance",
+      "cpuAffinity": "0-31"
+    }
+  },
+  "runtime": {
+    "mode": "aot",
+    "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"linux_x64\""
+  },
+  "configuration": {
+    "workloadVersion": 2,
+    "warmups": 1,
+    "samples": 3,
+    "isolation": "process-per-case",
+    "reducePercentage": 0.5,
+    "remeshDiagonalDivisor": 60,
+    "remeshIterations": 2,
+    "solidResolution": 96
+  },
+  "inputs": {
+    "12k": {
+      "sha256": "8c0b1e1c0eb05037b9b94ddc4169088b54395b79214eb9a0ad29da209954be0d",
+      "vertices": 6302,
+      "faces": 12600
+    },
+    "100k": {
+      "sha256": "3b826f3481578a94b735224986d783de405406d97afc528852749dffc52ac79f",
+      "vertices": 50002,
+      "faces": 99998
+    }
+  },
+  "provenance": {
+    "gitRevision": "486234cb88f2481ba68f19955c7ec9bee11292e4",
+    "gitStatus": "M .github/ISSUE_TEMPLATE/config.yml\n M .github/workflows/ci.yml\n M .gitignore\n M CHANGELOG.md\n M NOTICE\n M README.md\n M apps/mmx_studio/lib/state/studio_state.dart\n M apps/mmx_studio/lib/ui/panels.dart\n M apps/mmx_studio/lib/ui/screen.dart\n M apps/mmx_studio/lib/ui/viewport.dart\n M apps/mmx_studio/linux/flutter/generated_plugin_registrant.cc\n M apps/mmx_studio/linux/flutter/generated_plugins.cmake\n M apps/mmx_studio/macos/Flutter/GeneratedPluginRegistrant.swift\n M apps/mmx_studio/macos/Runner/DebugProfile.entitlements\n M apps/mmx_studio/macos/Runner/Release.entitlements\n M apps/mmx_studio/pubspec.lock\n M apps/mmx_studio/pubspec.yaml\n M apps/mmx_studio/test/widget_test.dart\n M apps/mmx_studio/windows/flutter/generated_plugin_registrant.cc\n M apps/mmx_studio/windows/flutter/generated_plugins.cmake\n M docs/FINISH-PLAN.md\n M docs/README.md\n M docs/REMEDIATION-PLAN.md\n M docs/TESTING.md\n M docs/TOOL-MATRIX.md\n M packages/mmx_core/README.md\n M packages/mmx_core/bin/mmx.dart\n M packages/mmx_core/lib/mmx_core.dart\n M packages/mmx_core/lib/src/io/mesh_io.dart\n M packages/mmx_core/lib/src/io/mix.dart\n M packages/mmx_core/lib/src/io/obj.dart\n M packages/mmx_core/lib/src/io/ply.dart\n M packages/mmx_core/lib/src/io/stl.dart\n M packages/mmx_core/lib/src/io/threemf.dart\n M packages/mmx_core/lib/src/io/zip.dart\n M packages/mmx_core/lib/src/mesh/tri_mesh.dart\n M packages/mmx_core/lib/src/remesh/decimate.dart\n M packages/mmx_core/lib/src/remesh/isotropic.dart\n M packages/mmx_core/lib/src/repair/holes.dart\n M packages/mmx_core/lib/src/repair/weld.dart\n M packages/mmx_core/lib/src/scene/document.dart\n M packages/mmx_core/lib/src/solid/mesh_boolean.dart\n M packages/mmx_core/lib/src/solid/solidifier.dart\n M packages/mmx_core/lib/src/solid/surface_nets.dart\n M packages/mmx_core/lib/src/solid/voxel.dart\n M packages/mmx_core/lib/src/spatial/bvh.dart\n M packages/mmx_core/lib/src/tools/complex.dart\n M packages/mmx_core/lib/src/tools/edits.dart\n M packages/mmx_core/lib/src/tools/modify.dart\n M packages/mmx_core/lib/src/tools/plane_cut.dart\n M packages/mmx_core/pubspec.yaml\n M packages/mmx_core/test/mix_test.dart\n M packages/mmx_core/tool/bench.dart\n M tool/verify.sh\n?? .gitattributes\n?? AGENTS.md\n?? apps/mmx_studio/integration_test/desktop_workflow_test.dart\n?? apps/mmx_studio/lib/state/manipulator.dart\n?? apps/mmx_studio/lib/state/spatial_cache.dart\n?? apps/mmx_studio/lib/state/worker_runtime.dart\n?? apps/mmx_studio/lib/state/workers.dart\n?? apps/mmx_studio/lib/ui/gizmo.dart\n?? apps/mmx_studio/test/interaction_test.dart\n?? apps/mmx_studio/test/recovery_test.dart\n?? apps/mmx_studio/test/transaction_test.dart\n?? apps/mmx_studio/test/worker_runtime_test.dart\n?? docs/PRODUCTION-READINESS.md\n?? docs/RELEASE.md\n?? packages/mmx_core/lib/src/io/atomic_file.dart\n?? packages/mmx_core/lib/src/io/polygon_triangulation.dart\n?? packages/mmx_core/lib/src/io/project.dart\n?? packages/mmx_core/lib/src/mesh/attributes.dart\n?? packages/mmx_core/lib/src/mesh/limits.dart\n?? packages/mmx_core/test/geometry_acceptance_test.dart\n?? packages/mmx_core/test/io_fidelity_test.dart\n?? packages/mmx_core/test/performance_test.dart\n?? packages/mmx_core/test/production_test.dart\n?? packages/mmx_core/tool/corpus/README.md\n?? packages/mmx_core/tool/corpus/analytic_meshes.dart\n?? packages/mmx_core/tool/performance.dart\n?? packages/mmx_core/tool/performance_support.dart\n?? packages/mmx_core/tool/validate_corpus.dart\n?? tool/check_coverage.dart\n?? tool/collect_licenses.py\n?? tool/package_release.py\n?? tool/release/sign_macos.sh\n?? tool/release/sign_windows.ps1\n?? tool/release/windows.iss\n?? tool/test_package_release.py",
+    "executableSha256": "aa2e6ee0b4faf1c26e83a3ac8ec677b68ebf18b8f12c957a6188e42c43f9aa89",
+    "fixtureSha256": "8344b49fefcb1c5bcd5b1119152d6bbe15ffb71374709038468cfd34c08636de",
+    "kernelWorkingTreeSha256": "a38539c4262a577704efecf47aca32713fcf62b9d3b6a9b27b3a3e29b348a3ea",
+    "benchmarkWorkingTreeSha256": "dcdfa869f7b379a6382782d548e7dc23fb1e74f3a7c42d182d9c2e25afca7be5"
+  },
+  "cases": {
+    "12k/reduce": {
+      "samplesMicroseconds": [
+        49283,
+        40570,
+        48756
+      ],
+      "medianMicroseconds": 48756,
+      "minMicroseconds": 40570,
+      "maxMicroseconds": 49283,
+      "processPeakRssBytes": 84807680,
+      "rssAfterInputBytes": 9748480,
+      "rssAfterOperationBytes": [
+        73003008,
+        63279104,
+        53420032
+      ],
+      "outputFaces": [
+        6300,
+        6300,
+        6300
+      ],
+      "workerWallMicroseconds": 207658
+    },
+    "12k/remesh": {
+      "samplesMicroseconds": [
+        6375920,
+        6370059,
+        6409704
+      ],
+      "medianMicroseconds": 6375920,
+      "minMicroseconds": 6370059,
+      "maxMicroseconds": 6409704,
+      "processPeakRssBytes": 76259328,
+      "rssAfterInputBytes": 9641984,
+      "rssAfterOperationBytes": [
+        49356800,
+        48832512,
+        48955392
+      ],
+      "outputFaces": [
+        9102,
+        9102,
+        9102
+      ],
+      "workerWallMicroseconds": 25551491
+    },
+    "12k/solid": {
+      "samplesMicroseconds": [
+        338315,
+        344675,
+        342488
+      ],
+      "medianMicroseconds": 342488,
+      "minMicroseconds": 338315,
+      "maxMicroseconds": 344675,
+      "processPeakRssBytes": 76427264,
+      "rssAfterInputBytes": 9723904,
+      "rssAfterOperationBytes": [
+        51507200,
+        52510720,
+        51818496
+      ],
+      "outputFaces": [
+        86512,
+        86512,
+        86512
+      ],
+      "workerWallMicroseconds": 1393649
+    },
+    "100k/reduce": {
+      "samplesMicroseconds": [
+        468474,
+        471426,
+        437102
+      ],
+      "medianMicroseconds": 468474,
+      "minMicroseconds": 437102,
+      "maxMicroseconds": 471426,
+      "processPeakRssBytes": 246689792,
+      "rssAfterInputBytes": 14856192,
+      "rssAfterOperationBytes": [
+        138153984,
+        132120576,
+        197443584
+      ],
+      "outputFaces": [
+        49999,
+        49999,
+        49999
+      ],
+      "workerWallMicroseconds": 1865961
+    },
+    "100k/remesh": {
+      "samplesMicroseconds": [
+        12755816,
+        12907107,
+        12764430
+      ],
+      "medianMicroseconds": 12764430,
+      "minMicroseconds": 12755816,
+      "maxMicroseconds": 12907107,
+      "processPeakRssBytes": 212004864,
+      "rssAfterInputBytes": 14659584,
+      "rssAfterOperationBytes": [
+        56844288,
+        57987072,
+        59666432
+      ],
+      "outputFaces": [
+        6936,
+        6936,
+        6936
+      ],
+      "workerWallMicroseconds": 51396438
+    },
+    "100k/solid": {
+      "samplesMicroseconds": [
+        1003077,
+        1007845,
+        1005928
+      ],
+      "medianMicroseconds": 1005928,
+      "minMicroseconds": 1003077,
+      "maxMicroseconds": 1007845,
+      "processPeakRssBytes": 94752768,
+      "rssAfterInputBytes": 14995456,
+      "rssAfterOperationBytes": [
+        56586240,
+        52502528,
+        57147392
+      ],
+      "outputFaces": [
+        86608,
+        86608,
+        86608
+      ],
+      "workerWallMicroseconds": 4080031
+    }
+  }
+}
